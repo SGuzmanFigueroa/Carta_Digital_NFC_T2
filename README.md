@@ -79,4 +79,4 @@ npm run dev
 ```
 
 ---
-*GastroPulse OS - Plataforma SaaS Multi-tenant.*
+*.*
