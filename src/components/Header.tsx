@@ -1,0 +1,234 @@
+import React, { useState } from 'react';
+import { ScreenTab } from '../types';
+
+interface HeaderProps {
+  currentTab: ScreenTab;
+  onSelectTab: (tab: ScreenTab) => void;
+  activeOrdersCount: number;
+  urgentCount: number;
+}
+
+export const Header: React.FC<HeaderProps> = ({
+  currentTab,
+  onSelectTab,
+  activeOrdersCount,
+  urgentCount
+}) => {
+  const [bistroOpen, setBistroOpen] = useState(false);
+  const [selectedBistro, setSelectedBistro] = useState('AUREA Bistro');
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+
+  const notifications = [
+    { id: 1, title: 'Demora Crítica: Mesa 02', desc: 'Comanda #104 supera en 8m el tiempo estándar de pase', time: 'Hace 2m', type: 'urgent' },
+    { id: 2, title: 'Salida simultánea', desc: 'Mesa 04 requiere sincronía entre Frío y Grill', time: 'Hace 4m', type: 'info' },
+    { id: 3, title: 'Runner Mateo asignado', desc: 'Comanda #105 recogida para Terraza Central', time: 'Hace 6m', type: 'success' },
+    { id: 4, title: 'Alérgenos en comanda #104', desc: 'Protocolo frutos secos activo en partida P1', time: 'Hace 15m', type: 'urgent' }
+  ];
+
+  const bistros = ['AUREA Bistro (Principal)', 'AUREA Rooftop Lounge', 'AUREA Privé Salón'];
+
+  return (
+    <header className="fixed top-0 left-0 right-0 z-50 bg-[#0e0e10]/95 backdrop-blur-xl border-b border-[#353437]/50 h-16">
+      <div className="h-full w-full px-4 lg:px-8 flex items-center justify-between gap-4">
+        {/* Left Brand and Status */}
+        <div className="flex items-center gap-4 shrink-0">
+          {/* Logo */}
+          <div 
+            className="flex items-center gap-2 cursor-pointer select-none"
+            onClick={() => onSelectTab('cocina_kds')}
+          >
+            <div className="w-7 h-7 rounded bg-[#ff5708] flex items-center justify-center shadow-lg shadow-[#ff5708]/30">
+              <span className="material-symbols-outlined text-[#0e0e10] text-[18px] font-bold">restaurant_menu</span>
+            </div>
+            <span className="text-[18px] tracking-tight font-bold text-[#e5e1e4] uppercase font-sans">
+              GASTROPULSE<span className="text-[#ffb59c] font-normal text-[12px] ml-1 tracking-normal font-mono-code">OS</span>
+            </span>
+          </div>
+
+          <div className="h-4 w-px bg-[#353437]"></div>
+
+          {/* Restaurant Selector Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setBistroOpen(!bistroOpen)}
+              className="flex items-center gap-1.5 bg-[#1c1b1d] hover:bg-[#2a2a2c] px-2.5 py-1 rounded border border-[#353437]/50 text-left transition-colors"
+            >
+              <span className="material-symbols-outlined text-[#ff5708] text-[16px]">storefront</span>
+              <span className="text-[13px] text-[#e5e1e4] font-semibold">{selectedBistro}</span>
+              <span className="material-symbols-outlined text-[#c6c5cf] text-[16px]">expand_more</span>
+            </button>
+
+            {bistroOpen && (
+              <div className="absolute top-full mt-1.5 left-0 w-64 bg-[#1c1b1d] border border-[#353437] rounded-lg shadow-2xl p-1 z-50">
+                <div className="text-[11px] font-mono-code text-[#71717a] px-2 py-1 uppercase tracking-wider font-bold">Sedes & Ámbitos</div>
+                {bistros.map((b) => (
+                  <button
+                    key={b}
+                    onClick={() => {
+                      setSelectedBistro(b);
+                      setBistroOpen(false);
+                    }}
+                    className={`w-full text-left px-2.5 py-1.5 rounded text-[13px] flex items-center justify-between hover:bg-[#2a2a2c] transition-colors ${
+                      selectedBistro === b ? 'text-[#ff5708] font-bold bg-[#ff5708]/10' : 'text-[#e5e1e4]'
+                    }`}
+                  >
+                    <span>{b}</span>
+                    {selectedBistro === b && (
+                      <span className="material-symbols-outlined text-[16px]">check</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* WebSocket Online Tag */}
+          <div className="hidden md:flex items-center gap-1.5 px-2 py-1 rounded bg-[#0e0e10] border border-[#353437]/40">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span className="font-mono-code text-[11px] text-[#c6c5cf] font-bold tracking-wider">WS ONLINE</span>
+            <span className="font-mono-code text-[11px] text-[#71717a]">24ms</span>
+          </div>
+        </div>
+
+        {/* Center Navigation Tabs (Pantallas del sistema) */}
+        <nav className="hidden xl:flex items-center gap-1 h-full">
+          <button
+            onClick={() => onSelectTab('central_pedidos')}
+            className={`h-full flex items-center px-3.5 font-sans text-[13px] font-medium transition-colors border-b-2 ${
+              currentTab === 'central_pedidos'
+                ? 'bg-[#2a2a2c] text-[#e5e1e4] font-semibold border-[#ff5708]'
+                : 'border-transparent text-[#bcbbc5] hover:text-[#e5e1e4] hover:bg-[#1c1b1d]'
+            }`}
+          >
+            Central de Pedidos
+          </button>
+
+          <button
+            onClick={() => onSelectTab('cocina_kds')}
+            className={`h-full flex items-center gap-1.5 px-3.5 font-sans text-[13px] font-medium transition-colors border-b-2 ${
+              currentTab === 'cocina_kds'
+                ? 'bg-[#2a2a2c] text-[#e5e1e4] font-semibold border-[#ff5708]'
+                : 'border-transparent text-[#bcbbc5] hover:text-[#e5e1e4] hover:bg-[#1c1b1d]'
+            }`}
+          >
+            <span>Cocina KDS</span>
+            {activeOrdersCount > 0 && (
+              <span className={`px-1.5 py-0.2 rounded text-[11px] font-mono-code font-bold ${
+                urgentCount > 0 ? 'bg-[#93000a] text-white animate-pulse' : 'bg-[#ff5708]/30 text-[#ffb59c]'
+              }`}>
+                {activeOrdersCount}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => onSelectTab('panel_admin')}
+            className={`h-full flex items-center px-3.5 font-sans text-[13px] font-medium transition-colors border-b-2 ${
+              currentTab === 'panel_admin'
+                ? 'bg-[#2a2a2c] text-[#e5e1e4] font-semibold border-[#ff5708]'
+                : 'border-transparent text-[#bcbbc5] hover:text-[#e5e1e4] hover:bg-[#1c1b1d]'
+            }`}
+          >
+            Panel Admin
+          </button>
+
+          <button
+            onClick={() => onSelectTab('gestion_usuarios')}
+            className={`h-full flex items-center px-3.5 font-sans text-[13px] font-medium transition-colors border-b-2 ${
+              currentTab === 'gestion_usuarios'
+                ? 'bg-[#2a2a2c] text-[#e5e1e4] font-semibold border-[#ff5708]'
+                : 'border-transparent text-[#bcbbc5] hover:text-[#e5e1e4] hover:bg-[#1c1b1d]'
+            }`}
+          >
+            Gestión de Usuarios
+          </button>
+
+          <button
+            onClick={() => onSelectTab('configuracion')}
+            className={`h-full flex items-center px-3.5 font-sans text-[13px] font-medium transition-colors border-b-2 ${
+              currentTab === 'configuracion'
+                ? 'bg-[#2a2a2c] text-[#e5e1e4] font-semibold border-[#ff5708]'
+                : 'border-transparent text-[#bcbbc5] hover:text-[#e5e1e4] hover:bg-[#1c1b1d]'
+            }`}
+          >
+            Configuración
+          </button>
+        </nav>
+
+        {/* Mobile/Tablet Screen Selector Drawer Toggle */}
+        <div className="flex xl:hidden items-center gap-1">
+          <select
+            value={currentTab}
+            onChange={(e) => onSelectTab(e.target.value as ScreenTab)}
+            className="bg-[#1c1b1d] text-[#e5e1e4] border border-[#353437] text-[12px] font-semibold rounded px-2.5 py-1.5"
+          >
+            <option value="cocina_kds">Cocina KDS ({activeOrdersCount})</option>
+            <option value="central_pedidos">Central de Pedidos</option>
+            <option value="panel_admin">Panel Admin</option>
+            <option value="gestion_usuarios">Gestión de Usuarios</option>
+            <option value="configuracion">Configuración</option>
+          </select>
+        </div>
+
+        {/* Right Controls: Notifications & Staff Profile */}
+        <div className="flex items-center gap-3 shrink-0">
+          {/* Notifications button */}
+          <div className="relative">
+            <button
+              onClick={() => setNotificationsOpen(!notificationsOpen)}
+              className="w-9 h-9 rounded flex items-center justify-center text-[#c6c5cf] hover:text-[#e5e1e4] hover:bg-[#2a2a2c] transition-colors relative"
+              aria-label="Notificaciones"
+            >
+              <span className="material-symbols-outlined text-[20px]">notifications</span>
+              <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-[#ff5708]"></span>
+            </button>
+
+            {notificationsOpen && (
+              <div className="absolute top-full mt-2 right-0 w-80 sm:w-96 bg-[#1c1b1d] border border-[#353437] rounded-xl shadow-2xl p-3 z-50">
+                <div className="flex items-center justify-between pb-2 border-b border-[#353437]/60 mb-2">
+                  <div className="font-bold text-[13px] text-[#e5e1e4]">Bitácora de Pase en Vivo</div>
+                  <span className="text-[11px] font-mono-code text-[#ff5708]">4 NUEVAS</span>
+                </div>
+                <div className="flex flex-col gap-2 max-h-80 overflow-y-auto">
+                  {notifications.map((n) => (
+                    <div
+                      key={n.id}
+                      className={`p-2.5 rounded-lg border text-left text-[12px] transition-colors ${
+                        n.type === 'urgent'
+                          ? 'bg-[#93000a]/20 border-[#ffb4ab]/30 text-white'
+                          : 'bg-[#201f22] border-[#353437] text-[#e5e1e4]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between font-bold text-[12px]">
+                        <span>{n.title}</span>
+                        <span className="text-[10px] font-mono-code text-[#71717a]">{n.time}</span>
+                      </div>
+                      <div className="text-[11px] text-[#a1a1aa] mt-0.5">{n.desc}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="h-4 w-px bg-[#353437]"></div>
+
+          {/* Chef Profile Badge */}
+          <div className="flex items-center gap-2.5 pl-1">
+            <div className="text-right hidden sm:block">
+              <div className="text-[13px] text-[#e5e1e4] leading-tight font-semibold">Chef Ejecutivo</div>
+              <div className="text-[11px] text-[#c6c5cf]">Servicio Activo</div>
+            </div>
+            <div className="w-8 h-8 rounded-full bg-[#ffb59c] flex items-center justify-center overflow-hidden border border-[#ff5708]">
+              <img
+                src="https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=100&auto=format&fit=crop&q=80"
+                alt="Chef"
+                className="w-full h-full object-cover"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+};

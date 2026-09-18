@@ -2,23 +2,99 @@
 
 @theme {
   /* GastroPulse Custom Colors */
-  --color-obsidian: #13151A;
-  --color-obsidian-light: #1E2026;
-  --color-obsidian-lighter: #2A2D35;
-  --color-kinetic-amber: #FF5A1F;
-  --color-kinetic-amber-light: #FF723B;
-  --color-esmeralda: #10B981;
+  --color-obsidian: #0b0c0e;
+  --color-obsidian-light: #15161a;
+  --color-obsidian-lighter: #1e1f26;
+  --color-kinetic-amber: #ff5708;
+  --color-kinetic-amber-light: #ff723b;
+  --color-esmeralda: #10b981;
   
-  --color-background: var(--color-obsidian);
-  --color-foreground: #F3F4F6; /* Gray 100 */
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-background: #0b0c0e;
+  --color-foreground: #e5e1e4;
+  --font-sans: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-space-mono), 'Space Mono', monospace;
+
+  /* Figma Palette Tokens */
+  --color-primary: #ff5708;
+  --color-primary-container: #ff5708;
+  --color-primary-fixed: #ffdbcf;
+  --color-primary-fixed-dim: #ffb59c;
+  --color-on-primary: #ffffff;
+  --color-on-primary-container: #ffffff;
+
+  --color-surface: #121317;
+  --color-surface-dim: #0b0c0e;
+  --color-surface-bright: #2d2e37;
+  --color-surface-container-lowest: #0b0c0e;
+  --color-surface-container-low: #15161a;
+  --color-surface-container: #1c1d23;
+  --color-surface-container-high: #24252d;
+  --color-surface-container-highest: #2d2e38;
+  --color-surface-variant: #343640;
+
+  --color-on-surface: #f3f4f6;
+  --color-on-surface-variant: #9ca3af;
+  --color-secondary: #9fa1ac;
+  --color-secondary-container: #363842;
+  --color-secondary-fixed: #e2e8f0;
+  --color-on-secondary: #ffffff;
+
+  --color-tertiary: #38bdf8;
+  --color-tertiary-container: #0f2e4a;
+  --color-on-tertiary: #082f49;
+
+  --color-error: #ef4444;
+  --color-error-container: #881414;
+  --color-on-error: #ffffff;
+  --color-on-error-container: #ffdad6;
+
+  --font-headline-md: var(--font-geist-sans), system-ui, sans-serif;
+  --font-headline-lg: var(--font-geist-sans), system-ui, sans-serif;
+  --font-label-code: var(--font-space-mono), 'Space Mono', monospace;
+  --font-label-md: var(--font-geist-sans), system-ui, sans-serif;
+  --font-label-sm: var(--font-geist-sans), system-ui, sans-serif;
+  --font-body-md: var(--font-geist-sans), system-ui, sans-serif;
+  --font-body-sm: var(--font-geist-sans), system-ui, sans-serif;
 }
 
 body {
-  background-color: var(--color-background);
-  color: var(--color-foreground);
+  background-color: #0b0c0e;
+  color: #e5e1e4;
   font-family: var(--font-sans), sans-serif;
-  /* Disable pull-to-refresh on mobile for an app-like feel */
   overscroll-behavior-y: none;
+}
+
+/* Material Symbols Outlined font-face and ligature rendering */
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined' !important;
+  font-weight: normal;
+  font-style: normal;
+  font-size: 20px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none !important;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'liga';
+  user-select: none;
+  vertical-align: middle;
+}
+
+/* Space Mono utility */
+.font-mono-code {
+  font-family: var(--font-space-mono), 'Space Mono', monospace;
+}
+
+/* Custom scrollbars */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }

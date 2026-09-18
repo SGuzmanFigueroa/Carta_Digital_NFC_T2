@@ -23,6 +23,7 @@
 # misc
 .DS_Store
 *.pem
+*.zip
 
 # debug
 npm-debug.log*
@@ -40,5 +41,10 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# AI Agents Configuration
+# AI Agents Configuration & auto-generated notes
 .agents/
+AGENTS.md
+CLAUDE.md
+
+# Raw design exports and temp dumps
+figma_exports/
