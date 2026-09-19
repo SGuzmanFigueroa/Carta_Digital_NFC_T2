@@ -7,7 +7,7 @@ const securityHeaders = [
   },
   {
     key: "X-Frame-Options",
-    value: "DENY",
+    value: "SAMEORIGIN", // Permite emuladores móviles, iframes de pruebas y extensiones
   },
   {
     key: "X-Content-Type-Options",
@@ -19,7 +19,7 @@ const securityHeaders = [
   },
   {
     key: "Permissions-Policy",
-    value: "camera=(), microphone=(), geolocation=(), browsing-topics=()",
+    value: "camera=(), microphone=(), geolocation=()",
   },
   {
     key: "X-XSS-Protection",
