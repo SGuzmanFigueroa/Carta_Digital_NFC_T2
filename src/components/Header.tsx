@@ -17,6 +17,7 @@ export const Header: React.FC<HeaderProps> = ({
   const [bistroOpen, setBistroOpen] = useState(false);
   const [selectedBistro, setSelectedBistro] = useState('AUREA Bistro');
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   const notifications = [
     { id: 1, title: 'Demora Crítica: Mesa 02', desc: 'Comanda #104 supera en 8m el tiempo estándar de pase', time: 'Hace 2m', type: 'urgent' },
@@ -213,19 +214,65 @@ export const Header: React.FC<HeaderProps> = ({
 
           <div className="h-4 w-px bg-[#353437]"></div>
 
-          {/* Chef Profile Badge */}
-          <div className="flex items-center gap-2 pl-0.5 shrink-0">
-            <div className="text-right hidden 2xl:block">
-              <div className="text-[12px] text-[#e5e1e4] leading-tight font-semibold">Chef Ejecutivo</div>
-              <div className="text-[10px] text-[#c6c5cf]">Servicio Activo</div>
-            </div>
-            <div className="w-8 h-8 rounded-full bg-[#ffb59c] flex items-center justify-center overflow-hidden border border-[#ff5708] shrink-0">
-              <img
-                src="https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=100&auto=format&fit=crop&q=80"
-                alt="Chef"
-                className="w-full h-full object-cover"
-              />
-            </div>
+          {/* Chef Profile & Session Menu Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setUserMenuOpen(!userMenuOpen)}
+              className="flex items-center gap-2 pl-0.5 shrink-0 cursor-pointer hover:opacity-90 transition-opacity"
+              title="Sesión de Personal / Acceso GastroPulse"
+            >
+              <div className="text-right hidden 2xl:block">
+                <div className="text-[12px] text-[#e5e1e4] leading-tight font-semibold">Chef Ejecutivo</div>
+                <div className="text-[10px] text-emerald-400 font-mono-code flex items-center justify-end gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                  <span>En Turno</span>
+                </div>
+              </div>
+              <div className="w-8 h-8 rounded-full bg-[#ffb59c] flex items-center justify-center overflow-hidden border border-[#ff5708] shrink-0 shadow-sm">
+                <img
+                  src="https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=100&auto=format&fit=crop&q=80"
+                  alt="Chef"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            </button>
+
+            {userMenuOpen && (
+              <div className="absolute top-full mt-2 right-0 w-56 bg-[#1c1b1d] border border-[#353437] rounded-xl shadow-2xl p-1.5 z-50 animate-fadeIn">
+                <div className="px-2.5 py-2 border-b border-[#353437]/60 mb-1">
+                  <div className="text-[12px] font-bold text-[#e5e1e4]">Kenji Takahashi</div>
+                  <div className="text-[10px] font-mono-code text-[#ffb59c]">Chef Ejecutivo • KDS Master</div>
+                  <div className="text-[10px] text-[#71717a] mt-0.5">Terminal: TERM-04</div>
+                </div>
+
+                <a
+                  href="/login"
+                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-[12px] flex items-center gap-2 text-[#e5e1e4] hover:bg-[#2a2a2c] hover:text-[#ff5708] transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[16px] text-[#ff5708]">badge</span>
+                  <span>Cambiar Usuario / PIN</span>
+                </a>
+
+                <a
+                  href="/menu"
+                  target="_blank"
+                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-[12px] flex items-center gap-2 text-[#c6c5cf] hover:bg-[#2a2a2c] hover:text-white transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[16px] text-[#a1c9ff]">qr_code_scanner</span>
+                  <span>Abrir Carta Digital NFC</span>
+                </a>
+
+                <div className="h-px bg-[#353437]/60 my-1"></div>
+
+                <a
+                  href="/login"
+                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-[12px] flex items-center gap-2 text-[#ffb4ab] hover:bg-[#93000a]/30 transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[16px]">logout</span>
+                  <span>Cerrar Turno & Salir</span>
+                </a>
+              </div>
+            )}
           </div>
         </div>
       </div>
