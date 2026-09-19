@@ -35,6 +35,7 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} ${spaceMono.variable} dark antialiased`}
     >
       <head>
+        <link rel="preload" href="/fonts/material-symbols-outlined.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
           rel="preconnect"
