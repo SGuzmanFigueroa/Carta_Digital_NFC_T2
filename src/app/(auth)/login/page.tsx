@@ -1,24 +1,38 @@
 'use client';
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { LoginScreen } from '@/components/LoginScreen';
 import { INITIAL_STAFF } from '@/data/mockData';
 import { AuthUser } from '@/types';
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [toast, setToast] = useState<{ message: string; icon?: string } | null>(null);
 
   const showToast = (message: string, icon = 'info') => {
     setToast({ message, icon });
-    setTimeout(() => setToast(null), 3000);
+    setTimeout(() => setToast(null), 3500);
   };
+
+  useEffect(() => {
+    const reason = searchParams.get('reason');
+    if (reason === 'unauthenticated') {
+      showToast('Acceso restringido. Inicia sesión con tus credenciales de personal.', 'lock');
+    } else if (reason === 'unauthorized' || searchParams.get('denied')) {
+      showToast('Tu rol actual no tiene permisos para el panel ejecutivo.', 'security');
+    }
+  }, [searchParams]);
 
   const handleLoginSuccess = (user: AuthUser) => {
     showToast(`Bienvenido/a, ${user.name}. Acceso a ${user.roleTitle}`, 'verified');
+    const redirectParam = searchParams.get('redirect');
+
     setTimeout(() => {
-      if (user.role === 'kitchen') {
+      if (redirectParam && redirectParam.startsWith('/')) {
+        router.push(redirectParam);
+      } else if (user.role === 'kitchen') {
         router.push('/kds');
       } else if (user.role === 'admin') {
         router.push('/dashboard');
@@ -51,5 +65,13 @@ export default function LoginPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#0e0e10]" />}>
+      <LoginContent />
+    </Suspense>
   );
 }

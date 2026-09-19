@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ScreenTab } from '../types';
+import { useRestaurant } from '../context/RestaurantContext';
 
 interface HeaderProps {
   currentTab: ScreenTab;
@@ -14,6 +15,7 @@ export const Header: React.FC<HeaderProps> = ({
   activeOrdersCount,
   urgentCount
 }) => {
+  const { currentUser, lockTerminal, logoutUser } = useRestaurant();
   const [bistroOpen, setBistroOpen] = useState(false);
   const [selectedBistro, setSelectedBistro] = useState('AUREA Bistro');
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -27,6 +29,14 @@ export const Header: React.FC<HeaderProps> = ({
   ];
 
   const bistros = ['AUREA Bistro (Principal)', 'AUREA Rooftop Lounge', 'AUREA Privé Salón'];
+
+  const roleNameMap: Record<string, string> = {
+    admin: 'Gerente General',
+    kitchen: 'Jefe de Partida / Cocina',
+    floor: 'Capitán de Sala',
+    bar: 'Jefe de Barra',
+    runner: 'Personal Runner'
+  };
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-[#0e0e10]/95 backdrop-blur-xl border-b border-[#353437]/50 h-16 w-full">
@@ -86,8 +96,8 @@ export const Header: React.FC<HeaderProps> = ({
           {/* WebSocket Online Tag (visible on 2xl or xl) */}
           <div className="hidden 2xl:flex items-center gap-1.5 px-2 py-1 rounded bg-[#0e0e10] border border-[#353437]/40 shrink-0">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span className="font-mono-code text-[11px] text-[#c6c5cf] font-bold tracking-wider">WS ONLINE</span>
-            <span className="font-mono-code text-[11px] text-[#71717a]">24ms</span>
+            <span className="font-mono-code text-[11px] text-[#c6c5cf] font-bold tracking-wider">SECURE SYNC</span>
+            <span className="font-mono-code text-[11px] text-emerald-400">ENCRYPTED</span>
           </div>
         </div>
 
@@ -171,13 +181,23 @@ export const Header: React.FC<HeaderProps> = ({
           </select>
         </div>
 
-        {/* Right Controls: Notifications & Staff Profile */}
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0 ml-auto">
+        {/* Right Controls: Quick Lock, Notifications & Staff Profile */}
+        <div className="flex items-center gap-2 sm:gap-2.5 shrink-0 ml-auto">
+          {/* Quick Lock Button */}
+          <button
+            onClick={lockTerminal}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#1c1b1d] hover:bg-[#2a2a2c] text-[#bcbbc5] hover:text-[#ff5708] border border-[#353437] transition-all text-[11px] font-semibold"
+            title="Bloquear Terminal Inmediatamente (PIN requerido para volver)"
+          >
+            <span className="material-symbols-outlined text-[16px] text-amber-500">lock</span>
+            <span className="hidden sm:inline">Bloquear</span>
+          </button>
+
           {/* Notifications button */}
           <div className="relative">
             <button
               onClick={() => setNotificationsOpen(!notificationsOpen)}
-              className="w-8 h-8 sm:w-9 sm:h-9 rounded flex items-center justify-center text-[#c6c5cf] hover:text-[#e5e1e4] hover:bg-[#2a2a2c] transition-colors relative cursor-pointer"
+              className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center text-[#c6c5cf] hover:text-[#e5e1e4] hover:bg-[#2a2a2c] border border-transparent hover:border-[#353437] transition-colors relative cursor-pointer"
               aria-label="Notificaciones"
             >
               <span className="material-symbols-outlined text-[19px] sm:text-[20px]">notifications</span>
@@ -222,28 +242,46 @@ export const Header: React.FC<HeaderProps> = ({
               title="Sesión de Personal / Acceso GastroPulse"
             >
               <div className="text-right hidden 2xl:block">
-                <div className="text-[12px] text-[#e5e1e4] leading-tight font-semibold">Chef Ejecutivo</div>
+                <div className="text-[12px] text-[#e5e1e4] leading-tight font-semibold">
+                  {currentUser?.name || 'Chef Ejecutivo'}
+                </div>
                 <div className="text-[10px] text-emerald-400 font-mono-code flex items-center justify-end gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                  <span>En Turno</span>
+                  <span>{currentUser ? (currentUser.roleTitle || roleNameMap[currentUser.role] || currentUser.role) : 'En Turno'}</span>
                 </div>
               </div>
               <div className="w-8 h-8 rounded-full bg-[#ffb59c] flex items-center justify-center overflow-hidden border border-[#ff5708] shrink-0 shadow-sm">
                 <img
                   src="https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=100&auto=format&fit=crop&q=80"
-                  alt="Chef"
+                  alt="Staff"
                   className="w-full h-full object-cover"
                 />
               </div>
             </button>
 
             {userMenuOpen && (
-              <div className="absolute top-full mt-2 right-0 w-56 bg-[#1c1b1d] border border-[#353437] rounded-xl shadow-2xl p-1.5 z-50 animate-fadeIn">
+              <div className="absolute top-full mt-2 right-0 w-60 bg-[#1c1b1d] border border-[#353437] rounded-xl shadow-2xl p-1.5 z-50 animate-fadeIn">
                 <div className="px-2.5 py-2 border-b border-[#353437]/60 mb-1">
-                  <div className="text-[12px] font-bold text-[#e5e1e4]">Kenji Takahashi</div>
-                  <div className="text-[10px] font-mono-code text-[#ffb59c]">Chef Ejecutivo • KDS Master</div>
-                  <div className="text-[10px] text-[#71717a] mt-0.5">Terminal: TERM-04</div>
+                  <div className="text-[12px] font-bold text-[#e5e1e4]">{currentUser?.name || 'Usuario Activo'}</div>
+                  <div className="text-[10px] font-mono-code text-[#ffb59c]">
+                    {(currentUser?.roleTitle || roleNameMap[currentUser?.role || 'kitchen'])} • {currentUser?.terminal || 'TERM-01'}
+                  </div>
+                  <div className="text-[10px] text-emerald-400 font-mono-code mt-0.5 flex items-center gap-1">
+                    <span className="w-1 h-1 rounded-full bg-emerald-400"></span>
+                    <span>Sesión Autenticada</span>
+                  </div>
                 </div>
+
+                <button
+                  onClick={() => {
+                    setUserMenuOpen(false);
+                    lockTerminal();
+                  }}
+                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-[12px] flex items-center gap-2 text-[#e5e1e4] hover:bg-[#2a2a2c] hover:text-amber-400 transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[16px] text-amber-500">lock</span>
+                  <span>Bloquear Pantalla</span>
+                </button>
 
                 <a
                   href="/login"
@@ -264,13 +302,16 @@ export const Header: React.FC<HeaderProps> = ({
 
                 <div className="h-px bg-[#353437]/60 my-1"></div>
 
-                <a
-                  href="/login"
+                <button
+                  onClick={() => {
+                    setUserMenuOpen(false);
+                    logoutUser();
+                  }}
                   className="w-full text-left px-2.5 py-1.5 rounded-lg text-[12px] flex items-center gap-2 text-[#ffb4ab] hover:bg-[#93000a]/30 transition-colors"
                 >
                   <span className="material-symbols-outlined text-[16px]">logout</span>
-                  <span>Cerrar Turno & Salir</span>
-                </a>
+                  <span>Cerrar Sesión & Salir</span>
+                </button>
               </div>
             )}
           </div>

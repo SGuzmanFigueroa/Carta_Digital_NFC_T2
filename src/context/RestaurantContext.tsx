@@ -1,10 +1,19 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { Ticket, OrderTicket, TableStatus, Runner, MenuItem, StationId, TicketItem } from '../types';
+import { Ticket, OrderTicket, TableStatus, Runner, MenuItem, StationId, TicketItem, AuthUser } from '../types';
 import { INITIAL_TICKETS, INITIAL_RUNNERS } from '../data/initialData';
 import { INITIAL_ORDERS, INITIAL_TABLES, INITIAL_MENU_ITEMS } from '../data/mockData';
 import { kitchenAudio } from '../utils/audio';
+import {
+  sanitizeText,
+  sanitizeNotes,
+  validateTableString,
+  verifyAndSanitizeDishPrice,
+  AuditLogger,
+  AuditLogEntry,
+  clearAuthSessionCookie
+} from '../utils/security';
 
 interface RestaurantContextType {
   // State
@@ -19,6 +28,8 @@ interface RestaurantContextType {
   toast: { message: string; icon?: string } | null;
   dinerActiveTicket: OrderTicket | null;
   audioEnabled: boolean;
+  currentUser: AuthUser | null;
+  isTerminalLocked: boolean;
 
   // Actions
   sendOrderFromMenu: (tableStr: string, cartItems: { item: MenuItem; quantity: number; notes?: string }[], pax?: number) => OrderTicket;
@@ -38,6 +49,10 @@ interface RestaurantContextType {
   resetAllDemoData: () => void;
   simulateNewOrder: () => void;
   createNewKdsTicket: (ticket: Ticket) => void;
+  logoutUser: () => void;
+  lockTerminal: () => void;
+  unlockTerminalWithPin: (pin: string) => boolean;
+  logSecurityEvent: (entry: Omit<AuditLogEntry, 'id' | 'timestamp' | 'isoDate'>) => AuditLogEntry;
 }
 
 const RestaurantContext = createContext<RestaurantContextType | undefined>(undefined);
@@ -47,6 +62,17 @@ const STORAGE_KEY_ORDERS = 'gastropulse_orders_v1';
 const STORAGE_KEY_TABLES = 'gastropulse_tables_v1';
 const STORAGE_KEY_REVENUE = 'gastropulse_revenue_v1';
 const STORAGE_KEY_DINER = 'gastropulse_diner_ticket_v1';
+const STORAGE_KEY_AUTH = 'gastropulse_auth_user';
+
+const ALLOWED_BROADCAST_ACTIONS = [
+  'NEW_ORDER',
+  'UPDATE_TICKETS',
+  'UPDATE_TABLES',
+  'UPDATE_RUNNERS',
+  'DINER_STATUS_UPDATE',
+  'PRIORITIZE_TABLE',
+  'RUNNER_ALERT'
+];
 
 export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [tickets, setTickets] = useState<Ticket[]>(INITIAL_TICKETS);
@@ -59,7 +85,10 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
   const [lastDispatchedTicket, setLastDispatchedTicket] = useState<Ticket | null>(null);
   const [toast, setToast] = useState<{ message: string; icon?: string } | null>(null);
   const [dinerActiveTicket, setDinerActiveTicket] = useState<OrderTicket | null>(null);
-  const [isClient, setIsClient] = useState(false);
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [isTerminalLocked, setIsTerminalLocked] = useState<boolean>(false);
+  const [quickUnlockPin, setQuickUnlockPin] = useState<string>('');
+  const [quickUnlockError, setQuickUnlockError] = useState<string>('');
 
   const showToast = useCallback((message: string, icon = 'check_circle') => {
     setToast({ message, icon });
@@ -80,6 +109,72 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
     });
   }, [showToast]);
 
+  const logSecurityEvent = useCallback(
+    (entry: Omit<AuditLogEntry, 'id' | 'timestamp' | 'isoDate'>) => {
+      return AuditLogger.log({
+        user: entry.user || currentUser?.name,
+        role: entry.role || currentUser?.role,
+        ...entry
+      });
+    },
+    [currentUser]
+  );
+
+  const logoutUser = useCallback(() => {
+    setCurrentUser(null);
+    setIsTerminalLocked(false);
+    clearAuthSessionCookie();
+    try {
+      localStorage.removeItem(STORAGE_KEY_AUTH);
+    } catch {}
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login';
+    }
+  }, []);
+
+  const lockTerminal = useCallback(() => {
+    setIsTerminalLocked(true);
+    setQuickUnlockPin('');
+    setQuickUnlockError('');
+    AuditLogger.log({
+      eventType: 'SESSION_LOCKED',
+      severity: 'INFO',
+      user: currentUser?.name || 'TERMINAL',
+      details: 'Terminal bloqueada manualmente por el operador'
+    });
+  }, [currentUser]);
+
+  const unlockTerminalWithPin = useCallback(
+    (pin: string): boolean => {
+      const targetPin = currentUser?.pin || '1234';
+      if (pin === targetPin) {
+        setIsTerminalLocked(false);
+        setQuickUnlockPin('');
+        setQuickUnlockError('');
+        AuditLogger.log({
+          eventType: 'SESSION_UNLOCKED',
+          severity: 'INFO',
+          user: currentUser?.name || 'TERMINAL',
+          details: 'Terminal desbloqueada con PIN exitosamente'
+        });
+        showToast('Terminal desbloqueada', 'lock_open');
+        return true;
+      } else {
+        kitchenAudio.playAllergyWarning();
+        setQuickUnlockError('PIN incorrecto');
+        setQuickUnlockPin('');
+        AuditLogger.log({
+          eventType: 'LOGIN_FAILED',
+          severity: 'WARN',
+          user: currentUser?.name || 'TERMINAL',
+          details: 'Intento fallido de desbloqueo rápido de terminal con PIN'
+        });
+        return false;
+      }
+    },
+    [currentUser, showToast]
+  );
+
   // Broadcast channel for instantaneous cross-tab synchronization
   const broadcastSync = useCallback((action: string, payload: any) => {
     try {
@@ -93,9 +188,8 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
     }
   }, []);
 
-  // Load persisted state on mount
+  // Load persisted state & current user on mount
   useEffect(() => {
-    setIsClient(true);
     try {
       const savedTickets = localStorage.getItem(STORAGE_KEY_TICKETS);
       if (savedTickets) setTickets(JSON.parse(savedTickets));
@@ -111,33 +205,77 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
 
       const savedDiner = localStorage.getItem(STORAGE_KEY_DINER);
       if (savedDiner) setDinerActiveTicket(JSON.parse(savedDiner));
+
+      const savedAuth = localStorage.getItem(STORAGE_KEY_AUTH);
+      if (savedAuth) setCurrentUser(JSON.parse(savedAuth));
     } catch (err) {
       console.warn('Error loading GastroPulse state from storage:', err);
     }
   }, []);
 
-  // Listen to BroadcastChannel events from other tabs (e.g. Menu order placed from diner tab)
+  // Inactivity auto-lock monitor (5 minutes of idle on management terminals)
+  useEffect(() => {
+    if (!currentUser || isTerminalLocked) return;
+
+    let timeoutId: NodeJS.Timeout;
+    const INACTIVITY_LIMIT_MS = 5 * 60 * 1000; // 5 minutes
+
+    const resetTimer = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        setIsTerminalLocked(true);
+        AuditLogger.log({
+          eventType: 'SESSION_LOCKED',
+          severity: 'WARN',
+          user: currentUser.name,
+          details: 'Terminal bloqueada automáticamente por 5 min de inactividad'
+        });
+      }, INACTIVITY_LIMIT_MS);
+    };
+
+    const events = ['mousemove', 'keydown', 'touchstart', 'pointerdown'];
+    events.forEach((ev) => window.addEventListener(ev, resetTimer, { passive: true }));
+    resetTimer();
+
+    return () => {
+      clearTimeout(timeoutId);
+      events.forEach((ev) => window.removeEventListener(ev, resetTimer));
+    };
+  }, [currentUser, isTerminalLocked]);
+
+  // Listen to BroadcastChannel events with strict schema and action validation
   useEffect(() => {
     if (typeof window === 'undefined' || !('BroadcastChannel' in window)) return;
     const channel = new BroadcastChannel('gastropulse_sync_bus');
 
     channel.onmessage = (event) => {
-      const { action, payload } = event.data;
-      if (action === 'NEW_ORDER') {
+      const { action, payload } = event.data || {};
+      
+      // Strict whitelist defense against spoofed or corrupted broadcasts
+      if (!action || !ALLOWED_BROADCAST_ACTIONS.includes(action)) {
+        AuditLogger.log({
+          eventType: 'UNAUTHORIZED_ACCESS_ATTEMPT',
+          severity: 'CRITICAL',
+          details: `Rechazado evento BroadcastChannel no autorizado: ${String(action)}`
+        });
+        return;
+      }
+
+      if (action === 'NEW_ORDER' && payload?.ticket && payload?.order) {
         setTickets((prev) => [payload.ticket, ...prev.filter((t) => t.id !== payload.ticket.id)]);
         setOrders((prev) => [payload.order, ...prev.filter((o) => o.id !== payload.order.id)]);
-        setTables(payload.tables);
+        if (Array.isArray(payload.tables)) setTables(payload.tables);
         kitchenAudio.playDispatchSound();
         showToast(`¡Nueva comanda recibida de ${payload.ticket.table}!`, 'soup_kitchen');
-      } else if (action === 'UPDATE_TICKETS') {
+      } else if (action === 'UPDATE_TICKETS' && Array.isArray(payload?.tickets)) {
         setTickets(payload.tickets);
-      } else if (action === 'UPDATE_TABLES') {
+      } else if (action === 'UPDATE_TABLES' && Array.isArray(payload?.tables)) {
         setTables(payload.tables);
-      } else if (action === 'UPDATE_RUNNERS') {
+      } else if (action === 'UPDATE_RUNNERS' && Array.isArray(payload?.runners)) {
         setRunners(payload.runners);
-      } else if (action === 'DINER_STATUS_UPDATE') {
+      } else if (action === 'DINER_STATUS_UPDATE' && payload?.ticket) {
         setDinerActiveTicket(payload.ticket);
-      } else if (action === 'PRIORITIZE_TABLE') {
+      } else if (action === 'PRIORITIZE_TABLE' && Array.isArray(payload?.tickets)) {
         setTickets(payload.tickets);
         kitchenAudio.playAllergyWarning();
         showToast(`¡Mesa ${payload.tableNumber} marcada con PRIORIDAD!`, 'priority_high');
@@ -190,20 +328,24 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
     []
   );
 
-  // 1. Send Order from Diner Carta Digital NFC (/menu)
+  // 1. Send Order from Diner Carta Digital NFC (/menu) with Sanitization and Anti-Tampering
   const sendOrderFromMenu = useCallback(
     (
       tableStr: string,
       cartItems: { item: MenuItem; quantity: number; notes?: string }[],
       pax = 2
     ): OrderTicket => {
+      // Input sanitization
+      const safeTable = validateTableString(tableStr);
+      const safePax = Math.max(1, Math.min(24, Math.floor(pax) || 2));
       const orderNum = Math.floor(100 + Math.random() * 899);
       const ticketId = `ticket-kds-${Date.now()}`;
       const cmdId = `cmd-${orderNum}`;
       const nowStr = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
 
-      // Determine stations from cart
+      let tamperedPricesFound = 0;
       const stationTags: StationId[] = [];
+
       const kdsItems: TicketItem[] = cartItems.map((c, idx) => {
         let station: StationId = 'wok_saute';
         let badge = 'WOK & SAUTÉ';
@@ -221,7 +363,11 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
           station = 'pasteleria';
           badge = 'PASTELERÍA';
           badgeColor = 'bg-[#c6c5cf] text-[#131315]';
-        } else if (c.item.name.toLowerCase().includes('wagyu') || c.item.name.toLowerCase().includes('pulpo') || c.item.name.toLowerCase().includes('lomo')) {
+        } else if (
+          c.item.name.toLowerCase().includes('wagyu') ||
+          c.item.name.toLowerCase().includes('pulpo') ||
+          c.item.name.toLowerCase().includes('lomo')
+        ) {
           station = 'fuego_grill';
           badge = 'FUEGO & GRILL';
           badgeColor = 'bg-[#ff5708] text-white';
@@ -229,30 +375,46 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
 
         if (!stationTags.includes(station)) stationTags.push(station);
 
+        // Security: verify price against canonical catalog (Anti-Tampering)
+        const { price: canonicalUnitPrice, wasTampered } = verifyAndSanitizeDishPrice(
+          c.item.id,
+          c.item.price,
+          INITIAL_MENU_ITEMS
+        );
+        if (wasTampered) tamperedPricesFound++;
+
+        const safeQuantity = Math.max(1, Math.min(99, Math.floor(c.quantity) || 1));
+        const safeNotes = sanitizeNotes(c.notes);
+        const safeName = sanitizeText(c.item.name, 60);
+
         return {
           id: `item-${Date.now()}-${idx}`,
-          name: `${c.quantity}x ${c.item.name}`,
-          quantity: c.quantity,
+          name: `${safeQuantity}x ${safeName}`,
+          quantity: safeQuantity,
           station,
           stationBadge: badge,
           stationBadgeColor: badgeColor,
           status: 'pendiente',
-          cookingNotes: c.notes ? [c.notes] : ['Pase estándar'],
-          price: c.item.price * c.quantity,
+          cookingNotes: safeNotes ? [safeNotes] : ['Pase estándar'],
+          price: canonicalUnitPrice * safeQuantity,
           photoUrl: c.item.image,
           checked: false,
           prepTimeMinutes: parseInt(c.item.prepTime || '8') || 8
         };
       });
 
-      const totalCart = cartItems.reduce((acc, c) => acc + c.item.price * c.quantity, 0);
+      const totalCart = kdsItems.reduce((acc, i) => acc + i.price, 0);
+
+      if (tamperedPricesFound > 0) {
+        showToast('⚠️ Precios recalculados al valor canónico del menú', 'security');
+      }
 
       // Create KDS Ticket
       const newKdsTicket: Ticket = {
         id: ticketId,
         orderNumber: orderNum,
-        table: tableStr,
-        zone: tableStr.includes('06') ? 'TERRAZA' : tableStr.includes('07') ? 'BARRA MIXOLOGÍA' : 'SALÓN PRINCIPAL',
+        table: safeTable,
+        zone: safeTable.includes('Terraza') ? 'TERRAZA' : safeTable.includes('Barra') ? 'BARRA MIXOLOGÍA' : 'SALÓN PRINCIPAL',
         serviceType: 'Carta Digital NFC',
         elapsedSeconds: 0,
         targetSeconds: 660,
@@ -269,18 +431,18 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
       // Create Diner View OrderTicket
       const newDinerOrder: OrderTicket = {
         id: cmdId,
-        table: tableStr,
-        pax,
+        table: safeTable,
+        pax: safePax,
         timeAgo: 'Justo ahora',
         createdTime: nowStr,
         origin: 'QR COMENSAL',
         status: 'por-validar',
         items: cartItems.map((c, idx) => ({
           id: `it-${Date.now()}-${idx}`,
-          name: `${c.quantity}x ${c.item.name}`,
+          name: `${c.quantity}x ${sanitizeText(c.item.name, 60)}`,
           quantity: c.quantity,
-          price: c.item.price * c.quantity,
-          notes: c.notes,
+          price: (kdsItems[idx]?.price || c.item.price * c.quantity),
+          notes: sanitizeNotes(c.notes),
           station: c.item.category === 'bebidas' ? 'Barra' : 'Cocina'
         })),
         subtotal: totalCart,
@@ -288,13 +450,13 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
       };
 
       // Update Floor Table Status
-      const cleanNum = tableStr.replace(/\D/g, '');
+      const cleanNum = safeTable.replace(/\D/g, '');
       const updatedTables = tables.map((t) => {
-        if (t.number === cleanNum || t.number === tableStr) {
+        if (t.number === cleanNum || safeTable.includes(t.number)) {
           return {
             ...t,
             status: 'qr' as const,
-            pax,
+            pax: safePax,
             amount: (t.amount || 0) + totalCart,
             timeActive: '0 min (QR)',
             dishesCount: `${kdsItems.length} platos`
@@ -313,17 +475,15 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
 
       persistState(updatedTickets, updatedOrders, updatedTables, undefined, newDinerOrder);
 
-      // Play chime sound
       kitchenAudio.playDispatchSound();
 
-      // Cross-tab broadcast
       broadcastSync('NEW_ORDER', {
         ticket: newKdsTicket,
         order: newDinerOrder,
         tables: updatedTables
       });
 
-      showToast(`¡Comanda #${orderNum} enviada a Cocina KDS desde ${tableStr}!`, 'soup_kitchen');
+      showToast(`¡Comanda #${orderNum} enviada a Cocina KDS desde ${safeTable}!`, 'soup_kitchen');
       return newDinerOrder;
     },
     [tickets, orders, tables, persistState, broadcastSync, showToast]
@@ -380,7 +540,6 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
         return t;
       });
 
-      // Update diner ticket status to 'en-cocina'
       if (dinerActiveTicket && (dinerActiveTicket.table === targetTable || targetTable.includes(dinerActiveTicket.table))) {
         const updatedDiner: OrderTicket = { ...dinerActiveTicket, status: 'en-cocina' };
         setDinerActiveTicket(updatedDiner);
@@ -418,7 +577,6 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
         return t;
       });
 
-      // Update matching order in Central de Pedidos to 'pase-listo'
       const cleanTable = ticketToDispatch.table;
       const updatedOrders = orders.map((o) => {
         if (o.table.toUpperCase() === cleanTable.toUpperCase()) {
@@ -427,7 +585,6 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
         return o;
       });
 
-      // Update table in Floor Plan to show 'cuenta' (ready for service/billing)
       const cleanNum = cleanTable.replace(/\D/g, '');
       const updatedTables = tables.map((tbl) => {
         if (tbl.number === cleanNum || tbl.number === cleanTable) {
@@ -436,7 +593,6 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
         return tbl;
       });
 
-      // If diner has this ticket active, update status to 'pase-listo'
       let updatedDiner = dinerActiveTicket;
       if (dinerActiveTicket && (dinerActiveTicket.table === cleanTable || cleanTable.includes(dinerActiveTicket.table))) {
         updatedDiner = { ...dinerActiveTicket, status: 'pase-listo' };
@@ -497,11 +653,19 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
       setTables(updatedTables);
       persistState(updatedTickets, undefined, updatedTables);
 
+      AuditLogger.log({
+        eventType: 'TABLE_PRIORITIZED',
+        severity: 'WARN',
+        user: currentUser?.name || 'SALA TPV',
+        role: currentUser?.role || 'admin',
+        details: `Alerta de prioridad urgente transmitida a cocina para Mesa ${tableNumber}`
+      });
+
       kitchenAudio.playAllergyWarning();
       broadcastSync('PRIORITIZE_TABLE', { tableNumber, tickets: updatedTickets });
       showToast(`¡Prioridad urgente transmitida a Cocina para Mesa ${tableNumber}!`, 'priority_high');
     },
-    [tickets, tables, persistState, broadcastSync, showToast]
+    [tickets, tables, currentUser, persistState, broadcastSync, showToast]
   );
 
   // 7. Collect Table Bill and Free Table (Corte / Cobro)
@@ -510,7 +674,6 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
       const cleanNum = tableNumber.replace(/\D/g, '');
       const billAmount = amount || 165.00;
 
-      // Mark table as free
       const updatedTables = tables.map((tbl) => {
         if (tbl.number === cleanNum || tbl.number === tableNumber) {
           return {
@@ -525,7 +688,6 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
         return tbl;
       });
 
-      // Archive tickets for this table
       const updatedTickets = tickets.map((t) => {
         const ticketNum = t.table.replace(/\D/g, '');
         if (ticketNum === cleanNum || t.table.includes(tableNumber)) {
@@ -534,7 +696,6 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
         return t;
       });
 
-      // If this was diner's active ticket, clear it
       if (dinerActiveTicket && (dinerActiveTicket.table === tableNumber || tableNumber.includes(dinerActiveTicket.table))) {
         setDinerActiveTicket(null);
         persistState(updatedTickets, undefined, updatedTables, totalShiftRevenue + billAmount, null);
@@ -547,25 +708,35 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
       setTickets(updatedTickets);
       setTotalShiftRevenue(newRev);
 
+      AuditLogger.log({
+        eventType: 'TABLE_SETTLED',
+        severity: 'INFO',
+        user: currentUser?.name || 'SALA TPV',
+        role: currentUser?.role || 'admin',
+        details: `Cobro liquidado para Mesa ${tableNumber}: S/ ${billAmount.toFixed(2)}. Mesa liberada.`
+      });
+
       kitchenAudio.playDispatchSound();
       broadcastSync('UPDATE_TABLES', { tables: updatedTables });
       broadcastSync('UPDATE_TICKETS', { tickets: updatedTickets });
       showToast(`Cobro liquidado para Mesa ${tableNumber}: S/ ${billAmount.toFixed(2)}. Mesa liberada.`, 'point_of_sale');
     },
-    [tables, tickets, dinerActiveTicket, totalShiftRevenue, persistState, broadcastSync, showToast]
+    [tables, tickets, dinerActiveTicket, totalShiftRevenue, currentUser, persistState, broadcastSync, showToast]
   );
 
   // 8. Open Table in Floor Plan
   const openTable = useCallback(
     (tableNumber: string, pax = 2, waiter = 'Valeria P.') => {
       const cleanNum = tableNumber.replace(/\D/g, '');
+      const safeWaiter = sanitizeText(waiter, 40) || 'Valeria P.';
+
       const updatedTables = tables.map((tbl) => {
         if (tbl.number === cleanNum || tbl.number === tableNumber) {
           return {
             ...tbl,
             status: 'comiendo' as const,
             pax,
-            waiter,
+            waiter: safeWaiter,
             amount: 0,
             timeActive: '0 min',
             dishesCount: 'Esperando comanda'
@@ -605,13 +776,14 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
   // 11. Update Single Runner Status
   const updateRunnerStatus = useCallback(
     (runnerId: string, status: Runner['status'], table?: string) => {
+      const safeTable = table ? validateTableString(table) : undefined;
       const updated = runners.map((r) => {
         if (r.id === runnerId) {
           return {
             ...r,
             status,
-            currentTable: table,
-            location: status === 'Libre en Pase' ? 'Libre en Pase' : table || 'En Mesa'
+            currentTable: safeTable,
+            location: status === 'Libre en Pase' ? 'Libre en Pase' : safeTable || 'En Mesa'
           };
         }
         return r;
@@ -687,6 +859,8 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
         toast,
         dinerActiveTicket,
         audioEnabled,
+        currentUser,
+        isTerminalLocked,
         sendOrderFromMenu,
         updateTicketItem,
         startTicketPrep,
@@ -703,10 +877,117 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
         showToast,
         resetAllDemoData,
         simulateNewOrder,
-        createNewKdsTicket
+        createNewKdsTicket,
+        logoutUser,
+        lockTerminal,
+        unlockTerminalWithPin,
+        logSecurityEvent
       }}
     >
       {children}
+
+      {/* Terminal Inactivity Quick Lock Screen Overlay */}
+      {isTerminalLocked && currentUser && (
+        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-xl flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-[#161619] max-w-sm w-full rounded-2xl border border-[#ff5708]/50 p-6 space-y-5 text-center shadow-[0_0_50px_rgba(255,87,8,0.25)]">
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-[#ff5708]/20 border border-[#ff5708]/40 flex items-center justify-center text-[#ff5708]">
+              <span className="material-symbols-outlined text-[32px]">lock</span>
+            </div>
+
+            <div>
+              <span className="font-label-code text-[11px] text-[#ffb59c] uppercase font-bold tracking-wider">
+                Terminal Bloqueada por Inactividad
+              </span>
+              <h3 className="text-[20px] font-bold text-white mt-1">{currentUser.name}</h3>
+              <p className="text-[12px] text-[#c6c5cf] mt-0.5 font-label-code">
+                {currentUser.roleTitle} • Ingresa tu PIN para continuar
+              </p>
+            </div>
+
+            {quickUnlockError && (
+              <div className="p-2 rounded-lg bg-[#93000a]/30 border border-[#ffb4ab]/40 text-[#ffb4ab] text-[12px]">
+                {quickUnlockError}
+              </div>
+            )}
+
+            {/* Bullets */}
+            <div className="flex justify-center items-center gap-3 py-1">
+              {[0, 1, 2, 3].map((index) => (
+                <div
+                  key={index}
+                  className={`w-3.5 h-3.5 rounded-full border-2 transition-all ${
+                    quickUnlockPin.length > index
+                      ? 'bg-[#ff5708] border-[#ff5708] shadow-[0_0_10px_#ff5708]'
+                      : 'bg-transparent border-[#353437]'
+                  }`}
+                />
+              ))}
+            </div>
+
+            {/* Numeric Keypad */}
+            <div className="grid grid-cols-3 gap-2 max-w-[220px] mx-auto">
+              {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
+                <button
+                  key={digit}
+                  type="button"
+                  onClick={() => {
+                    if (quickUnlockPin.length < 4) {
+                      const next = quickUnlockPin + digit;
+                      setQuickUnlockPin(next);
+                      if (next.length === 4) {
+                        unlockTerminalWithPin(next);
+                      }
+                    }
+                  }}
+                  className="h-11 rounded-xl bg-[#201f22] hover:bg-[#2a2a2c] active:bg-[#ff5708] text-white font-bold text-[18px] transition-colors cursor-pointer border border-[#353437]/40"
+                >
+                  {digit}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => setQuickUnlockPin('')}
+                className="h-11 rounded-xl bg-[#201f22] hover:bg-[#2a2a2c] text-[#c6c5cf] font-medium text-[11px] flex items-center justify-center cursor-pointer border border-[#353437]/40"
+              >
+                Borrar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (quickUnlockPin.length < 4) {
+                    const next = quickUnlockPin + '0';
+                    setQuickUnlockPin(next);
+                    if (next.length === 4) {
+                      unlockTerminalWithPin(next);
+                    }
+                  }
+                }}
+                className="h-11 rounded-xl bg-[#201f22] hover:bg-[#2a2a2c] active:bg-[#ff5708] text-white font-bold text-[18px] transition-colors cursor-pointer border border-[#353437]/40"
+              >
+                0
+              </button>
+              <button
+                type="button"
+                onClick={() => setQuickUnlockPin((prev) => prev.slice(0, -1))}
+                className="h-11 rounded-xl bg-[#201f22] hover:bg-[#2a2a2c] text-[#c6c5cf] flex items-center justify-center cursor-pointer border border-[#353437]/40"
+              >
+                <span className="material-symbols-outlined text-[18px]">backspace</span>
+              </button>
+            </div>
+
+            <div className="pt-2 border-t border-[#353437]/40 flex items-center justify-between text-[11px]">
+              <span className="text-[#c6c5cf]">¿No eres tú?</span>
+              <button
+                type="button"
+                onClick={logoutUser}
+                className="text-[#ff5708] hover:underline font-semibold cursor-pointer"
+              >
+                Cerrar Sesión
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </RestaurantContext.Provider>
   );
 };

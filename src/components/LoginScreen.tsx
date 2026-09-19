@@ -1,4 +1,6 @@
-﻿import React, { useState } from 'react';
+﻿import React, { useState, useEffect } from 'react';
+import { setAuthSessionCookie, AuditLogger, sanitizeText } from '../utils/security';
+import { kitchenAudio } from '../utils/audio';
 import { AuthUser, StaffMember } from '../types';
 
 interface LoginScreenProps {
@@ -26,11 +28,33 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   const [pinDigits, setPinDigits] = useState<string>('');
   const [selectedStaffForPin, setSelectedStaffForPin] = useState<StaffMember | null>(null);
 
+  // Security: Brute-force & Lockout state
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [lockoutSeconds, setLockoutSeconds] = useState(0);
+
+  // Lockout countdown timer
+  useEffect(() => {
+    if (lockoutSeconds <= 0) return;
+    const timer = setInterval(() => {
+      setLockoutSeconds((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          setErrorMessage('');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [lockoutSeconds]);
+
   const handleCredentialsLogin = (e: React.FormEvent) => {
     e.preventDefault();
+    if (lockoutSeconds > 0) return;
     setErrorMessage('');
 
-    if (!usernameOrEmail.trim() || !password) {
+    const sanitizedUser = sanitizeText(usernameOrEmail, 80);
+    if (!sanitizedUser || !password) {
       setErrorMessage('Por favor ingresa tu usuario/correo y contraseña.');
       return;
     }
@@ -38,7 +62,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     setIsLoading(true);
 
     setTimeout(() => {
-      const trimmedInput = usernameOrEmail.trim().toLowerCase();
+      const trimmedInput = sanitizedUser.toLowerCase();
       const matched = staffList.find((st) => {
         const emailMatches = st.email && st.email.toLowerCase() === trimmedInput;
         const userMatches = st.username && st.username.toLowerCase() === trimmedInput;
@@ -48,6 +72,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       });
 
       if (matched) {
+        setFailedAttempts(0);
         const authUser: AuthUser = {
           id: matched.id,
           name: matched.name,
@@ -56,25 +81,52 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           role: (matched.role as AuthUser['role']) || 'floor',
           roleTitle: matched.roleTitle || 'Personal',
           pin: matched.pin || '1234',
-          assignment: matched.assignment || 'SalÃ³n',
+          assignment: matched.assignment || 'Salón Principal',
           terminal: 'TERM-04',
           loginTime: new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
         };
 
-        if (rememberMe) {
-          try {
+        try {
+          if (rememberMe) {
             localStorage.setItem('gastropulse_auth_user', JSON.stringify(authUser));
-          } catch (err) {
-            // LocalStorage might be disabled
           }
-        }
+          setAuthSessionCookie(authUser);
+        } catch (err) {}
+
+        AuditLogger.log({
+          eventType: 'LOGIN_SUCCESS',
+          severity: 'INFO',
+          user: matched.name,
+          role: matched.role,
+          details: `Inicio de sesión exitoso vía credenciales (Usuario: ${sanitizedUser})`
+        });
 
         setIsLoading(false);
         onShowToast(`¡Bienvenido/a, ${matched.name}! Sesión iniciada.`, 'verified_user');
         onLoginSuccess(authUser);
       } else {
+        const nextAttempts = failedAttempts + 1;
+        setFailedAttempts(nextAttempts);
         setIsLoading(false);
-        setErrorMessage('Credenciales inválidas. Verifica tu usuario o contraseña.');
+
+        AuditLogger.log({
+          eventType: 'LOGIN_FAILED',
+          severity: 'WARN',
+          details: `Fallo de autenticación por credenciales (intento #${nextAttempts})`
+        });
+
+        if (nextAttempts >= 4) {
+          setLockoutSeconds(30);
+          kitchenAudio.playAllergyWarning();
+          AuditLogger.log({
+            eventType: 'PIN_LOCKOUT',
+            severity: 'CRITICAL',
+            details: 'Terminal bloqueada por 30 segundos tras 4 intentos fallidos'
+          });
+          setErrorMessage('⚠️ Terminal bloqueada temporalmente (30s) por exceso de intentos.');
+        } else {
+          setErrorMessage(`Credenciales inválidas. Intento ${nextAttempts}/4 antes del bloqueo.`);
+        }
       }
     }, 450);
   };
@@ -102,6 +154,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   };
 
   const validatePin = (enteredPin: string) => {
+    if (lockoutSeconds > 0) return;
     setIsLoading(true);
     setTimeout(() => {
       let matched: StaffMember | undefined;
@@ -115,6 +168,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       }
 
       if (matched) {
+        setFailedAttempts(0);
         const authUser: AuthUser = {
           id: matched.id,
           name: matched.name,
@@ -123,24 +177,53 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           role: (matched.role as AuthUser['role']) || 'floor',
           roleTitle: matched.roleTitle || 'Personal',
           pin: matched.pin || '1234',
-          assignment: matched.assignment || 'SalÃ³n',
+          assignment: matched.assignment || 'Salón Principal',
           terminal: 'TERM-04',
           loginTime: new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
         };
 
         try {
           localStorage.setItem('gastropulse_auth_user', JSON.stringify(authUser));
+          setAuthSessionCookie(authUser);
         } catch (e) {}
+
+        AuditLogger.log({
+          eventType: 'LOGIN_SUCCESS',
+          severity: 'INFO',
+          user: matched.name,
+          role: matched.role,
+          details: `Acceso exitoso vía PIN en terminal TERM-04`
+        });
 
         setIsLoading(false);
         onShowToast(`Acceso concedido vía PIN: ${matched.name}`, 'key');
         onLoginSuccess(authUser);
       } else {
+        const nextAttempts = failedAttempts + 1;
+        setFailedAttempts(nextAttempts);
         setIsLoading(false);
-        setErrorMessage('PIN incorrecto. Intenta nuevamente.');
         setPinDigits('');
+
+        AuditLogger.log({
+          eventType: 'LOGIN_FAILED',
+          severity: 'WARN',
+          details: `Intento de PIN fallido #${nextAttempts}`
+        });
+
+        if (nextAttempts >= 4) {
+          setLockoutSeconds(30);
+          kitchenAudio.playAllergyWarning();
+          AuditLogger.log({
+            eventType: 'PIN_LOCKOUT',
+            severity: 'CRITICAL',
+            details: 'Terminal bloqueada por 30s tras 4 intentos fallidos de PIN'
+          });
+          setErrorMessage('⚠️ Terminal bloqueada temporalmente (30s) por exceso de intentos fallidos.');
+        } else {
+          setErrorMessage(`PIN incorrecto. Intento ${nextAttempts}/4 antes del bloqueo temporal.`);
+        }
       }
-    }, 350);
+    }, 380);
   };
 
   const fillQuickDemoUser = (staffId: string) => {
@@ -402,6 +485,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                     <button
                       key={digit}
                       type="button"
+                      disabled={lockoutSeconds > 0 || isLoading}
                       onClick={() => handlePinInput(digit)}
                       className="h-14 rounded-xl bg-[#201f22] hover:bg-[#2a2a2c] active:bg-[#ff5708] active:text-[#511500] text-[#e5e1e4] font-bold text-[20px] transition-colors flex items-center justify-center border border-[#353437]/40 cursor-pointer"
                     >
@@ -410,6 +494,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   ))}
                   <button
                     type="button"
+                    disabled={lockoutSeconds > 0 || isLoading}
                     onClick={handlePinClear}
                     className="h-14 rounded-xl bg-[#201f22] hover:bg-[#2a2a2c] text-[#c6c5cf] font-medium text-[13px] transition-colors flex items-center justify-center border border-[#353437]/40 cursor-pointer"
                   >
@@ -417,6 +502,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   </button>
                   <button
                     type="button"
+                    disabled={lockoutSeconds > 0 || isLoading}
                     onClick={() => handlePinInput('0')}
                     className="h-14 rounded-xl bg-[#201f22] hover:bg-[#2a2a2c] active:bg-[#ff5708] active:text-[#511500] text-[#e5e1e4] font-bold text-[20px] transition-colors flex items-center justify-center border border-[#353437]/40 cursor-pointer"
                   >
@@ -424,6 +510,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   </button>
                   <button
                     type="button"
+                    disabled={lockoutSeconds > 0 || isLoading}
                     onClick={handlePinBackspace}
                     className="h-14 rounded-xl bg-[#201f22] hover:bg-[#2a2a2c] text-[#c6c5cf] hover:text-white transition-colors flex items-center justify-center border border-[#353437]/40 cursor-pointer"
                   >
