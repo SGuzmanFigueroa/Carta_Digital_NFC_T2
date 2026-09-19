@@ -28,34 +28,34 @@ export const Header: React.FC<HeaderProps> = ({
   const bistros = ['AUREA Bistro (Principal)', 'AUREA Rooftop Lounge', 'AUREA Privé Salón'];
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-[#0e0e10]/95 backdrop-blur-xl border-b border-[#353437]/50 h-16">
-      <div className="h-full w-full px-4 lg:px-8 flex items-center justify-between gap-4">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-[#0e0e10]/95 backdrop-blur-xl border-b border-[#353437]/50 h-16 w-full">
+      <div className="h-full w-full px-3 sm:px-4 lg:px-8 flex items-center justify-between gap-2 sm:gap-4 max-w-[1920px] mx-auto">
         {/* Left Brand and Status */}
-        <div className="flex items-center gap-4 shrink-0">
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           {/* Logo */}
           <div 
             className="flex items-center gap-2 cursor-pointer select-none"
             onClick={() => onSelectTab('cocina_kds')}
           >
-            <div className="w-7 h-7 rounded bg-[#ff5708] flex items-center justify-center shadow-lg shadow-[#ff5708]/30">
+            <div className="w-7 h-7 rounded bg-[#ff5708] flex items-center justify-center shadow-lg shadow-[#ff5708]/30 shrink-0">
               <span className="material-symbols-outlined text-[#0e0e10] text-[18px] font-bold">restaurant_menu</span>
             </div>
-            <span className="text-[18px] tracking-tight font-bold text-[#e5e1e4] uppercase font-sans">
-              GASTROPULSE<span className="text-[#ffb59c] font-normal text-[12px] ml-1 tracking-normal font-mono-code">OS</span>
+            <span className="text-[16px] sm:text-[18px] tracking-tight font-bold text-[#e5e1e4] uppercase font-sans">
+              GASTROPULSE<span className="text-[#ffb59c] font-normal text-[11px] sm:text-[12px] ml-1 tracking-normal font-mono-code">OS</span>
             </span>
           </div>
 
-          <div className="h-4 w-px bg-[#353437]"></div>
+          <div className="h-4 w-px bg-[#353437] hidden sm:block"></div>
 
           {/* Restaurant Selector Dropdown */}
           <div className="relative">
             <button
               onClick={() => setBistroOpen(!bistroOpen)}
-              className="flex items-center gap-1.5 bg-[#1c1b1d] hover:bg-[#2a2a2c] px-2.5 py-1 rounded border border-[#353437]/50 text-left transition-colors"
+              className="flex items-center gap-1.5 bg-[#1c1b1d] hover:bg-[#2a2a2c] px-2 sm:px-2.5 py-1 rounded border border-[#353437]/50 text-left transition-colors max-w-[130px] sm:max-w-none"
             >
-              <span className="material-symbols-outlined text-[#ff5708] text-[16px]">storefront</span>
-              <span className="text-[13px] text-[#e5e1e4] font-semibold">{selectedBistro}</span>
-              <span className="material-symbols-outlined text-[#c6c5cf] text-[16px]">expand_more</span>
+              <span className="material-symbols-outlined text-[#ff5708] text-[15px] sm:text-[16px] shrink-0">storefront</span>
+              <span className="text-[12px] sm:text-[13px] text-[#e5e1e4] font-semibold truncate">{selectedBistro}</span>
+              <span className="material-symbols-outlined text-[#c6c5cf] text-[15px] sm:text-[16px] shrink-0">expand_more</span>
             </button>
 
             {bistroOpen && (
@@ -82,8 +82,8 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </div>
 
-          {/* WebSocket Online Tag */}
-          <div className="hidden md:flex items-center gap-1.5 px-2 py-1 rounded bg-[#0e0e10] border border-[#353437]/40">
+          {/* WebSocket Online Tag (visible on 2xl or xl) */}
+          <div className="hidden 2xl:flex items-center gap-1.5 px-2 py-1 rounded bg-[#0e0e10] border border-[#353437]/40 shrink-0">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
             <span className="font-mono-code text-[11px] text-[#c6c5cf] font-bold tracking-wider">WS ONLINE</span>
             <span className="font-mono-code text-[11px] text-[#71717a]">24ms</span>
@@ -91,21 +91,21 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Center Navigation Tabs (Pantallas del sistema) */}
-        <nav className="hidden xl:flex items-center gap-1 h-full">
+        <nav className="hidden xl:flex items-center gap-0.5 2xl:gap-1 h-full shrink-0">
           <button
             onClick={() => onSelectTab('central_pedidos')}
-            className={`h-full flex items-center px-3.5 font-sans text-[13px] font-medium transition-colors border-b-2 ${
+            className={`h-full flex items-center px-2.5 2xl:px-3.5 font-sans text-[12px] 2xl:text-[13px] font-medium transition-colors border-b-2 whitespace-nowrap ${
               currentTab === 'central_pedidos'
                 ? 'bg-[#2a2a2c] text-[#e5e1e4] font-semibold border-[#ff5708]'
                 : 'border-transparent text-[#bcbbc5] hover:text-[#e5e1e4] hover:bg-[#1c1b1d]'
             }`}
           >
-            Central de Pedidos
+            <span className="hidden 2xl:inline">Central de </span>Pedidos
           </button>
 
           <button
             onClick={() => onSelectTab('cocina_kds')}
-            className={`h-full flex items-center gap-1.5 px-3.5 font-sans text-[13px] font-medium transition-colors border-b-2 ${
+            className={`h-full flex items-center gap-1.5 px-2.5 2xl:px-3.5 font-sans text-[12px] 2xl:text-[13px] font-medium transition-colors border-b-2 whitespace-nowrap ${
               currentTab === 'cocina_kds'
                 ? 'bg-[#2a2a2c] text-[#e5e1e4] font-semibold border-[#ff5708]'
                 : 'border-transparent text-[#bcbbc5] hover:text-[#e5e1e4] hover:bg-[#1c1b1d]'
@@ -113,7 +113,7 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <span>Cocina KDS</span>
             {activeOrdersCount > 0 && (
-              <span className={`px-1.5 py-0.2 rounded text-[11px] font-mono-code font-bold ${
+              <span className={`px-1.5 py-0.2 rounded text-[10px] 2xl:text-[11px] font-mono-code font-bold ${
                 urgentCount > 0 ? 'bg-[#93000a] text-white animate-pulse' : 'bg-[#ff5708]/30 text-[#ffb59c]'
               }`}>
                 {activeOrdersCount}
@@ -123,7 +123,7 @@ export const Header: React.FC<HeaderProps> = ({
 
           <button
             onClick={() => onSelectTab('panel_admin')}
-            className={`h-full flex items-center px-3.5 font-sans text-[13px] font-medium transition-colors border-b-2 ${
+            className={`h-full flex items-center px-2.5 2xl:px-3.5 font-sans text-[12px] 2xl:text-[13px] font-medium transition-colors border-b-2 whitespace-nowrap ${
               currentTab === 'panel_admin'
                 ? 'bg-[#2a2a2c] text-[#e5e1e4] font-semibold border-[#ff5708]'
                 : 'border-transparent text-[#bcbbc5] hover:text-[#e5e1e4] hover:bg-[#1c1b1d]'
@@ -134,18 +134,18 @@ export const Header: React.FC<HeaderProps> = ({
 
           <button
             onClick={() => onSelectTab('gestion_usuarios')}
-            className={`h-full flex items-center px-3.5 font-sans text-[13px] font-medium transition-colors border-b-2 ${
+            className={`h-full flex items-center px-2.5 2xl:px-3.5 font-sans text-[12px] 2xl:text-[13px] font-medium transition-colors border-b-2 whitespace-nowrap ${
               currentTab === 'gestion_usuarios'
                 ? 'bg-[#2a2a2c] text-[#e5e1e4] font-semibold border-[#ff5708]'
                 : 'border-transparent text-[#bcbbc5] hover:text-[#e5e1e4] hover:bg-[#1c1b1d]'
             }`}
           >
-            Gestión de Usuarios
+            <span className="hidden 2xl:inline">Gestión de </span>Usuarios
           </button>
 
           <button
             onClick={() => onSelectTab('configuracion')}
-            className={`h-full flex items-center px-3.5 font-sans text-[13px] font-medium transition-colors border-b-2 ${
+            className={`h-full flex items-center px-2.5 2xl:px-3.5 font-sans text-[12px] 2xl:text-[13px] font-medium transition-colors border-b-2 whitespace-nowrap ${
               currentTab === 'configuracion'
                 ? 'bg-[#2a2a2c] text-[#e5e1e4] font-semibold border-[#ff5708]'
                 : 'border-transparent text-[#bcbbc5] hover:text-[#e5e1e4] hover:bg-[#1c1b1d]'
@@ -156,11 +156,11 @@ export const Header: React.FC<HeaderProps> = ({
         </nav>
 
         {/* Mobile/Tablet Screen Selector Drawer Toggle */}
-        <div className="flex xl:hidden items-center gap-1">
+        <div className="flex xl:hidden items-center gap-1 shrink-0">
           <select
             value={currentTab}
             onChange={(e) => onSelectTab(e.target.value as ScreenTab)}
-            className="bg-[#1c1b1d] text-[#e5e1e4] border border-[#353437] text-[12px] font-semibold rounded px-2.5 py-1.5"
+            className="bg-[#1c1b1d] text-[#e5e1e4] border border-[#353437] text-[11px] sm:text-[12px] font-semibold rounded px-2 py-1 cursor-pointer focus:outline-none focus:border-[#ff5708]"
           >
             <option value="cocina_kds">Cocina KDS ({activeOrdersCount})</option>
             <option value="central_pedidos">Central de Pedidos</option>
@@ -171,20 +171,20 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Right Controls: Notifications & Staff Profile */}
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0 ml-auto">
           {/* Notifications button */}
           <div className="relative">
             <button
               onClick={() => setNotificationsOpen(!notificationsOpen)}
-              className="w-9 h-9 rounded flex items-center justify-center text-[#c6c5cf] hover:text-[#e5e1e4] hover:bg-[#2a2a2c] transition-colors relative"
+              className="w-8 h-8 sm:w-9 sm:h-9 rounded flex items-center justify-center text-[#c6c5cf] hover:text-[#e5e1e4] hover:bg-[#2a2a2c] transition-colors relative cursor-pointer"
               aria-label="Notificaciones"
             >
-              <span className="material-symbols-outlined text-[20px]">notifications</span>
-              <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-[#ff5708]"></span>
+              <span className="material-symbols-outlined text-[19px] sm:text-[20px]">notifications</span>
+              <span className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 w-2 h-2 rounded-full bg-[#ff5708]"></span>
             </button>
 
             {notificationsOpen && (
-              <div className="absolute top-full mt-2 right-0 w-80 sm:w-96 bg-[#1c1b1d] border border-[#353437] rounded-xl shadow-2xl p-3 z-50">
+              <div className="absolute top-full mt-2 right-0 w-72 sm:w-96 bg-[#1c1b1d] border border-[#353437] rounded-xl shadow-2xl p-3 z-50">
                 <div className="flex items-center justify-between pb-2 border-b border-[#353437]/60 mb-2">
                   <div className="font-bold text-[13px] text-[#e5e1e4]">Bitácora de Pase en Vivo</div>
                   <span className="text-[11px] font-mono-code text-[#ff5708]">4 NUEVAS</span>
@@ -214,12 +214,12 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="h-4 w-px bg-[#353437]"></div>
 
           {/* Chef Profile Badge */}
-          <div className="flex items-center gap-2.5 pl-1">
-            <div className="text-right hidden sm:block">
-              <div className="text-[13px] text-[#e5e1e4] leading-tight font-semibold">Chef Ejecutivo</div>
-              <div className="text-[11px] text-[#c6c5cf]">Servicio Activo</div>
+          <div className="flex items-center gap-2 pl-0.5 shrink-0">
+            <div className="text-right hidden 2xl:block">
+              <div className="text-[12px] text-[#e5e1e4] leading-tight font-semibold">Chef Ejecutivo</div>
+              <div className="text-[10px] text-[#c6c5cf]">Servicio Activo</div>
             </div>
-            <div className="w-8 h-8 rounded-full bg-[#ffb59c] flex items-center justify-center overflow-hidden border border-[#ff5708]">
+            <div className="w-8 h-8 rounded-full bg-[#ffb59c] flex items-center justify-center overflow-hidden border border-[#ff5708] shrink-0">
               <img
                 src="https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=100&auto=format&fit=crop&q=80"
                 alt="Chef"

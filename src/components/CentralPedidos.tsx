@@ -53,7 +53,7 @@ export const CentralPedidos: React.FC<CentralPedidosProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
           <button
             onClick={onOpenKDS}
             className="px-4 py-2.5 rounded-lg bg-[#27272a] hover:bg-[#3f3f46] text-[#e5e1e4] font-mono-code text-[12px] font-bold uppercase flex items-center gap-2 transition-colors border border-[#3f3f46]"
@@ -73,7 +73,7 @@ export const CentralPedidos: React.FC<CentralPedidosProps> = ({
       </div>
 
       {/* KPI Cards Row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <div className="p-4 rounded-xl bg-[#18181b] border border-[#27272a]">
           <span className="text-[11px] font-mono-code uppercase text-[#a1a1aa] block font-bold">
             Comandas en Proceso
@@ -132,7 +132,7 @@ export const CentralPedidos: React.FC<CentralPedidosProps> = ({
         </div>
 
         {/* Filter Pills */}
-        <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto font-mono-code text-[11px]">
+        <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar w-full md:w-auto font-mono-code text-[11px] pb-1">
           <button
             onClick={() => setStatusFilter('all')}
             className={`px-3 py-1.5 rounded-lg font-bold transition-colors ${

@@ -217,10 +217,10 @@ export const KDSBoard: React.FC<KDSBoardProps> = ({
   return (
     <div className={`flex flex-col w-full text-[#e5e1e4] select-none pb-28 ${highContrast ? 'contrast-125' : ''}`}>
       {/* Top Telemetry & Station Switcher Sticky Bar */}
-      <div className="sticky top-16 z-40 bg-[#0e0e10]/95 backdrop-blur-xl px-4 lg:px-8 py-3.5 shadow-2xl flex flex-col gap-3 border-b border-[#353437]/40">
+      <div className="sticky top-16 z-40 bg-[#0e0e10]/95 backdrop-blur-xl px-3 sm:px-4 lg:px-8 py-3 shadow-2xl flex flex-col gap-2.5 border-b border-[#353437]/40 w-full">
         {/* Row 1: Station Selector Touch Ribbon */}
-        <div className="flex items-center justify-between gap-4 overflow-x-auto no-scrollbar">
-          <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center justify-between gap-2.5 w-full">
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5 flex-1 min-w-0">
             {/* Todas las partidas */}
             <button
               onClick={() => setSelectedStation('all')}
@@ -306,29 +306,29 @@ export const KDSBoard: React.FC<KDSBoardProps> = ({
             </button>
           </div>
 
-          {/* Quick Right Action Buttons */}
-          <div className="flex items-center gap-2.5 shrink-0">
+          {/* Quick Right Action Buttons (Always visible and pinned) */}
+          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
             {/* New Comanda Trigger */}
             <button
               onClick={() => setNewOrderModalOpen(true)}
-              className="h-10 px-3.5 rounded-lg bg-[#ff5708] hover:bg-orange-600 text-white font-mono-code text-[12px] font-bold uppercase flex items-center gap-1.5 shadow-md transition-all active:scale-95"
+              className="h-9 sm:h-10 px-2.5 sm:px-3.5 rounded-lg bg-[#ff5708] hover:bg-orange-600 text-white font-mono-code text-[11px] sm:text-[12px] font-bold uppercase flex items-center gap-1.5 shadow-md transition-all active:scale-95 shrink-0 cursor-pointer"
             >
-              <span className="material-symbols-outlined text-[18px]">add</span>
+              <span className="material-symbols-outlined text-[17px] sm:text-[18px]">add</span>
               <span className="hidden sm:inline">Nueva Comanda</span>
             </button>
 
             {/* Audio Toggle */}
             <button
               onClick={handleAudioToggle}
-              className={`h-10 px-3.5 rounded-lg bg-[#2a2a2c] hover:bg-[#39393b] flex items-center gap-2 text-[#e5e1e4] font-mono-code text-[11px] font-bold active:scale-95 transition-all ${
+              className={`h-9 sm:h-10 px-2.5 sm:px-3.5 rounded-lg bg-[#2a2a2c] hover:bg-[#39393b] flex items-center gap-1.5 text-[#e5e1e4] font-mono-code text-[11px] font-bold active:scale-95 transition-all shrink-0 cursor-pointer ${
                 audioEnabled ? 'border border-[#ff5708]/40 text-[#ffb59c]' : 'text-[#71717a]'
               }`}
               title="Alternar alertas sonoras de cocina"
             >
-              <span className="material-symbols-outlined text-[18px] text-[#ff5708]">
+              <span className="material-symbols-outlined text-[17px] sm:text-[18px] text-[#ff5708]">
                 {audioEnabled ? 'volume_up' : 'volume_off'}
               </span>
-              <span className="hidden xl:inline uppercase">Alertas: {audioEnabled ? 'ON' : 'MUTE'}</span>
+              <span className="hidden 2xl:inline uppercase">Alertas: {audioEnabled ? 'ON' : 'MUTE'}</span>
             </button>
 
             {/* High Contrast Toggle */}
@@ -337,12 +337,13 @@ export const KDSBoard: React.FC<KDSBoardProps> = ({
                 setHighContrast(!highContrast);
                 showToast(highContrast ? 'Modo normal restablecido' : 'Alto contraste activado', 'contrast');
               }}
-              className={`h-10 px-3.5 rounded-lg bg-[#2a2a2c] hover:bg-[#39393b] flex items-center gap-2 text-[#e5e1e4] font-mono-code text-[11px] font-bold active:scale-95 transition-all ${
+              className={`h-9 sm:h-10 px-2.5 sm:px-3.5 rounded-lg bg-[#2a2a2c] hover:bg-[#39393b] flex items-center gap-1.5 text-[#e5e1e4] font-mono-code text-[11px] font-bold active:scale-95 transition-all shrink-0 cursor-pointer ${
                 highContrast ? 'border border-white text-white bg-[#353437]' : ''
               }`}
+              title="Alternar modo alto contraste"
             >
-              <span className="material-symbols-outlined text-[18px]">contrast</span>
-              <span className="hidden xl:inline uppercase">Alto Contraste</span>
+              <span className="material-symbols-outlined text-[17px] sm:text-[18px]">contrast</span>
+              <span className="hidden 2xl:inline uppercase">Alto Contraste</span>
             </button>
           </div>
         </div>
@@ -397,7 +398,7 @@ export const KDSBoard: React.FC<KDSBoardProps> = ({
       </div>
 
       {/* MAIN KANBAN BOARD: Dynamic Responsive Grid */}
-      <div className="px-4 lg:px-8 pt-6 grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-4 gap-5 items-start">
+      <div className="px-3 sm:px-4 lg:px-8 pt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-start">
         {visibleTickets.map((ticket) => {
           const isOverdue = ticket.elapsedSeconds > ticket.targetSeconds;
           const isDispatched = ticket.status === 'lista_despachada';
@@ -786,46 +787,46 @@ export const KDSBoard: React.FC<KDSBoardProps> = ({
       </div>
 
       {/* FIXED BOTTOM TACTILE KITCHEN CONTROL BAR */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 bg-[#0e0e10]/95 backdrop-blur-xl px-4 lg:px-8 py-3 border-t border-[#353437]/50 shadow-[0_-10px_30px_rgba(0,0,0,0.8)]">
-        <div className="max-w-[1920px] mx-auto flex flex-wrap items-center justify-between gap-3">
+      <div className="fixed bottom-0 left-0 right-0 z-40 bg-[#0e0e10]/95 backdrop-blur-xl px-3 sm:px-4 lg:px-8 py-2.5 sm:py-3 border-t border-[#353437]/50 shadow-[0_-10px_30px_rgba(0,0,0,0.8)]">
+        <div className="max-w-[1920px] mx-auto flex flex-wrap items-center justify-between gap-2">
           {/* Left Emergency & Fast Action Tactile Buttons */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
             <button
               onClick={handleRecallLast}
-              className="h-12 px-5 rounded-lg bg-[#201f22] hover:bg-[#2a2a2c] active:scale-95 text-white font-sans text-[13px] uppercase font-bold flex items-center gap-2.5 transition-all shadow-md border border-[#353437]"
+              className="h-10 sm:h-12 px-3 sm:px-5 rounded-lg bg-[#201f22] hover:bg-[#2a2a2c] active:scale-95 text-white font-sans text-[12px] sm:text-[13px] uppercase font-bold flex items-center gap-2 transition-all shadow-md border border-[#353437] cursor-pointer"
             >
-              <span className="material-symbols-outlined text-[20px] text-[#a1c9ff]">history</span>
-              <span>Recuperar Última Comanda</span>
+              <span className="material-symbols-outlined text-[18px] sm:text-[20px] text-[#a1c9ff]">history</span>
+              <span><span className="hidden sm:inline">Recuperar </span>Última Comanda</span>
             </button>
 
             <button
               onClick={handleNotifyRunners}
-              className="h-12 px-5 rounded-lg bg-[#201f22] hover:bg-[#2a2a2c] active:scale-95 text-white font-sans text-[13px] uppercase font-bold flex items-center gap-2.5 transition-all shadow-md border border-[#353437]"
+              className="h-10 sm:h-12 px-3 sm:px-5 rounded-lg bg-[#201f22] hover:bg-[#2a2a2c] active:scale-95 text-white font-sans text-[12px] sm:text-[13px] uppercase font-bold flex items-center gap-2 transition-all shadow-md border border-[#353437] cursor-pointer"
             >
-              <span className="material-symbols-outlined text-[20px] text-[#ff5708]">campaign</span>
-              <span>Avisar Runners (Pase)</span>
+              <span className="material-symbols-outlined text-[18px] sm:text-[20px] text-[#ff5708]">campaign</span>
+              <span><span className="hidden sm:inline">Avisar </span>Runners<span className="hidden md:inline"> (Pase)</span></span>
             </button>
           </div>
 
           {/* Right Pause Kitchen Rush Button */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0 ml-auto">
             <button
               onClick={handleToggleKitchenPause}
-              className={`h-12 px-5 rounded-lg font-sans text-[13px] uppercase font-bold flex items-center gap-2.5 transition-all shadow-md active:scale-95 border ${
+              className={`h-10 sm:h-12 px-3 sm:px-5 rounded-lg font-sans text-[12px] sm:text-[13px] uppercase font-bold flex items-center gap-2 transition-all shadow-md active:scale-95 border cursor-pointer ${
                 kitchenPaused
                   ? 'bg-[#93000a] text-white border-[#ffb4ab]'
                   : 'bg-[#201f22] hover:bg-[#93000a]/20 text-[#ffb4ab] border-[#353437]'
               }`}
             >
-              <span className="material-symbols-outlined text-[20px]">
+              <span className="material-symbols-outlined text-[18px] sm:text-[20px]">
                 {kitchenPaused ? 'play_circle' : 'pause_circle'}
               </span>
-              <span>{kitchenPaused ? 'Cocina Pausada (Reanudar)' : 'Pausar Entradas de Cocina'}</span>
+              <span>{kitchenPaused ? 'Reanudar Cocina' : 'Pausar Cocina'}</span>
             </button>
 
-            <div className="hidden sm:flex items-center gap-2 px-3 py-2 rounded bg-[#201f22] font-mono-code text-[11px] text-[#c6c5cf] border border-[#353437]/40">
+            <div className="hidden lg:flex items-center gap-2 px-3 py-2 rounded bg-[#201f22] font-mono-code text-[11px] text-[#c6c5cf] border border-[#353437]/40">
               <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-              <span>MODO TOUCH: ACTIVO</span>
+              <span>MODO TOUCH</span>
             </div>
           </div>
         </div>
