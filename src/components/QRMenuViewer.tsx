@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { MenuItem, OrderTicket, TableStatus } from '../types';
 import { ThreeDView } from './ThreeDView';
 
@@ -29,8 +29,17 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   const [isTableModalOpen, setIsTableModalOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [selectedTable, setSelectedTable] = useState('MESA 04');
-  const [isArModalOpen, setIsArModalOpen] = useState(false);
+
+  // 3D Inspector Modal
   const [selectedDishForModal, setSelectedDishForModal] = useState<MenuItem | null>(null);
+
+  // Real Camera AR Modal
+  const [isArModalOpen, setIsArModalOpen] = useState(false);
+  const [arCameraActive, setArCameraActive] = useState(false);
+  const [arScale, setArScale] = useState(1.0);
+  const [arDish, setArDish] = useState<MenuItem>(menuItems[0]); // default to Chaufa or current
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
 
   const [cart, setCart] = useState<{ item: MenuItem; quantity: number; notes?: string }[]>([
     {
@@ -43,6 +52,60 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       quantity: 1
     }
   ]);
+
+  // Handle Real Camera stream for AR Visor
+  useEffect(() => {
+    if (!isArModalOpen) {
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach((t) => t.stop());
+        mediaStreamRef.current = null;
+      }
+      setArCameraActive(false);
+      return;
+    }
+
+    let isMounted = true;
+    const startCamera = async () => {
+      try {
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              facingMode: { ideal: 'environment' },
+              width: { ideal: 1280 },
+              height: { ideal: 720 }
+            },
+            audio: false
+          });
+
+          if (isMounted) {
+            mediaStreamRef.current = stream;
+            if (videoRef.current) {
+              videoRef.current.srcObject = stream;
+              videoRef.current.play();
+            }
+            setArCameraActive(true);
+            onShowToast('Cámara AR activada: Apunta a tu mesa', 'view_in_ar');
+          }
+        } else {
+          setArCameraActive(false);
+        }
+      } catch (err) {
+        console.warn('Camera access error or denied:', err);
+        setArCameraActive(false);
+        onShowToast('Modo AR Simulado activo (permiso de cámara no concedido)', 'info');
+      }
+    };
+
+    startCamera();
+
+    return () => {
+      isMounted = false;
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach((t) => t.stop());
+        mediaStreamRef.current = null;
+      }
+    };
+  }, [isArModalOpen]);
 
   const filteredItems = menuItems.filter((item) => {
     const matchesCat = selectedCategory === 'todos' || item.category === selectedCategory;
@@ -124,7 +187,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   const heroItem = menuItems[0]; // Arroz Chaufa Wok de Autor
 
   return (
-    <div className="w-full min-h-screen bg-[#0b0c0e] text-[#e5e1e4] pb-32 selection:bg-[#ff5708] selection:text-white">
+    <div className="w-full min-h-screen bg-[#0b0c0e] text-[#e5e1e4] pb-36 selection:bg-[#ff5708] selection:text-white">
       {/* ========================================================================= */}
       {/* 📱 ULTRA-CLEAN MOBILE-FIRST TOP APP BAR */}
       {/* ========================================================================= */}
@@ -144,7 +207,6 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
               </div>
               <div className="flex items-center gap-1">
-                {/* Clickable Table Selector Pill */}
                 <button
                   type="button"
                   onClick={() => setIsTableModalOpen(true)}
@@ -179,7 +241,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       </header>
 
       {/* ========================================================================= */}
-      {/* ⏳ LIVE OPERATIONAL ORDER STATUS TRACKER (DINER FEEDBACK) */}
+      {/* ⏳ LIVE OPERATIONAL ORDER STATUS TRACKER */}
       {/* ========================================================================= */}
       {activeTicket && (
         <div className="max-w-4xl mx-auto px-3.5 sm:px-6 pt-3.5">
@@ -264,7 +326,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
             )}
           </div>
 
-          {/* Categories Pill Bar (Smooth touch horizontal scroll) */}
+          {/* Categories Pill Bar */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar -mx-3.5 px-3.5 sm:mx-0 sm:px-0">
             {[
               { id: 'todos', label: 'Todos' },
@@ -292,7 +354,6 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
         {/* ⭐ HERO FEATURED DISH (DUAL VIEW: 📸 FOTO HD / 🧊 3D 360°) */}
         {/* ========================================================================= */}
         <section className="bg-[#15161c] rounded-2xl overflow-hidden border border-[#ff5708]/35 shadow-[0_4px_30px_rgba(255,87,8,0.15)]">
-          {/* Card Header with View Mode Switcher Toggle */}
           <div className="px-3.5 py-2.5 bg-[#121318] border-b border-[#24252e] flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-[#ff5708]"></span>
@@ -301,7 +362,6 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
               </span>
             </div>
 
-            {/* Segmented Toggle: [Foto HD] / [3D 360°] */}
             <div className="flex items-center bg-[#1e1f28] p-0.5 rounded-lg border border-[#353642]">
               <button
                 type="button"
@@ -333,7 +393,6 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
             </div>
           </div>
 
-          {/* Hero Visual Display Area */}
           <div className="relative">
             {heroViewMode === 'photo' ? (
               <div className="relative w-full h-64 sm:h-80 overflow-hidden bg-[#0e0e10] group">
@@ -344,7 +403,6 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#15161c] via-transparent to-black/40" />
 
-                {/* Badges on Photo */}
                 <div className="absolute top-3 left-3 flex items-center gap-1.5">
                   <span className="px-2.5 py-0.5 rounded-full bg-[#ff5708] text-[#2b0b00] font-mono-code text-[10px] font-bold shadow-lg">
                     {heroItem.badge}
@@ -354,7 +412,6 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                   </span>
                 </div>
 
-                {/* Floating "Ver en 3D" Pill */}
                 <button
                   type="button"
                   onClick={() => setHeroViewMode('3d')}
@@ -366,13 +423,13 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
               </div>
             ) : (
               <ThreeDView
+                dishId={heroItem.id}
                 heightClass="h-64 sm:h-80"
                 onInteract={() => onShowToast('Rotando Arroz Chaufa Wok 3D', '3d_rotation')}
               />
             )}
           </div>
 
-          {/* Hero Details Content */}
           <div className="p-4 sm:p-5 space-y-3.5">
             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
               <div className="space-y-1">
@@ -422,12 +479,15 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
             <div className="pt-2 flex items-center gap-2.5">
               <button
                 type="button"
-                onClick={() => setIsArModalOpen(true)}
+                onClick={() => {
+                  setArDish(heroItem);
+                  setIsArModalOpen(true);
+                }}
                 className="px-3.5 py-2.5 rounded-xl bg-[#1e1f28] hover:bg-[#282935] text-[#e5e1e4] text-[13px] font-medium flex items-center gap-1.5 border border-[#353642] transition-colors cursor-pointer"
-                title="Proyectar plato en tu mesa con AR"
+                title="Proyectar plato con cámara en tu mesa"
               >
                 <span className="material-symbols-outlined text-[17px] text-[#ff5708]">view_in_ar</span>
-                <span className="hidden sm:inline">Visor AR</span>
+                <span>Visor AR en Mesa</span>
               </button>
 
               <button
@@ -484,11 +544,11 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                         setSelectedDishForModal(dish);
                         onShowToast(`Abriendo modelo 3D: ${dish.name}`, 'view_in_ar');
                       }}
-                      className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-full bg-black/75 backdrop-blur-md text-[#a1c9ff] border border-[#a1c9ff]/40 font-mono-code text-[10px] flex items-center gap-1 cursor-pointer hover:bg-[#a1c9ff] hover:text-[#002a4d] transition-colors"
+                      className="absolute top-2.5 right-2.5 px-2.5 py-1 rounded-full bg-black/80 backdrop-blur-md text-[#ffb59c] border border-[#ff5708]/50 font-mono-code text-[10px] font-bold flex items-center gap-1 cursor-pointer hover:bg-[#ff5708] hover:text-[#2b0b00] transition-colors shadow-lg"
                       title="Ver plato en 3D interactivo"
                     >
-                      <span className="material-symbols-outlined text-[13px]">view_in_ar</span>
-                      <span>3D</span>
+                      <span className="material-symbols-outlined text-[14px]">view_in_ar</span>
+                      <span>Ver en 3D</span>
                     </button>
                   )}
 
@@ -520,14 +580,29 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                       </span>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => handleAddToCart(dish)}
-                      className="px-3 py-1.5 rounded-xl bg-[#24252e] hover:bg-[#ff5708] text-white hover:text-[#2b0b00] font-semibold text-[12px] flex items-center gap-1 transition-all cursor-pointer active:scale-95"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">add</span>
-                      <span>Agregar</span>
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      {dish.has3D && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setArDish(dish);
+                            setIsArModalOpen(true);
+                          }}
+                          className="p-1.5 rounded-xl bg-[#1e1f28] hover:bg-[#282935] text-[#a1c9ff] border border-[#353642] transition-colors cursor-pointer"
+                          title="Proyectar con cámara AR"
+                        >
+                          <span className="material-symbols-outlined text-[16px]">view_in_ar</span>
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleAddToCart(dish)}
+                        className="px-3 py-1.5 rounded-xl bg-[#24252e] hover:bg-[#ff5708] text-white hover:text-[#2b0b00] font-semibold text-[12px] flex items-center gap-1 transition-all cursor-pointer active:scale-95"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">add</span>
+                        <span>Agregar</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </article>
@@ -537,7 +612,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       </main>
 
       {/* ========================================================================= */}
-      {/* 🛒 PERSISTENT FLOATING BOTTOM ORDER BAR (MOBILE & DESKTOP) */}
+      {/* 🛒 PERSISTENT FLOATING BOTTOM ORDER BAR */}
       {/* ========================================================================= */}
       {cart.length > 0 && (
         <div className="fixed bottom-3 left-3 right-3 max-w-md mx-auto z-40">
@@ -579,7 +654,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       )}
 
       {/* ========================================================================= */}
-      {/* 🪑 TABLE SELECTOR MODAL (MOBILE BOTTOM SHEET / MODAL) */}
+      {/* 🪑 TABLE SELECTOR MODAL */}
       {/* ========================================================================= */}
       {isTableModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
@@ -599,25 +674,16 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
             </div>
 
             <p className="text-[12px] text-[#a1a1aa]">
-              Indica la mesa donde te encuentras sentado para despachar tu comanda directo a la estación de cocina correspondiente:
+              Indica la mesa donde te encuentras para despachar tu comanda a la estación de cocina correspondiente:
             </p>
 
             <div className="grid grid-cols-3 gap-2.5 max-h-60 overflow-y-auto pr-1">
               {(tables && tables.length > 0
                 ? tables.map((t) => `MESA ${t.number.toString().padStart(2, '0')}`)
                 : [
-                    'MESA 01',
-                    'MESA 02',
-                    'MESA 03',
-                    'MESA 04',
-                    'MESA 05',
-                    'MESA 06',
-                    'MESA 07',
-                    'MESA 08',
-                    'MESA 09',
-                    'MESA 10',
-                    'MESA 11',
-                    'MESA 12'
+                    'MESA 01', 'MESA 02', 'MESA 03', 'MESA 04',
+                    'MESA 05', 'MESA 06', 'MESA 07', 'MESA 08',
+                    'MESA 09', 'MESA 10', 'MESA 11', 'MESA 12'
                   ]
               ).map((tableNum) => (
                 <button
@@ -672,7 +738,6 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
               </button>
             </div>
 
-            {/* Cart Items List */}
             <div className="space-y-2.5">
               {cart.map((c) => (
                 <div
@@ -708,7 +773,6 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                     </div>
                   </div>
 
-                  {/* Optional Kitchen Notes Input */}
                   <input
                     type="text"
                     placeholder="Nota de cocina (ej. Sin cebolla, término medio...)"
@@ -720,7 +784,6 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
               ))}
             </div>
 
-            {/* Calculations Breakdown */}
             <div className="p-3 bg-[#0e0e10] rounded-xl space-y-1.5 text-[11px] sm:text-[12px] font-mono-code">
               <div className="flex justify-between text-[#a1a1aa]">
                 <span>SUBTOTAL (SIN IGV)</span>
@@ -758,10 +821,10 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       )}
 
       {/* ========================================================================= */}
-      {/* 🧊 DISH 3D INSPECTOR MODAL */}
+      {/* 🧊 SPECIFIC DISH 3D INSPECTOR MODAL */}
       {/* ========================================================================= */}
       {selectedDishForModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
           <div className="bg-[#15161c] w-full max-w-lg rounded-t-3xl sm:rounded-2xl border border-[#ff5708]/40 shadow-2xl p-4 sm:p-5 space-y-3.5">
             <div className="flex items-center justify-between pb-2 border-b border-[#24252e]">
               <div className="flex items-center gap-2">
@@ -779,16 +842,17 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
               </button>
             </div>
 
-            {/* 3D Canvas */}
+            {/* Custom 3D canvas tailored to this specific dish! */}
             <ThreeDView
-              heightClass="h-60 sm:h-72"
+              dishId={selectedDishForModal.id}
+              heightClass="h-64 sm:h-72"
               onInteract={() => onShowToast(`Inspeccionando ${selectedDishForModal.name}`, '3d_rotation')}
             />
 
             <div className="space-y-1">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-mono-code text-[#ffb59c]">{selectedDishForModal.tag}</span>
-                <span className="text-[17px] font-mono-code font-bold text-[#ff5708]">
+                <span className="text-[11px] font-mono-code text-[#ffb59c] font-bold">{selectedDishForModal.tag}</span>
+                <span className="text-[18px] font-mono-code font-bold text-[#ff5708]">
                   S/ {selectedDishForModal.price.toFixed(2)}
                 </span>
               </div>
@@ -800,21 +864,28 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
             <div className="pt-1 flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => setSelectedDishForModal(null)}
-                className="flex-1 py-2.5 rounded-xl bg-[#24252e] text-[#e5e1e4] font-medium text-[12px]"
+                onClick={() => {
+                  setArDish(selectedDishForModal);
+                  setSelectedDishForModal(null);
+                  setIsArModalOpen(true);
+                }}
+                className="px-3.5 py-2.5 rounded-xl bg-[#1e1f28] hover:bg-[#282935] text-[#a1c9ff] border border-[#353642] text-[12px] flex items-center gap-1.5"
+                title="Proyectar con cámara en tu mesa"
               >
-                Cerrar
+                <span className="material-symbols-outlined text-[16px]">view_in_ar</span>
+                <span>Visor AR</span>
               </button>
+
               <button
                 type="button"
                 onClick={() => {
                   handleAddToCart(selectedDishForModal);
                   setSelectedDishForModal(null);
                 }}
-                className="flex-1 py-2.5 rounded-xl bg-[#ff5708] text-[#2b0b00] font-bold text-[13px] flex items-center justify-center gap-1.5 shadow-lg"
+                className="flex-1 py-2.5 rounded-xl bg-[#ff5708] text-[#2b0b00] font-bold text-[13px] flex items-center justify-center gap-1.5 shadow-lg hover:bg-[#ff6924]"
               >
                 <span className="material-symbols-outlined text-[16px]">add_shopping_cart</span>
-                <span>Pedir Plato</span>
+                <span>Pedir Plato • S/ {selectedDishForModal.price.toFixed(2)}</span>
               </button>
             </div>
           </div>
@@ -822,51 +893,114 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       )}
 
       {/* ========================================================================= */}
-      {/* 🚀 AR PROJECTION SIMULATOR MODAL */}
+      {/* 🚀 REAL CAMERA AUGMENTED REALITY (AR) VISOR OVERLAY */}
       {/* ========================================================================= */}
       {isArModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-[#15161c] max-w-md w-full rounded-2xl border border-[#ff5708]/40 p-5 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between pb-2 border-b border-[#24252e]">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-[#ff5708] text-[22px]">view_in_ar</span>
-                <h3 className="text-[16px] font-bold text-white">Proyección AR en Mesa</h3>
+        <div className="fixed inset-0 z-50 bg-black flex flex-col justify-between animate-fadeIn overflow-hidden">
+          {/* Live Phone Camera Video Stream */}
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            className="absolute inset-0 w-full h-full object-cover z-0"
+          />
+
+          {/* Fallback surface texture if camera access is denied */}
+          {!arCameraActive && (
+            <div className="absolute inset-0 z-0 bg-gradient-to-b from-[#111216] via-[#1a1c24] to-[#0e0f13] flex flex-col items-center justify-center">
+              <div className="w-80 h-80 rounded-full border border-dashed border-[#ff5708]/30 animate-pulse flex items-center justify-center">
+                <span className="text-[12px] font-mono-code text-[#ffb59c]">Superficie de Mesa Calibrada</span>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsArModalOpen(false)}
-                className="text-[#a1a1aa] hover:text-white"
-              >
-                <span className="material-symbols-outlined text-[20px]">close</span>
-              </button>
             </div>
+          )}
 
-            <p className="text-[12px] text-[#a1a1aa] leading-relaxed">
-              El visor de Realidad Aumentada proyecta la escala 1:1 (diámetro real 28 cm) sobre tu mesa mediante WebXR.
-            </p>
-
-            <div className="p-5 rounded-xl bg-[#0e0e10] border border-[#24252e] flex flex-col items-center justify-center text-center space-y-2">
-              <span className="material-symbols-outlined text-[44px] text-[#ff5708] animate-bounce">
-                center_focus_strong
-              </span>
-              <span className="text-[12px] font-mono-code text-[#ffb59c] font-semibold">
-                Calibrando superficie con sensor lidar...
-              </span>
-              <span className="text-[10px] text-[#71717a]">
-                Porción real de Arroz Chaufa Wok lista para proyectar
-              </span>
+          {/* Top Bar Overlay */}
+          <div className="relative z-20 px-4 pt-safe pt-4 flex items-center justify-between bg-gradient-to-b from-black/80 to-transparent pb-6">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-[#ff5708] flex items-center justify-center text-[#2b0b00] font-bold">
+                <span className="material-symbols-outlined text-[18px]">view_in_ar</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[13px] font-bold text-white leading-tight">Visor AR en Mesa</span>
+                <span className="text-[10px] font-mono-code text-emerald-400 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+                  <span>{arCameraActive ? 'Cámara Trasera Activa' : 'Sensor Simulado'}</span>
+                </span>
+              </div>
             </div>
 
             <button
               type="button"
-              onClick={() => {
-                setIsArModalOpen(false);
-                onShowToast('Calibración AR completada con éxito', 'done');
-              }}
-              className="w-full py-2.5 rounded-xl bg-[#ff5708] text-[#2b0b00] font-bold text-[13px] hover:bg-[#ff6924] shadow-lg cursor-pointer"
+              onClick={() => setIsArModalOpen(false)}
+              className="w-9 h-9 rounded-full bg-black/60 backdrop-blur-md border border-white/20 flex items-center justify-center text-white hover:bg-white/20 transition-colors"
             >
-              Cerrar Visor AR
+              <span className="material-symbols-outlined text-[20px]">close</span>
             </button>
+          </div>
+
+          {/* Interactive 3D Dish Overlay directly in the camera view! */}
+          <div className="relative z-10 flex-1 flex flex-col items-center justify-center pointer-events-auto">
+            {/* Reticle Table Target Indicator */}
+            <div className="absolute w-64 h-64 border-2 border-dashed border-[#ff5708]/50 rounded-full pointer-events-none animate-pulse flex items-center justify-center">
+              <span className="text-[10px] font-mono-code text-[#ffb59c] bg-black/60 px-2 py-0.5 rounded-full">
+                {arDish.name} (Escala 1:1 • 28cm Ø)
+              </span>
+            </div>
+
+            <div style={{ transform: `scale(${arScale})` }} className="w-full transition-transform duration-200">
+              <ThreeDView
+                dishId={arDish.id}
+                enableCameraBg={true}
+                heightClass="h-72 sm:h-96"
+                onInteract={() => onShowToast('Moviendo plato en tu mesa', 'view_in_ar')}
+              />
+            </div>
+          </div>
+
+          {/* Bottom Floating AR Controls */}
+          <div className="relative z-20 px-4 pb-safe pb-5 bg-gradient-to-t from-black/90 via-black/60 to-transparent pt-4 space-y-3">
+            {/* Scale controls */}
+            <div className="flex items-center justify-between bg-black/70 backdrop-blur-md px-3 py-2 rounded-xl border border-white/15 text-[11px] font-mono-code">
+              <span className="text-[#a1a1aa]">Escala Real en Mesa:</span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setArScale((s) => Math.max(0.6, s - 0.1))}
+                  className="w-6 h-6 rounded bg-[#2a2b36] text-white flex items-center justify-center font-bold"
+                >
+                  -
+                </button>
+                <span className="text-[#ff5708] font-bold">{(arScale * 28).toFixed(0)} cm Ø</span>
+                <button
+                  type="button"
+                  onClick={() => setArScale((s) => Math.min(1.4, s + 0.1))}
+                  className="w-6 h-6 rounded bg-[#2a2b36] text-white flex items-center justify-center font-bold"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+
+            {/* Dish Info & Add to Cart button */}
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-col min-w-0">
+                <span className="text-[14px] font-bold text-white truncate">{arDish.name}</span>
+                <span className="text-[12px] font-mono-code text-[#ff5708] font-bold">S/ {arDish.price.toFixed(2)}</span>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  handleAddToCart(arDish);
+                  setIsArModalOpen(false);
+                }}
+                className="px-4 py-2.5 rounded-xl bg-[#ff5708] text-[#2b0b00] font-bold text-[13px] flex items-center gap-1.5 shadow-lg hover:bg-[#ff6924] active:scale-95"
+              >
+                <span className="material-symbols-outlined text-[17px]">add_shopping_cart</span>
+                <span>Pedir este Plato</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
