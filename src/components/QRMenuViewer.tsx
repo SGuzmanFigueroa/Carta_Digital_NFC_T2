@@ -1,17 +1,27 @@
 import React, { useState } from 'react';
-import { MenuItem, OrderTicket } from '../types';
+import { MenuItem, OrderTicket, TableStatus } from '../types';
 import { ThreeDView } from './ThreeDView';
 
 interface QRMenuViewerProps {
   menuItems: MenuItem[];
   onAddNewOrder: (newTicket: OrderTicket) => void;
   onShowToast: (msg: string, icon?: string) => void;
+  activeTicket?: OrderTicket | null;
+  tables?: TableStatus[];
+  onSendOrderFromMenu?: (
+    table: string,
+    items: Array<{ item: MenuItem; quantity: number; notes?: string }>,
+    pax?: number
+  ) => OrderTicket;
 }
 
 export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   menuItems,
   onAddNewOrder,
   onShowToast,
+  activeTicket,
+  tables,
+  onSendOrderFromMenu
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('todos');
   const [searchQuery, setSearchQuery] = useState('');
@@ -67,27 +77,36 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   const handleSendOrder = () => {
     if (cart.length === 0) return;
 
-    const newTicket: OrderTicket = {
-      id: `cmd-${Math.floor(1000 + Math.random() * 9000)}`,
-      table: selectedTable,
-      pax: 2,
-      timeAgo: 'Justo ahora',
-      createdTime: new Date().toLocaleTimeString('es-PE', { hour12: false }),
-      origin: 'QR COMENSAL',
-      status: 'por-validar',
-      items: cart.map((c, idx) => ({
-        id: `it-${Date.now()}-${idx}`,
-        name: `${c.quantity}x ${c.item.name}`,
-        quantity: c.quantity,
-        price: c.item.price * c.quantity,
-        notes: c.notes,
-        station: c.item.category === 'bebidas' ? 'Barra' : c.item.category === 'entradas' ? 'Cuarto Frío' : 'Wok Station'
-      })),
-      subtotal: cartTotal,
-      total: cartTotal
-    };
+    if (onSendOrderFromMenu) {
+      onSendOrderFromMenu(selectedTable, cart, 2);
+    } else {
+      const newTicket: OrderTicket = {
+        id: `cmd-${Math.floor(1000 + Math.random() * 9000)}`,
+        table: selectedTable,
+        pax: 2,
+        timeAgo: 'Justo ahora',
+        createdTime: new Date().toLocaleTimeString('es-PE', { hour12: false }),
+        origin: 'QR COMENSAL',
+        status: 'por-validar',
+        items: cart.map((c, idx) => ({
+          id: `it-${Date.now()}-${idx}`,
+          name: `${c.quantity}x ${c.item.name}`,
+          quantity: c.quantity,
+          price: c.item.price * c.quantity,
+          notes: c.notes,
+          station:
+            c.item.category === 'bebidas'
+              ? 'Barra'
+              : c.item.category === 'entradas'
+              ? 'Cuarto Frío'
+              : 'Wok Station'
+        })),
+        subtotal: cartTotal,
+        total: cartTotal
+      };
+      onAddNewOrder(newTicket);
+    }
 
-    onAddNewOrder(newTicket);
     setCart([]);
     setIsCartOpen(false);
     onShowToast(`¡Comanda enviada a Cocina KDS desde ${selectedTable}!`, 'soup_kitchen');
@@ -116,11 +135,21 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
             onChange={(e) => setSelectedTable(e.target.value)}
             className="bg-[#1c1b1d] text-[#e5e1e4] text-[11px] font-label-code px-2 py-1 rounded border border-[#353437] focus:outline-none focus:border-[#ff5708]"
           >
-            <option value="MESA 04">Mesa 04</option>
-            <option value="MESA 01">Mesa 01</option>
-            <option value="MESA 02">Mesa 02</option>
-            <option value="MESA 07">Mesa 07 (Barra)</option>
-            <option value="MESA 06">Mesa 06 (Terraza)</option>
+            {tables && tables.length > 0 ? (
+              tables.map((t) => (
+                <option key={t.id} value={`MESA ${t.number.toString().padStart(2, '0')}`}>
+                  Mesa {t.number.toString().padStart(2, '0')} {t.zone ? `(${t.zone})` : ''}
+                </option>
+              ))
+            ) : (
+              <>
+                <option value="MESA 04">Mesa 04</option>
+                <option value="MESA 01">Mesa 01</option>
+                <option value="MESA 02">Mesa 02</option>
+                <option value="MESA 07">Mesa 07 (Barra)</option>
+                <option value="MESA 06">Mesa 06 (Terraza)</option>
+              </>
+            )}
           </select>
 
           <button
@@ -133,6 +162,68 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Live Operational Order Status Tracker for Diner */}
+      {activeTicket && (
+        <div className="max-w-4xl mx-auto px-4 pt-4">
+          <div className="bg-gradient-to-r from-[#1c1b1d] via-[#201f22] to-[#1c1b1d] border border-[#ff5708]/40 rounded-2xl p-4 shadow-[0_0_25px_-5px_rgba(255,87,8,0.25)] flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="relative flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff5708] opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-[#ff5708]"></span>
+                </span>
+                <span className="font-label-code text-[12px] text-[#ffb59c] font-bold uppercase tracking-wider">
+                  Comanda #{activeTicket.id.replace('ticket-', '').replace('cmd-', '')} • {activeTicket.table}
+                </span>
+              </div>
+              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-label-code font-bold uppercase bg-[#ff5708]/20 text-[#ffb59c] border border-[#ff5708]/40">
+                {activeTicket.status === 'por-validar' && '⏳ Recibido / Por Validar'}
+                {activeTicket.status === 'en-cocina' && '🔥 Cocinando en Wok/Josper'}
+                {activeTicket.status === 'pase-listo' && '✨ Listo en Mesa de Pase'}
+                {activeTicket.status === 'entregado' && '🍽️ Servido en Mesa'}
+              </span>
+            </div>
+
+            {/* Stepper Progress */}
+            <div className="grid grid-cols-4 gap-2 pt-1">
+              <div
+                className={`h-1.5 rounded-full transition-all ${
+                  ['por-validar', 'en-cocina', 'pase-listo', 'entregado'].includes(activeTicket.status)
+                    ? 'bg-[#ff5708] shadow-[0_0_8px_#ff5708]'
+                    : 'bg-[#353437]'
+                }`}
+              />
+              <div
+                className={`h-1.5 rounded-full transition-all ${
+                  ['en-cocina', 'pase-listo', 'entregado'].includes(activeTicket.status)
+                    ? 'bg-[#ff5708] shadow-[0_0_8px_#ff5708]'
+                    : 'bg-[#353437]'
+                }`}
+              />
+              <div
+                className={`h-1.5 rounded-full transition-all ${
+                  ['pase-listo', 'entregado'].includes(activeTicket.status)
+                    ? 'bg-[#ff5708] shadow-[0_0_8px_#ff5708]'
+                    : 'bg-[#353437]'
+                }`}
+              />
+              <div
+                className={`h-1.5 rounded-full transition-all ${
+                  activeTicket.status === 'entregado'
+                    ? 'bg-emerald-400 shadow-[0_0_8px_#34d399]'
+                    : 'bg-[#353437]'
+                }`}
+              />
+            </div>
+
+            <div className="flex items-center justify-between text-[11px] text-[#c6c5cf] font-label-code">
+              <span>{activeTicket.items.length} platos en marcha</span>
+              <span className="text-[#e5e1e4] font-bold">Total: S/ {activeTicket.total.toFixed(2)}</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="max-w-4xl mx-auto px-4 py-4 space-y-6">
         {/* Search & Category Filter */}
@@ -395,7 +486,10 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
             {/* Cart list */}
             <div className="space-y-3">
               {cart.map((c) => (
-                <div key={c.item.id} className="flex items-center justify-between bg-[#201f22] p-3 rounded-xl border border-[#353437]/30">
+                <div
+                  key={c.item.id}
+                  className="flex items-center justify-between bg-[#201f22] p-3 rounded-xl border border-[#353437]/30"
+                >
                   <div className="flex-1 min-w-0 pr-2">
                     <h4 className="text-[14px] font-medium text-[#e5e1e4] truncate">{c.item.name}</h4>
                     <span className="font-label-code text-[12px] text-[#ff5708] font-bold">

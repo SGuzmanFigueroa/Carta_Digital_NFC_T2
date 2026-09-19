@@ -3,14 +3,22 @@ import { TableStatus } from '../types';
 
 interface AdminFloorPanelProps {
   tables: TableStatus[];
+  totalShiftRevenue?: number;
   onShowToast: (msg: string, icon?: string) => void;
   onSelectTable?: (tableId: string) => void;
+  onPrioritizeTable?: (tableNum: string) => void;
+  onCollectTableBill?: (tableNum: string, amount?: number) => void;
+  onOpenTable?: (tableNum: string, pax?: number) => void;
 }
 
 export const AdminFloorPanel: React.FC<AdminFloorPanelProps> = ({
   tables,
+  totalShiftRevenue,
   onShowToast,
   onSelectTable,
+  onPrioritizeTable,
+  onCollectTableBill,
+  onOpenTable
 }) => {
   const [activeZone, setActiveZone] = useState<'all' | 'salon' | 'terraza' | 'barra'>('all');
   const [selectedTableDetail, setSelectedTableDetail] = useState<TableStatus | null>(null);
@@ -40,15 +48,27 @@ export const AdminFloorPanel: React.FC<AdminFloorPanelProps> = ({
   };
 
   const handlePrioritize = (tableNum: string) => {
-    onShowToast(`Alerta de prioridad enviada a Parrilla para Mesa ${tableNum}`, 'priority_high');
+    if (onPrioritizeTable) {
+      onPrioritizeTable(tableNum);
+    } else {
+      onShowToast(`Alerta de prioridad enviada a Parrilla para Mesa ${tableNum}`, 'priority_high');
+    }
   };
 
-  const handleCollectTicket = (tableNum: string, amount: number) => {
-    onShowToast(`Cobro registrado para Mesa ${tableNum}: S/ ${amount.toFixed(2)}`, 'point_of_sale');
+  const handleCollectTicket = (tableNum: string, amount?: number) => {
+    if (onCollectTableBill) {
+      onCollectTableBill(tableNum, amount);
+    } else {
+      onShowToast(`Cobro registrado para Mesa ${tableNum}: S/ ${(amount || 0).toFixed(2)}`, 'point_of_sale');
+    }
   };
 
   const handleOpenTable = (tableNum: string) => {
-    onShowToast(`Mesa ${tableNum} abierta. Comensales asignados.`, 'table_restaurant');
+    if (onOpenTable) {
+      onOpenTable(tableNum);
+    } else {
+      onShowToast(`Mesa ${tableNum} abierta. Comensales asignados.`, 'table_restaurant');
+    }
   };
 
   const handleCheckIn = (tableNum: string, guest: string) => {
@@ -121,7 +141,7 @@ export const AdminFloorPanel: React.FC<AdminFloorPanelProps> = ({
                 VENTAS DEL DÍA
               </span>
               <div className="flex items-baseline gap-2">
-                <span className="text-[26px] font-bold text-[#e5e1e4]">S/ 3,842.50</span>
+                <span className="text-[26px] font-bold text-[#e5e1e4]">S/ {(totalShiftRevenue ?? 4215.00).toFixed(2)}</span>
                 <span className="font-label-code text-[11px] text-[#ff5708] bg-[#ff5708]/15 px-1.5 py-0.5 rounded font-bold">
                   +18.4%
                 </span>
@@ -830,6 +850,89 @@ export const AdminFloorPanel: React.FC<AdminFloorPanelProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Interactive Table Operation Modal */}
+      {selectedTableDetail && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#1c1b1d] w-full max-w-md rounded-2xl border border-[#ff5708]/40 p-5 space-y-4 shadow-2xl animate-fadeIn">
+            <div className="flex items-center justify-between pb-2 border-b border-[#353437]">
+              <div className="flex items-center gap-2">
+                <span className="w-10 h-10 rounded-xl bg-[#ff5708] text-[#511500] font-bold font-label-code text-[18px] flex items-center justify-center">
+                  {selectedTableDetail.number}
+                </span>
+                <div>
+                  <h3 className="text-[17px] font-bold text-white">Mesa {selectedTableDetail.number}</h3>
+                  <span className="text-[11px] font-label-code text-[#c6c5cf] uppercase">
+                    Zona: {selectedTableDetail.zone} • {selectedTableDetail.pax || selectedTableDetail.capacity} PAX
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedTableDetail(null)}
+                className="p-1.5 rounded-lg text-[#c6c5cf] hover:text-white hover:bg-[#2a2a2c] cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-[12px] font-label-code">
+              <div className="p-3 bg-[#0e0e10] rounded-xl border border-[#2a2a2c]">
+                <span className="text-[#c6c5cf] block text-[10px] uppercase">ESTADO ACTUAL</span>
+                <span className="text-[14px] font-bold text-[#ffb59c] uppercase">
+                  {selectedTableDetail.status}
+                </span>
+              </div>
+              <div className="p-3 bg-[#0e0e10] rounded-xl border border-[#2a2a2c]">
+                <span className="text-[#c6c5cf] block text-[10px] uppercase">CONSUMO ACUMULADO</span>
+                <span className="text-[14px] font-bold text-[#ff5708]">
+                  S/ {(selectedTableDetail.amount || 0).toFixed(2)}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  handlePrioritize(selectedTableDetail.number);
+                  setSelectedTableDetail(null);
+                }}
+                className="w-full py-2.5 rounded-xl bg-[#ffb4ab]/20 hover:bg-[#ffb4ab]/30 text-[#ffb4ab] border border-[#ffb4ab]/40 font-bold text-[13px] flex items-center justify-center gap-2 cursor-pointer transition-all"
+              >
+                <span className="material-symbols-outlined text-[18px]">priority_high</span>
+                <span>Priorizar Comanda en Cocina KDS</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  handleCollectTicket(selectedTableDetail.number, selectedTableDetail.amount || 165);
+                  setSelectedTableDetail(null);
+                }}
+                className="w-full py-2.5 rounded-xl bg-[#ff5708] hover:brightness-110 text-[#511500] font-bold text-[13px] flex items-center justify-center gap-2 cursor-pointer transition-all shadow-lg"
+              >
+                <span className="material-symbols-outlined text-[18px]">point_of_sale</span>
+                <span>Cobrar Cuenta y Liberar Mesa</span>
+              </button>
+
+              {selectedTableDetail.status === 'disponible' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleOpenTable(selectedTableDetail.number);
+                    setSelectedTableDetail(null);
+                  }}
+                  className="w-full py-2.5 rounded-xl bg-[#2a2a2c] hover:bg-[#353437] text-white font-semibold text-[13px] flex items-center justify-center gap-2 cursor-pointer transition-all"
+                >
+                  <span className="material-symbols-outlined text-[18px]">table_restaurant</span>
+                  <span>Abrir Mesa (Asignar Comensales)</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Operational Footer Bar */}
       <footer className="w-full bg-[#0e0e10] py-3 px-4 rounded-xl border border-[#353437]/40 shadow-sm mt-4">

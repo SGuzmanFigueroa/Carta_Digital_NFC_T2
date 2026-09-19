@@ -4,6 +4,7 @@ import { kitchenAudio } from '../utils/audio';
 import { DishDetailModal } from './DishDetailModal';
 import { RunnersModal } from './RunnersModal';
 import { NewOrderModal } from './NewOrderModal';
+import { useRestaurant } from '../context/RestaurantContext';
 
 interface KDSBoardProps {
   tickets: Ticket[];
@@ -18,10 +19,22 @@ export const KDSBoard: React.FC<KDSBoardProps> = ({
   onUpdateTickets,
   onUpdateRunners
 }) => {
+  const {
+    dispatchTicket: contextDispatchTicket,
+    startTicketPrep: contextStartTicketPrep,
+    updateTicketItem: contextUpdateTicketItem,
+    recallLastDispatched: contextRecallLastDispatched,
+    notifyRunners: contextNotifyRunners,
+    callAllRunners: contextCallAllRunners,
+    updateRunnerStatus: contextUpdateRunnerStatus,
+    toggleKitchenPause: contextToggleKitchenPause,
+    kitchenPaused: contextKitchenPaused,
+    audioEnabled: contextAudioEnabled,
+    toggleAudio: contextToggleAudio
+  } = useRestaurant();
+
   const [selectedStation, setSelectedStation] = useState<StationId>('all');
-  const [audioEnabled, setAudioEnabled] = useState(true);
   const [highContrast, setHighContrast] = useState(false);
-  const [kitchenPaused, setKitchenPaused] = useState(false);
   const [currentTimeStr, setCurrentTimeStr] = useState('14:48:22');
   
   // Toast notification
@@ -37,21 +50,9 @@ export const KDSBoard: React.FC<KDSBoardProps> = ({
   const [runnersModalOpen, setRunnersModalOpen] = useState(false);
   const [newOrderModalOpen, setNewOrderModalOpen] = useState(false);
 
-  // Recall memory
-  const [lastDispatched, setLastDispatched] = useState<Ticket | null>(null);
-
-  // Live timer tick every second
+  // Live timer tick every second for wall clock
   useEffect(() => {
     const timer = setInterval(() => {
-      // Update tickets elapsed time
-      onUpdateTickets(
-        tickets.map((t) => {
-          if (t.status === 'lista_despachada' || t.status === 'archivada') return t;
-          return { ...t, elapsedSeconds: t.elapsedSeconds + 1 };
-        })
-      );
-
-      // Update current time string
       const now = new Date();
       setCurrentTimeStr(
         now.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
@@ -59,7 +60,7 @@ export const KDSBoard: React.FC<KDSBoardProps> = ({
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [tickets, onUpdateTickets]);
+  }, []);
 
   const showToast = (msg: string, icon = 'check_circle') => {
     setToastMessage(msg);
@@ -70,96 +71,34 @@ export const KDSBoard: React.FC<KDSBoardProps> = ({
   };
 
   const handleAudioToggle = () => {
-    const next = !audioEnabled;
-    setAudioEnabled(next);
-    kitchenAudio.enabled = next;
-    if (next) {
-      kitchenAudio.playCheckItemSound();
-      showToast('Alertas sonoras activadas', 'volume_up');
-    } else {
-      showToast('Alertas silenciadas', 'volume_off');
-    }
+    contextToggleAudio();
   };
 
   const handleToggleItemCheck = (ticketId: string, itemId: string) => {
-    const updated = tickets.map((ticket) => {
-      if (ticket.id !== ticketId) return ticket;
-      const updatedItems = ticket.items.map((item) => {
-        if (item.id !== itemId) return item;
-        const newChecked = !item.checked;
-        return {
-          ...item,
-          checked: newChecked,
-          status: newChecked ? ('listo' as const) : ('pendiente' as const)
-        };
-      });
-      return { ...ticket, items: updatedItems };
-    });
-
-    onUpdateTickets(updated);
-    kitchenAudio.playCheckItemSound();
+    const ticket = tickets.find((t) => t.id === ticketId);
+    const item = ticket?.items.find((i) => i.id === itemId);
+    if (!ticket || !item) return;
+    contextUpdateTicketItem(ticketId, itemId, !item.checked);
   };
 
   const handleDispatchOrder = (ticketId: string) => {
-    const ticketToDispatch = tickets.find((t) => t.id === ticketId);
-    if (!ticketToDispatch) return;
-
-    kitchenAudio.playDispatchSound();
-    setLastDispatched(ticketToDispatch);
-
-    const updated = tickets.map((t) => {
-      if (t.id === ticketId) {
-        return {
-          ...t,
-          status: 'lista_despachada' as const,
-          items: t.items.map((i) => ({ ...i, checked: true, status: 'listo' as const }))
-        };
-      }
-      return t;
-    });
-
-    onUpdateTickets(updated);
-    showToast(`Comanda #${ticketToDispatch.orderNumber} despachada al Pase con éxito`, 'done_all');
+    contextDispatchTicket(ticketId);
   };
 
   const handleStartPrep = (ticketId: string) => {
-    kitchenAudio.playCheckItemSound();
-    const updated = tickets.map((t) => {
-      if (t.id === ticketId) {
-        return { ...t, status: 'en_fuego' as const };
-      }
-      return t;
-    });
-    onUpdateTickets(updated);
-    showToast(`Orden #${tickets.find((t) => t.id === ticketId)?.orderNumber} iniciada en cocina`, 'soup_kitchen');
+    contextStartTicketPrep(ticketId);
   };
 
   const handleRecallLast = () => {
-    if (!lastDispatched) {
-      showToast('No hay comandas despachadas recientemente para recuperar', 'info');
-      return;
-    }
-    const recalledTicket = { ...lastDispatched, status: 'en_fuego' as const };
-    const updated = tickets.map((t) => (t.id === recalledTicket.id ? recalledTicket : t));
-    onUpdateTickets(updated);
-    setLastDispatched(null);
-    kitchenAudio.playCheckItemSound();
-    showToast(`Comanda #${recalledTicket.orderNumber} recuperada en pantalla KDS`, 'restore');
+    contextRecallLastDispatched();
   };
 
   const handleNotifyRunners = () => {
-    kitchenAudio.playRunnerAlertSound();
-    showToast('Aviso transmitido a salón: Platos calientes esperan en mesa de pase', 'campaign');
+    contextNotifyRunners();
   };
 
   const handleToggleKitchenPause = () => {
-    const next = !kitchenPaused;
-    setKitchenPaused(next);
-    if (next) {
-      showToast('Cocina pausada temporalmente. TPV notificará retraso a salón', 'pause');
-    } else {
-      showToast('Servicio y flujo de cocina reanudado con normalidad', 'play_arrow');
-    }
+    contextToggleKitchenPause();
   };
 
   const handleCreateNewTicket = (newTicket: Ticket) => {
@@ -169,30 +108,11 @@ export const KDSBoard: React.FC<KDSBoardProps> = ({
   };
 
   const handleCallAllRunners = () => {
-    kitchenAudio.playRunnerAlertSound();
-    const updatedRunners = runners.map((r) => ({
-      ...r,
-      status: 'Libre en Pase' as const,
-      location: 'Libre en Pase'
-    }));
-    onUpdateRunners(updatedRunners);
-    showToast('Todos los runners convocados de inmediato al Pase Central', 'campaign');
+    contextCallAllRunners();
   };
 
   const handleUpdateRunnerStatus = (runnerId: string, status: Runner['status'], table?: string) => {
-    const updated = runners.map((r) => {
-      if (r.id === runnerId) {
-        return {
-          ...r,
-          status,
-          currentTable: table,
-          location: status === 'Libre en Pase' ? 'Libre en Pase' : table || 'En Mesa'
-        };
-      }
-      return r;
-    });
-    onUpdateRunners(updated);
-    showToast('Estado de runner actualizado', 'person');
+    contextUpdateRunnerStatus(runnerId, status, table);
   };
 
   // Filter tickets by station
@@ -321,14 +241,14 @@ export const KDSBoard: React.FC<KDSBoardProps> = ({
             <button
               onClick={handleAudioToggle}
               className={`h-9 sm:h-10 px-2.5 sm:px-3.5 rounded-lg bg-[#2a2a2c] hover:bg-[#39393b] flex items-center gap-1.5 text-[#e5e1e4] font-mono-code text-[11px] font-bold active:scale-95 transition-all shrink-0 cursor-pointer ${
-                audioEnabled ? 'border border-[#ff5708]/40 text-[#ffb59c]' : 'text-[#71717a]'
+                contextAudioEnabled ? 'border border-[#ff5708]/40 text-[#ffb59c]' : 'text-[#71717a]'
               }`}
               title="Alternar alertas sonoras de cocina"
             >
               <span className="material-symbols-outlined text-[17px] sm:text-[18px] text-[#ff5708]">
-                {audioEnabled ? 'volume_up' : 'volume_off'}
+                {contextAudioEnabled ? 'volume_up' : 'volume_off'}
               </span>
-              <span className="hidden 2xl:inline uppercase">Alertas: {audioEnabled ? 'ON' : 'MUTE'}</span>
+              <span className="hidden 2xl:inline uppercase">Alertas: {contextAudioEnabled ? 'ON' : 'MUTE'}</span>
             </button>
 
             {/* High Contrast Toggle */}
@@ -366,9 +286,11 @@ export const KDSBoard: React.FC<KDSBoardProps> = ({
             </div>
 
             {/* Demora Crítica */}
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all ${
-              delayCriticalCount > 0 ? 'bg-[#93000a]/50 border border-[#ffb4ab]/40 animate-pulse' : 'bg-[#2a2a2c]'
-            }`}>
+            <div
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all ${
+                delayCriticalCount > 0 ? 'bg-[#93000a]/50 border border-[#ffb4ab]/40 animate-pulse' : 'bg-[#2a2a2c]'
+              }`}
+            >
               <span className="material-symbols-outlined text-[16px] text-[#ffb4ab]">warning</span>
               <span className="text-[#ffb4ab] font-bold tracking-wider">Demora Crítica:</span>
               <span className="text-[#ffb4ab] font-bold text-[15px]">{delayCriticalCount}</span>
@@ -386,8 +308,12 @@ export const KDSBoard: React.FC<KDSBoardProps> = ({
           {/* Quick Status Ticker */}
           <div className="flex items-center gap-4 text-[#c6c5cf] font-mono-code text-[11px]">
             <div className="flex items-center gap-2">
-              <span className={`inline-block w-2 h-2 rounded-full ${kitchenPaused ? 'bg-amber-400 animate-ping' : 'bg-emerald-500'}`}></span>
-              <span>{kitchenPaused ? 'COCINA EN PAUSA CONTROLADA' : 'SINCRONIZADO: SALÓN + DELIVERY'}</span>
+              <span
+                className={`inline-block w-2 h-2 rounded-full ${
+                  contextKitchenPaused ? 'bg-amber-400 animate-ping' : 'bg-emerald-500'
+                }`}
+              ></span>
+              <span>{contextKitchenPaused ? 'COCINA EN PAUSA CONTROLADA' : 'SINCRONIZADO: SALÓN + DELIVERY'}</span>
             </div>
             <div className="hidden md:flex items-center gap-1">
               <span className="text-[#ff5708] font-bold">{currentTimeStr}</span>
@@ -616,10 +542,10 @@ export const KDSBoard: React.FC<KDSBoardProps> = ({
                     <span className="material-symbols-outlined text-[20px]">done_all</span>
                     <span>DESPACHADO A RUNNERS</span>
                   </div>
-                ) : ticket.status === 'ingresada' && ticket.table === 'MESA 09' ? (
+                ) : ticket.status === 'ingresada' ? (
                   <button
                     onClick={() => handleStartPrep(ticket.id)}
-                    className="w-full py-3.5 px-5 rounded-lg bg-[#0494fc] hover:bg-blue-600 text-white font-sans text-[15px] font-bold tracking-wider uppercase flex items-center justify-center gap-2.5 shadow-lg shadow-[#0494fc]/20 transition-all active:scale-98"
+                    className="w-full py-3.5 px-5 rounded-lg bg-[#0494fc] hover:bg-blue-600 text-white font-sans text-[15px] font-bold tracking-wider uppercase flex items-center justify-center gap-2.5 shadow-lg shadow-[#0494fc]/20 transition-all active:scale-98 cursor-pointer"
                   >
                     <span className="material-symbols-outlined text-[22px]">play_arrow</span>
                     <span>Iniciar Preparación</span>
@@ -627,7 +553,7 @@ export const KDSBoard: React.FC<KDSBoardProps> = ({
                 ) : (
                   <button
                     onClick={() => handleDispatchOrder(ticket.id)}
-                    className={`w-full py-3.5 px-5 rounded-lg font-sans text-[15px] font-bold tracking-wider uppercase flex items-center justify-center gap-2.5 shadow-lg transition-all active:scale-98 ${
+                    className={`w-full py-3.5 px-5 rounded-lg font-sans text-[15px] font-bold tracking-wider uppercase flex items-center justify-center gap-2.5 shadow-lg transition-all active:scale-98 cursor-pointer ${
                       ticket.isUrgent || isOverdue
                         ? 'bg-[#ff5708] hover:bg-orange-600 text-white shadow-[#ff5708]/30'
                         : 'bg-[#ffb59c] hover:bg-[#ffdbcf] text-[#5c1900]'
@@ -813,15 +739,15 @@ export const KDSBoard: React.FC<KDSBoardProps> = ({
             <button
               onClick={handleToggleKitchenPause}
               className={`h-10 sm:h-12 px-3 sm:px-5 rounded-lg font-sans text-[12px] sm:text-[13px] uppercase font-bold flex items-center gap-2 transition-all shadow-md active:scale-95 border cursor-pointer ${
-                kitchenPaused
+                contextKitchenPaused
                   ? 'bg-[#93000a] text-white border-[#ffb4ab]'
                   : 'bg-[#201f22] hover:bg-[#93000a]/20 text-[#ffb4ab] border-[#353437]'
               }`}
             >
               <span className="material-symbols-outlined text-[18px] sm:text-[20px]">
-                {kitchenPaused ? 'play_circle' : 'pause_circle'}
+                {contextKitchenPaused ? 'play_circle' : 'pause_circle'}
               </span>
-              <span>{kitchenPaused ? 'Reanudar Cocina' : 'Pausar Cocina'}</span>
+              <span>{contextKitchenPaused ? 'Reanudar Cocina' : 'Pausar Cocina'}</span>
             </button>
 
             <div className="hidden lg:flex items-center gap-2 px-3 py-2 rounded bg-[#201f22] font-mono-code text-[11px] text-[#c6c5cf] border border-[#353437]/40">

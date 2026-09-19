@@ -4,18 +4,32 @@ import React, { useState } from 'react';
 import { PanelAdmin } from '@/components/PanelAdmin';
 import { AdminFloorPanel } from '@/components/AdminFloorPanel';
 import { Header } from '@/components/Header';
-import { INITIAL_TABLES } from '@/data/mockData';
 import { useRouter } from 'next/navigation';
+import { useRestaurant } from '@/context/RestaurantContext';
 
 export default function DashboardPage() {
   const router = useRouter();
   const [viewMode, setViewMode] = useState<'floor' | 'metrics'>('floor');
-  const [toast, setToast] = useState<{ message: string; icon?: string } | null>(null);
+  const {
+    tables,
+    tickets,
+    totalShiftRevenue,
+    prioritizeTable,
+    collectTableBill,
+    openTable,
+    toast,
+    showToast
+  } = useRestaurant();
 
-  const showToast = (message: string, icon = 'info') => {
-    setToast({ message, icon });
-    setTimeout(() => setToast(null), 3000);
-  };
+  // Active tickets count
+  const activeCount = tickets.filter(
+    (t) => t.status !== 'lista_despachada' && t.status !== 'archivada'
+  ).length;
+  const urgentCount = tickets.filter(
+    (t) =>
+      t.status !== 'lista_despachada' &&
+      (t.isUrgent || t.elapsedSeconds > t.targetSeconds)
+  ).length;
 
   const handleSelectTab = (tab: string) => {
     if (tab === 'cocina_kds') router.push('/kds');
@@ -29,8 +43,8 @@ export default function DashboardPage() {
       <Header
         currentTab="panel_admin"
         onSelectTab={handleSelectTab}
-        activeOrdersCount={4}
-        urgentCount={1}
+        activeOrdersCount={activeCount}
+        urgentCount={urgentCount}
       />
 
       <main className="w-full pt-16 min-h-screen">
@@ -40,7 +54,7 @@ export default function DashboardPage() {
             <button
               type="button"
               onClick={() => setViewMode('floor')}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-[12px] font-bold uppercase tracking-wider transition-all ${
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-[12px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
                 viewMode === 'floor'
                   ? 'bg-[#ff5708] text-white shadow-md shadow-[#ff5708]/30'
                   : 'bg-[#181920] text-[#9ca3af] hover:text-white'
@@ -53,7 +67,7 @@ export default function DashboardPage() {
             <button
               type="button"
               onClick={() => setViewMode('metrics')}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-[12px] font-bold uppercase tracking-wider transition-all ${
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-[12px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
                 viewMode === 'metrics'
                   ? 'bg-[#ff5708] text-white shadow-md shadow-[#ff5708]/30'
                   : 'bg-[#181920] text-[#9ca3af] hover:text-white'
@@ -72,8 +86,12 @@ export default function DashboardPage() {
 
         {viewMode === 'floor' ? (
           <AdminFloorPanel
-            tables={INITIAL_TABLES}
+            tables={tables}
+            totalShiftRevenue={totalShiftRevenue}
             onShowToast={showToast}
+            onPrioritizeTable={prioritizeTable}
+            onCollectTableBill={collectTableBill}
+            onOpenTable={openTable}
           />
         ) : (
           <PanelAdmin />

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Space_Mono } from "next/font/google";
 import "./globals.css";
+import { RestaurantProvider } from "@/context/RestaurantContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -19,8 +20,8 @@ const spaceMono = Space_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "GastroPulse OS - Cocina KDS",
-  description: "Kitchen Display System inteligente de alta velocidad para restaurantes",
+  title: "GastroPulse OS - Plataforma Gastronómica Integral",
+  description: "Plataforma integral de Carta Digital NFC, Cocina KDS y Control de Sala en tiempo real",
 };
 
 export default function RootLayout({
@@ -46,7 +47,9 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col bg-[#0b0c0e] text-[#e5e1e4] selection:bg-[#ff5708] selection:text-white">
-        {children}
+        <RestaurantProvider>
+          {children}
+        </RestaurantProvider>
       </body>
     </html>
   );

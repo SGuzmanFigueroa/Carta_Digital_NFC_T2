@@ -1,28 +1,22 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { QRMenuViewer } from '@/components/QRMenuViewer';
 import { INITIAL_MENU_ITEMS } from '@/data/mockData';
+import { useRestaurant } from '@/context/RestaurantContext';
 import { OrderTicket } from '@/types';
 
 export default function MenuPage() {
-  const [toast, setToast] = useState<{ message: string; icon?: string } | null>(null);
+  const {
+    sendOrderFromMenu,
+    dinerActiveTicket,
+    tables,
+    toast,
+    showToast
+  } = useRestaurant();
 
   const handleAddNewOrder = (newTicket: OrderTicket) => {
-    // Save to localStorage for real-time pickup in KDS
-    try {
-      const existing = localStorage.getItem('gastropulse_orders');
-      const orders = existing ? JSON.parse(existing) : [];
-      orders.unshift(newTicket);
-      localStorage.setItem('gastropulse_orders', JSON.stringify(orders));
-    } catch (e) {
-      console.warn('Could not save order to storage', e);
-    }
-  };
-
-  const showToast = (message: string, icon = 'info') => {
-    setToast({ message, icon });
-    setTimeout(() => setToast(null), 3500);
+    // Already handled via sendOrderFromMenu inside QRMenuViewer
   };
 
   return (
@@ -31,6 +25,9 @@ export default function MenuPage() {
         menuItems={INITIAL_MENU_ITEMS}
         onAddNewOrder={handleAddNewOrder}
         onShowToast={showToast}
+        activeTicket={dinerActiveTicket}
+        tables={tables}
+        onSendOrderFromMenu={sendOrderFromMenu}
       />
 
       {/* Floating Toast Alert */}
