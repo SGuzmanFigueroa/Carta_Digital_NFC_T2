@@ -5,6 +5,10 @@ import { Ticket, OrderTicket, TableStatus, Runner, MenuItem, StationId, TicketIt
 import { INITIAL_TICKETS, INITIAL_RUNNERS } from '../data/initialData';
 import { INITIAL_ORDERS, INITIAL_TABLES, INITIAL_MENU_ITEMS } from '../data/mockData';
 import { kitchenAudio } from '../utils/audio';
+import { supabase } from '@/lib/supabase';
+import { fetchTablesFromDb, settleTableInDb } from '@/services/tableService';
+import { fetchOrdersFromDb, createOrderInDb, updateOrderStatusInDb } from '@/services/orderService';
+import { loginStaffWithPin } from '@/services/authService';
 import {
   sanitizeText,
   sanitizeNotes,
@@ -186,6 +190,43 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
     } catch (err) {
       // BroadcastChannel optional fallback
     }
+  }, []);
+
+  // Supabase Database Sync & Realtime Subscription
+  useEffect(() => {
+    // 1. Initial fetch from Supabase
+    fetchTablesFromDb().then((dbTables) => {
+      if (dbTables && dbTables.length > 0) {
+        setTables(dbTables);
+      }
+    }).catch(console.warn);
+
+    fetchOrdersFromDb().then((dbOrders) => {
+      if (dbOrders && dbOrders.length > 0) {
+        setOrders(dbOrders);
+      }
+    }).catch(console.warn);
+
+    // 2. Supabase Realtime Channel
+    const channel = supabase
+      .channel('gastropulse_realtime_sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, async () => {
+        const freshOrders = await fetchOrdersFromDb();
+        if (freshOrders && freshOrders.length > 0) {
+          setOrders(freshOrders);
+        }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'restaurant_tables' }, async () => {
+        const freshTables = await fetchTablesFromDb();
+        if (freshTables && freshTables.length > 0) {
+          setTables(freshTables);
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   // Load persisted state & current user on mount
@@ -671,6 +712,8 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
   // 7. Collect Table Bill and Free Table (Corte / Cobro)
   const collectTableBill = useCallback(
     (tableNumber: string, amount?: number) => {
+      // Settle in Supabase DB
+      settleTableInDb(tableNumber).catch(console.warn);
       const cleanNum = tableNumber.replace(/\D/g, '');
       const billAmount = amount || 165.00;
 
