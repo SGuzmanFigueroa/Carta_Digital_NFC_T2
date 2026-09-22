@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { SystemConfigState } from '../types';
 import { applyTheme } from '@/utils/theme';
+import { getTranslations, getLanguageCode } from '@/utils/i18n';
 
 interface SystemConfigProps {
   config: SystemConfigState;
@@ -58,6 +59,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
     setShowLogoModal(false);
   };
 
+  const t = getTranslations(formData.language);
   const isLight = formData.themeMode === 'light';
   const isHighContrast = formData.themeMode === 'kds-high-contrast';
 
@@ -132,15 +134,15 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
       {/* Header */}
       <div className={`mb-2 border-b pb-6 ${sectionHeaderBorder}`}>
         <p className={`text-[10px] uppercase tracking-[0.2em] mb-2 font-mono ${isLight ? 'text-[#64748b]' : 'text-gray-500'}`}>
-          SYS // CONFIG-SUITE • NODE.LIM-01 • FIRMWARE v4.8.2
+          {t.sys_code}
         </p>
         <div className="flex justify-between items-center flex-wrap gap-4">
           <div>
             <h1 className={`text-3xl md:text-4xl font-bold mb-1 tracking-tight ${titleColor}`}>
-              Configuración del Sistema
+              {t.sys_title}
             </h1>
             <p className={`text-[13px] max-w-2xl ${descColor}`}>
-              Parámetros operacionales para la sucursal {formData.branchName || 'AUREA Bistro'}. Cambios reflejados en tiempo real en KDS, tabletas de mozos y comandera térmica.
+              {t.sys_subtitle} {formData.branchName || 'AUREA Bistro'}. {t.sys_subtitle_end}
             </p>
           </div>
           <div className="flex gap-4">
@@ -159,14 +161,14 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
               }`}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-              Restablecer Valores
+              {t.reset_values}
             </button>
             <button 
               onClick={handleSave}
               className="px-5 py-2.5 bg-[#FF5A1F] text-white rounded hover:bg-[#FF703D] transition font-bold text-sm flex items-center gap-2 cursor-pointer shadow-[0_0_15px_rgba(255,90,31,0.25)] active:scale-95"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
-              Guardar Cambios
+              {t.save_changes}
             </button>
           </div>
         </div>
@@ -247,21 +249,21 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
 
           <div className={`mt-8 p-5 rounded text-[11px] font-mono tracking-wide border ${sidebarBg}`}>
             <div className={`flex justify-between mb-4 uppercase font-bold ${isLight ? 'text-[#64748b]' : 'text-gray-500'}`}>
-              <span>Estado de Terminal</span>
+              <span>{t.terminal_status}</span>
               <span className="text-[#00FF88] flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-[#00FF88]"></span> OK</span>
             </div>
             <div className="flex flex-col gap-2.5">
               <div className="flex justify-between">
-                <span>Latencia KDS</span> 
+                <span>{t.kds_latency}</span> 
                 <span className={isLight ? 'text-[#0f172a] font-semibold' : 'text-white'}>18 ms</span>
               </div>
               <div className="flex justify-between">
-                <span>Sincro Local</span> 
+                <span>{t.local_sync}</span> 
                 <span className={isLight ? 'text-[#0f172a] font-semibold' : 'text-white'}>SQLite Activo</span>
               </div>
               <div className="flex justify-between">
-                <span>Impresora Red</span> 
-                <span className="text-[#FF5A1F] font-semibold">Conectada</span>
+                <span>{t.printer_network}</span> 
+                <span className="text-[#FF5A1F] font-semibold">{t.connected}</span>
               </div>
             </div>
           </div>
@@ -280,8 +282,8 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                   </svg>
                 </div>
                 <div>
-                  <h2 className={`text-lg font-bold mb-0.5 ${titleColor}`}>Perfil & Cuenta Operativa</h2>
-                  <p className={`text-[13px] ${descColor}`}>Identidad de sala y contacto oficial para auditorías tributarias y comandas.</p>
+                  <h2 className={`text-lg font-bold mb-0.5 ${titleColor}`}>{t.profile_title}</h2>
+                  <p className={`text-[13px] ${descColor}`}>{t.profile_desc}</p>
                 </div>
               </div>
               <span className={`text-[10px] font-mono px-2 py-1 rounded border tracking-widest uppercase ${badgeStyle}`}>SEC_01</span>
@@ -314,7 +316,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                   }`}
                 >
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                  Cambiar Logo
+                  {t.change_logo}
                 </button>
                 <input 
                   type="file" 
@@ -329,7 +331,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
               <div className="flex-1 flex flex-col justify-between">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
                   <div className="flex flex-col gap-1.5">
-                    <label className={`text-[10px] uppercase tracking-[0.1em] font-bold ${labelColor}`}>Nombre de la Sucursal</label>
+                    <label className={`text-[10px] uppercase tracking-[0.1em] font-bold ${labelColor}`}>{t.branch_name}</label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z" /></svg>
@@ -339,7 +341,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                   </div>
 
                   <div className="flex flex-col gap-1.5">
-                    <label className={`text-[10px] uppercase tracking-[0.1em] font-bold ${labelColor}`}>Administrador de Turno</label>
+                    <label className={`text-[10px] uppercase tracking-[0.1em] font-bold ${labelColor}`}>{t.shift_manager}</label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
@@ -349,7 +351,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                   </div>
 
                   <div className="flex flex-col gap-1.5">
-                    <label className={`text-[10px] uppercase tracking-[0.1em] font-bold ${labelColor}`}>Correo de Notificaciones</label>
+                    <label className={`text-[10px] uppercase tracking-[0.1em] font-bold ${labelColor}`}>{t.notification_email}</label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
@@ -359,7 +361,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                   </div>
 
                   <div className="flex flex-col gap-1.5">
-                    <label className={`text-[10px] uppercase tracking-[0.1em] font-bold ${labelColor}`}>Teléfono de Contacto Sala</label>
+                    <label className={`text-[10px] uppercase tracking-[0.1em] font-bold ${labelColor}`}>{t.room_phone}</label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
@@ -390,8 +392,8 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                   </svg>
                 </div>
                 <div>
-                  <h2 className={`text-lg font-bold mb-0.5 ${titleColor}`}>Preferencias de Notificaciones & Alertas</h2>
-                  <p className={`text-[13px] ${descColor}`}>Ajusta los disparadores de audio y avisos visuales para el personal de servicio.</p>
+                  <h2 className={`text-lg font-bold mb-0.5 ${titleColor}`}>{t.notif_title}</h2>
+                  <p className={`text-[13px] ${descColor}`}>{t.notif_desc}</p>
                 </div>
               </div>
               <span className={`text-[10px] font-mono px-2 py-1 rounded border tracking-widest uppercase ${badgeStyle}`}>SEC_02</span>
@@ -484,7 +486,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
             <div className="p-6 flex flex-col gap-6">
               {/* MODO DE PANTALLA */}
               <div>
-                <label className={`text-[10px] uppercase tracking-[0.1em] font-bold mb-3 block ${labelColor}`}>Modo de Pantalla</label>
+                <label className={`text-[10px] uppercase tracking-[0.1em] font-bold mb-3 block ${labelColor}`}>{t.screen_mode}</label>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   
                   {/* Obsidian */}
@@ -502,7 +504,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                     }`}
                   >
                     <div className="flex justify-between items-center mb-3">
-                      <span className="text-[13px] font-bold text-white">Oscuro Obsidian</span>
+                      <span className="text-[13px] font-bold text-white">{t.theme_obsidian_title}</span>
                       <span className={`w-4 h-4 rounded-full border flex items-center justify-center ${
                         formData.themeMode === 'obsidian' ? 'border-[#FF5A1F]' : 'border-gray-600'
                       }`}>
@@ -539,7 +541,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                     }`}
                   >
                     <div className="flex justify-between items-center mb-3">
-                      <span className={`text-[13px] font-bold ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>Claro Minimal</span>
+                      <span className={`text-[13px] font-bold ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>{t.theme_light_title}</span>
                       <span className={`w-4 h-4 rounded-full border flex items-center justify-center ${
                         formData.themeMode === 'light' ? 'border-[#FF5A1F]' : 'border-gray-500'
                       }`}>
@@ -557,7 +559,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                         <div className="h-6 bg-white rounded border border-[#e2e8f0]" />
                       </div>
                     </div>
-                    <p className={`text-[11px] leading-tight ${isLight ? 'text-[#64748b]' : 'text-gray-400'}`}>Ideal para terrazas con alta iluminación natural directa.</p>
+                    <p className={`text-[11px] leading-tight ${isLight ? 'text-[#64748b]' : 'text-gray-400'}`}>{t.theme_light_desc}</p>
                   </div>
 
                   {/* Alto Contraste KDS */}
@@ -575,7 +577,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                     }`}
                   >
                     <div className="flex justify-between items-center mb-3">
-                      <span className="text-[13px] font-bold text-white">Alto Contraste KDS</span>
+                      <span className="text-[13px] font-bold text-white">{t.theme_kds_title}</span>
                       <span className={`w-4 h-4 rounded-full border flex items-center justify-center ${
                         formData.themeMode === 'kds-high-contrast' ? 'border-[#FF5A1F]' : 'border-gray-600'
                       }`}>
@@ -593,7 +595,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                         <div className="h-6 bg-white rounded-sm" />
                       </div>
                     </div>
-                    <p className="text-[11px] text-gray-400 leading-tight">Líneas hiper-visibles a 3 metros de distancia en línea de fuego.</p>
+                    <p className="text-[11px] text-gray-400 leading-tight">{t.theme_kds_desc}</p>
                   </div>
                 </div>
               </div>
@@ -602,7 +604,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
                 {/* Acento Cromático */}
                 <div className="flex flex-col gap-3">
-                  <label className={`text-[10px] uppercase tracking-[0.1em] font-bold ${labelColor}`}>Acento Cromático Operativo</label>
+                  <label className={`text-[10px] uppercase tracking-[0.1em] font-bold ${labelColor}`}>{t.chromatic_accent}</label>
                   <div className="grid grid-cols-3 gap-2">
                     <button
                       type="button"
@@ -670,7 +672,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                 {/* Densidad de Interfaz */}
                 <div className="flex flex-col gap-3">
                   <label className={`text-[10px] uppercase tracking-[0.1em] font-bold ${labelColor}`}>
-                    Densidad de Interfaz
+                    {t.density_title}
                   </label>
                   <div className={`grid grid-cols-2 gap-2 p-1 rounded-lg border ${
                     isLight ? 'bg-[#f1f5f9] border-[#e2e8f0]' : 'bg-[#141414] border-[#2A2A2A]'
@@ -699,7 +701,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                       >
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
                       </svg>
-                      <span>Compacta (Desktop)</span>
+                      <span>{t.density_compact}</span>
                     </button>
 
                     <button
@@ -726,7 +728,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                       >
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11.5V14m0-2.5v-6a1.5 1.5 0 113 0m-3 6a1.5 1.5 0 00-3 0v2a7.5 7.5 0 0015 0v-5a1.5 1.5 0 00-3 0m-6-3V11m0-5.5v-1a1.5 1.5 0 013 0v1m0 0V11m0-5.5a1.5 1.5 0 013 0v3m0 0V11" />
                       </svg>
-                      <span>Táctil Ampliada</span>
+                      <span>{t.density_touch}</span>
                     </button>
                   </div>
                   <p className={`text-[11px] ${descColor}`}>
@@ -747,29 +749,49 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                   <svg className="w-5 h-5 text-[#FF5A1F]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" /></svg>
                 </div>
                 <div>
-                  <h2 className={`text-lg font-bold mb-0.5 ${titleColor}`}>Idioma & Regionalización</h2>
-                  <p className={`text-[13px] ${descColor}`}>Ajustes fiscales, moneda contable y sincronización horaria de comandas.</p>
+                  <h2 className={`text-lg font-bold mb-0.5 ${titleColor}`}>{t.region_title}</h2>
+                  <p className={`text-[13px] ${descColor}`}>{t.region_desc}</p>
                 </div>
               </div>
               <span className={`text-[10px] font-mono px-2 py-1 rounded border tracking-widest uppercase ${badgeStyle}`}>SEC_04</span>
             </div>
             <div className="p-6 grid grid-cols-1 md:grid-cols-4 gap-6">
               <div className="flex flex-col gap-1.5">
-                <label className={`text-[10px] uppercase tracking-[0.1em] font-bold ${labelColor}`}>Idioma del Sistema</label>
-                <select value={formData.language} onChange={(e) => setFormData({...formData, language: e.target.value})} className={`w-full rounded p-2.5 text-[13px] focus:border-[#FF5A1F] focus:outline-none transition ${selectBg}`}>
+                <label className={`text-[10px] uppercase tracking-[0.1em] font-bold ${labelColor}`}>{t.system_language}</label>
+                <select 
+                    value={formData.language} 
+                    onChange={(e) => {
+                      const newLang = e.target.value;
+                      setFormData({...formData, language: newLang});
+                      const newT = getTranslations(newLang);
+                      if (typeof document !== 'undefined') {
+                        document.documentElement.lang = getLanguageCode(newLang);
+                      }
+                      onShowToast(newT.toast_lang_changed, 'translate');
+                    }} 
+                    className={`w-full rounded p-2.5 text-[13px] focus:border-[#FF5A1F] focus:outline-none transition ${selectBg}`}
+                  >
                   <option value="Español (Perú)">Español (Perú)</option>
                   <option value="English (US)">English (US)</option>
                 </select>
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className={`text-[10px] uppercase tracking-[0.1em] font-bold ${labelColor}`}>Moneda Base</label>
-                <select value={formData.currency} onChange={(e) => setFormData({...formData, currency: e.target.value})} className={`w-full rounded p-2.5 text-[13px] focus:border-[#FF5A1F] focus:outline-none transition ${selectBg}`}>
+                <label className={`text-[10px] uppercase tracking-[0.1em] font-bold ${labelColor}`}>{t.base_currency}</label>
+                <select 
+                    value={formData.currency} 
+                    onChange={(e) => {
+                      const newCurr = e.target.value;
+                      setFormData({...formData, currency: newCurr});
+                      onShowToast(`Moneda actualizada: ${newCurr}`, 'payments');
+                    }} 
+                    className={`w-full rounded p-2.5 text-[13px] focus:border-[#FF5A1F] focus:outline-none transition ${selectBg}`}
+                  >
                   <option value="Soles Peruanos (S/)">Soles Peruanos (S/)</option>
                   <option value="USD ($)">Dólares (USD)</option>
                 </select>
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className={`text-[10px] uppercase tracking-[0.1em] font-bold ${labelColor}`}>Zona Horaria (NTP)</label>
+                <label className={`text-[10px] uppercase tracking-[0.1em] font-bold ${labelColor}`}>{t.timezone}</label>
                 <select 
                   value={formData.timezone} 
                   onChange={(e) => setFormData({...formData, timezone: e.target.value})} 
@@ -785,7 +807,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                 </select>
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className={`text-[10px] uppercase tracking-[0.1em] font-bold ${labelColor}`}>Formato Horario</label>
+                <label className={`text-[10px] uppercase tracking-[0.1em] font-bold ${labelColor}`}>{t.time_format}</label>
                 <div className={`flex border rounded overflow-hidden p-0.5 ${
                   isLight ? 'bg-[#f1f5f9] border-[#cbd5e1]' : 'bg-[#252525] border-[#333]'
                 }`}>
@@ -801,7 +823,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                         : isLight ? 'text-[#64748b] hover:text-[#0f172a]' : 'text-gray-500 hover:text-gray-300'
                     }`}
                   >
-                    24 HORAS
+                    {t.format_24h}
                   </button>
                   <button 
                     type="button"
@@ -815,7 +837,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                         : isLight ? 'text-[#64748b] hover:text-[#0f172a]' : 'text-gray-500 hover:text-gray-300'
                     }`}
                   >
-                    12H (AM/PM)
+                    {t.format_12h}
                   </button>
                 </div>
               </div>
@@ -830,8 +852,8 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                   <svg className="w-5 h-5 text-[#FF5A1F]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
                 </div>
                 <div>
-                  <h2 className={`text-lg font-bold mb-0.5 ${titleColor}`}>Hardware de Impresión & ESC/POS</h2>
-                  <p className={`text-[13px] ${descColor}`}>Conexión directa vía socket TCP a impresoras térmicas de cocina y caja central.</p>
+                  <h2 className={`text-lg font-bold mb-0.5 ${titleColor}`}>{t.hardware_title}</h2>
+                  <p className={`text-[13px] ${descColor}`}>{t.hardware_desc}</p>
                 </div>
               </div>
               <span className={`text-[10px] font-mono px-2 py-1 rounded border tracking-widest uppercase ${badgeStyle}`}>SEC_05</span>
@@ -840,21 +862,21 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
               <div className="flex-1 space-y-6">
                 <div className="flex items-center justify-between">
                   <p className={`text-[13px] font-semibold flex items-center gap-2 ${isLight ? 'text-[#334155]' : 'text-gray-300'}`}>
-                    <span className="w-2 h-2 rounded-full bg-[#00FF88]"></span> Comandera Térmica de Red
+                    <span className="w-2 h-2 rounded-full bg-[#00FF88]"></span> {t.thermal_printer}
                   </p>
                   <span className="text-[#00FF88] text-[10px] font-mono tracking-widest font-bold">ONLINE // READY</span>
                 </div>
                 <div className="grid grid-cols-3 gap-4">
                   <div className="flex flex-col gap-1.5 col-span-1">
-                    <label className={`text-[10px] uppercase tracking-[0.1em] font-bold ${labelColor}`}>Dirección IP</label>
+                    <label className={`text-[10px] uppercase tracking-[0.1em] font-bold ${labelColor}`}>{t.ip_address}</label>
                     <input type="text" value={formData.printerIp} onChange={(e) => setFormData({...formData, printerIp: e.target.value})} className={`w-full rounded p-2.5 text-[13px] font-mono focus:border-[#FF5A1F] focus:outline-none transition ${selectBg}`} />
                   </div>
                   <div className="flex flex-col gap-1.5 col-span-1">
-                    <label className={`text-[10px] uppercase tracking-[0.1em] font-bold ${labelColor}`}>Puerto / Socket</label>
+                    <label className={`text-[10px] uppercase tracking-[0.1em] font-bold ${labelColor}`}>{t.port_socket}</label>
                     <input type="text" value={formData.printerPort} onChange={(e) => setFormData({...formData, printerPort: e.target.value})} className={`w-full rounded p-2.5 text-[13px] font-mono focus:border-[#FF5A1F] focus:outline-none transition ${selectBg}`} />
                   </div>
                   <div className="flex flex-col gap-1.5 col-span-1">
-                    <label className={`text-[10px] uppercase tracking-[0.1em] font-bold ${labelColor}`}>Ancho Papel</label>
+                    <label className={`text-[10px] uppercase tracking-[0.1em] font-bold ${labelColor}`}>{t.paper_width}</label>
                     <select value={formData.paperWidth} onChange={(e) => setFormData({...formData, paperWidth: e.target.value as any})} className={`w-full rounded p-2.5 text-[13px] focus:border-[#FF5A1F] focus:outline-none transition ${selectBg}`}>
                       <option value="80mm">80mm</option>
                       <option value="58mm">58mm</option>
@@ -864,11 +886,11 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                 <div className="flex items-center gap-6 pt-4 flex-wrap">
                   <label className={`flex items-center gap-2 text-[12.5px] cursor-pointer ${isLight ? 'text-[#334155]' : 'text-gray-300'}`}>
                     <input type="checkbox" checked={formData.autoCut} onChange={() => handleToggle('autoCut')} className="w-4 h-4 accent-[#FF5A1F]" />
-                    Corte automático
+                    {t.auto_cut}
                   </label>
                   <label className={`flex items-center gap-2 text-[12.5px] cursor-pointer ${isLight ? 'text-[#334155]' : 'text-gray-300'}`}>
                     <input type="checkbox" checked={formData.acousticBuzzer} onChange={() => handleToggle('acousticBuzzer')} className="w-4 h-4 accent-[#FF5A1F]" />
-                    Buzzer acústico
+                    {t.acoustic_buzzer}
                   </label>
                   <button onClick={handleTestPrint} className={`ml-auto px-4 py-2 border rounded-lg transition text-[12px] font-medium flex items-center gap-2 cursor-pointer ${
                     isLight 
@@ -876,7 +898,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                       : 'bg-[#252525] hover:bg-[#333] border-[#3A3A3A] text-gray-300'
                   }`}>
                     <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
-                    {testPrintActive ? 'Enviando...' : 'Imprimir Ticket de Prueba'}
+                    {testPrintActive ? t.printing : t.print_test}
                   </button>
                 </div>
               </div>
@@ -886,14 +908,14 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                 isLight ? 'bg-[#f8fafc] border-[#cbd5e1]' : 'bg-[#0F0F0F] border-[#2A2A2A]'
               }`}>
                 <div className="flex justify-between items-center mb-3">
-                  <span className={`text-[10px] tracking-[0.1em] font-mono ${isLight ? 'text-[#64748b]' : 'text-gray-500'}`}>MONITOR ESC/POS</span>
-                  <span className="text-[10px] text-[#FF5A1F] tracking-[0.1em] font-bold font-mono">SIMULADOR</span>
+                  <span className={`text-[10px] tracking-[0.1em] font-mono ${isLight ? 'text-[#64748b]' : 'text-gray-500'}`}>{t.escpos_monitor}</span>
+                  <span className="text-[10px] text-[#FF5A1F] tracking-[0.1em] font-bold font-mono">{t.simulator}</span>
                 </div>
                 <div className="flex-1 bg-white p-4 font-mono text-[10px] text-black leading-relaxed shadow-md border border-[#e2e8f0] rounded">
                   <p className="text-center font-bold">=== {formData.branchName.toUpperCase() || 'AUREA BISTRO'} ===</p>
                   <p className="text-center font-bold mb-2">COMANDA: #4088 (MESA 12)</p>
                   <div className="flex justify-between mb-2 pb-1 border-b border-dashed border-gray-400">
-                    <span>MOZO: CARLOS R.</span>
+                    <span>{t.waiter}: CARLOS R.</span>
                     <span className="font-bold">{formData.timeFormat === '12h' ? '02:28:10 PM' : '14:28:10'}</span>
                   </div>
                   <div className="flex justify-between font-bold mt-2">
@@ -906,10 +928,10 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                     <span>PIC: MED</span>
                   </div>
                   <div className="flex justify-between font-bold mt-2 text-[10px] pb-1 border-b border-dashed border-gray-300">
-                    <span>TOTAL COMANDA:</span>
+                    <span>{t.total_order}:</span>
                     <span className="text-[#FF5A1F] font-bold">{formData.currency.includes('USD') ? '$ 48.00' : 'S/ 124.00'}</span>
                   </div>
-                  <p className="text-center text-gray-500 mt-2 text-[8px]">-- PROTOCOLO ESC/POS OK --</p>
+                  <p className="text-center text-gray-500 mt-2 text-[8px]">{t.escpos_ok}</p>
                 </div>
               </div>
             </div>
@@ -928,7 +950,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-[#FF5A1F] text-[22px]">add_photo_alternate</span>
                 <h3 className={`font-bold text-[16px] ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>
-                  Actualizar Logo de la Sucursal
+                  {t.modal_logo_title}
                 </h3>
               </div>
               <button
@@ -952,15 +974,15 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                   <span className="material-symbols-outlined text-[24px]">upload_file</span>
                 </div>
                 <div className="text-center">
-                  <div className={`text-[13px] font-bold ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>Subir imagen desde el equipo</div>
-                  <div className={`text-[11px] ${isLight ? 'text-[#64748b]' : 'text-gray-400'}`}>PNG, JPG, SVG o WebP (Max. 5MB)</div>
+                  <div className={`text-[13px] font-bold ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>{t.upload_pc}</div>
+                  <div className={`text-[11px] ${isLight ? 'text-[#64748b]' : 'text-gray-400'}`}>{t.upload_specs}</div>
                 </div>
               </div>
 
               {/* Opcion 2: URL Externa */}
               <form onSubmit={handleApplyLogoUrl} className="space-y-2">
                 <label className={`text-[11px] font-bold uppercase tracking-wider block ${isLight ? 'text-[#475569]' : 'text-gray-400'}`}>
-                  O ingresar enlace directo (URL de imagen)
+                  {t.or_url}
                 </label>
                 <div className="flex gap-2">
                   <input
@@ -990,7 +1012,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                 }`}
               >
                 <span className="material-symbols-outlined text-[16px]">restart_alt</span>
-                <span>Restaurar Logo Predeterminado (/logo.png)</span>
+                <span>{t.restore_default_logo}</span>
               </button>
             </div>
           </div>

@@ -66,6 +66,7 @@ export default function ConfiguracionPage() {
         onSelectTab={handleSelectTab}
         activeOrdersCount={4}
         urgentCount={1}
+        language={config.language}
       />
       <main className="w-full pt-16 min-h-screen transition-colors duration-200">
         <SystemConfig

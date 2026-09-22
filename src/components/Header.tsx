@@ -1,20 +1,24 @@
 import React, { useState } from 'react';
 import { ScreenTab } from '../types';
 import { useRestaurant } from '../context/RestaurantContext';
+import { getTranslations } from '../utils/i18n';
 
 interface HeaderProps {
   currentTab: ScreenTab;
   onSelectTab: (tab: ScreenTab) => void;
   activeOrdersCount: number;
   urgentCount: number;
+  language?: string;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   currentTab,
   onSelectTab,
   activeOrdersCount,
-  urgentCount
+  urgentCount,
+  language
 }) => {
+  const t = getTranslations(language);
   const { currentUser, lockTerminal, logoutUser } = useRestaurant();
   const [bistroOpen, setBistroOpen] = useState(false);
   const [selectedBistro, setSelectedBistro] = useState('AUREA Bistro');
@@ -111,7 +115,7 @@ export const Header: React.FC<HeaderProps> = ({
                 : 'border-transparent text-[#bcbbc5] hover:text-[#e5e1e4] hover:bg-[#1c1b1d]'
             }`}
           >
-            <span className="hidden 2xl:inline">Central de </span>Pedidos
+            {t.orders_central}
           </button>
 
           <button
@@ -122,7 +126,7 @@ export const Header: React.FC<HeaderProps> = ({
                 : 'border-transparent text-[#bcbbc5] hover:text-[#e5e1e4] hover:bg-[#1c1b1d]'
             }`}
           >
-            <span>Cocina KDS</span>
+            <span>{t.kitchen_kds}</span>
             {activeOrdersCount > 0 && (
               <span className={`px-1.5 py-0.2 rounded text-[10px] 2xl:text-[11px] font-mono-code font-bold ${
                 urgentCount > 0 ? 'bg-[#93000a] text-white animate-pulse' : 'bg-[#ff5708]/30 text-[#ffb59c]'
@@ -140,7 +144,7 @@ export const Header: React.FC<HeaderProps> = ({
                 : 'border-transparent text-[#bcbbc5] hover:text-[#e5e1e4] hover:bg-[#1c1b1d]'
             }`}
           >
-            Panel Admin
+            {t.admin_panel}
           </button>
 
           <button
@@ -151,7 +155,7 @@ export const Header: React.FC<HeaderProps> = ({
                 : 'border-transparent text-[#bcbbc5] hover:text-[#e5e1e4] hover:bg-[#1c1b1d]'
             }`}
           >
-            <span className="hidden 2xl:inline">Gestión de </span>Usuarios
+            {t.user_management}
           </button>
 
           <button
@@ -162,7 +166,7 @@ export const Header: React.FC<HeaderProps> = ({
                 : 'border-transparent text-[#bcbbc5] hover:text-[#e5e1e4] hover:bg-[#1c1b1d]'
             }`}
           >
-            Configuración
+            {t.configuration}
           </button>
         </nav>
 
@@ -190,7 +194,7 @@ export const Header: React.FC<HeaderProps> = ({
             title="Bloquear Terminal Inmediatamente (PIN requerido para volver)"
           >
             <span className="material-symbols-outlined text-[16px] text-amber-500">lock</span>
-            <span className="hidden sm:inline">Bloquear</span>
+            <span className="hidden sm:inline">{t.lock}</span>
           </button>
 
           {/* Notifications button */}
