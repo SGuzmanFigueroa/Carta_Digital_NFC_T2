@@ -147,6 +147,21 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
           : (isEn ? 'Low stock alerts disabled' : 'Alertas de bajo stock desactivadas'),
         'inventory_2'
       );
+    } else if (field === 'autoCut') {
+      onShowToast(
+        nextVal
+          ? (isEn ? 'ESC/POS Auto-cut enabled' : 'Corte automático ESC/POS activado')
+          : (isEn ? 'Auto-cut disabled' : 'Corte automático desactivado'),
+        'content_cut'
+      );
+    } else if (field === 'acousticBuzzer') {
+      if (nextVal) kitchenAudio.playCheckItemSound();
+      onShowToast(
+        nextVal
+          ? (isEn ? 'Printer acoustic buzzer enabled' : 'Buzzer acústico de impresora activado')
+          : (isEn ? 'Buzzer disabled' : 'Buzzer acústico desactivado'),
+        'notifications_active'
+      );
     }
   };
 
@@ -156,10 +171,19 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
 
   const handleTestPrint = () => {
     setTestPrintActive(true);
+    const isEn = formData.language.includes('English');
+    if (formData.acousticBuzzer) {
+      kitchenAudio.playRunnerAlertSound();
+    }
     setTimeout(() => {
       setTestPrintActive(false);
-      onShowToast(`Impresión de prueba enviada a ${formData.printerIp}:${formData.printerPort}`, 'print');
-    }, 600);
+      onShowToast(
+        isEn
+          ? `Test ticket dispatched to ${formData.printerIp}:${formData.printerPort} (${formData.paperWidth})`
+          : `Impresión de prueba enviada a ${formData.printerIp}:${formData.printerPort} (${formData.paperWidth})`,
+        'print'
+      );
+    }, 700);
   };
 
   return (
@@ -888,7 +912,11 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                   <p className={`text-[13px] font-semibold flex items-center gap-2 ${isLight ? 'text-[#334155]' : 'text-gray-300'}`}>
                     <span className="w-2 h-2 rounded-full bg-[#00FF88]"></span> {t.thermal_printer}
                   </p>
-                  <span className="text-[#00FF88] text-[10px] font-mono tracking-widest font-bold">ONLINE // READY</span>
+                  {formData.printerIp.trim() ? (
+                    <span className="text-[#00FF88] text-[10px] font-mono tracking-widest font-bold">ONLINE // READY</span>
+                  ) : (
+                    <span className="text-[#FF5A1F] text-[10px] font-mono tracking-widest font-bold">OFFLINE // NO IP</span>
+                  )}
                 </div>
                 <div className="grid grid-cols-3 gap-4">
                   <div className="flex flex-col gap-1.5 col-span-1">
@@ -901,9 +929,18 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                   </div>
                   <div className="flex flex-col gap-1.5 col-span-1">
                     <label className={`text-[10px] uppercase tracking-[0.1em] font-bold ${labelColor}`}>{t.paper_width}</label>
-                    <select value={formData.paperWidth} onChange={(e) => setFormData({...formData, paperWidth: e.target.value as any})} className={`w-full rounded p-2.5 text-[13px] focus:border-[#FF5A1F] focus:outline-none transition ${selectBg}`}>
-                      <option value="80mm">80mm</option>
-                      <option value="58mm">58mm</option>
+                    <select 
+                      value={formData.paperWidth} 
+                      onChange={(e) => {
+                        const newWidth = e.target.value as any;
+                        setFormData({...formData, paperWidth: newWidth});
+                        const isEn = formData.language.includes('English');
+                        onShowToast(isEn ? `Paper width set to ${newWidth}` : `Ancho de papel configurado en ${newWidth}`, 'receipt_long');
+                      }} 
+                      className={`w-full rounded p-2.5 text-[13px] focus:border-[#FF5A1F] focus:outline-none transition ${selectBg}`}
+                    >
+                      <option value="80mm">80mm (Estándar)</option>
+                      <option value="58mm">58mm (Compacto)</option>
                     </select>
                   </div>
                 </div>
@@ -928,34 +965,63 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
               </div>
               
               {/* Monitor Simulador */}
-              <div className={`w-full md:w-[280px] shrink-0 border p-4 rounded-xl flex flex-col ${
+              <div className={`w-full md:w-[290px] shrink-0 border p-4 rounded-xl flex flex-col ${
                 isLight ? 'bg-[#f8fafc] border-[#cbd5e1]' : 'bg-[#0F0F0F] border-[#2A2A2A]'
               }`}>
                 <div className="flex justify-between items-center mb-3">
-                  <span className={`text-[10px] tracking-[0.1em] font-mono ${isLight ? 'text-[#64748b]' : 'text-gray-500'}`}>{t.escpos_monitor}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className={`text-[10px] tracking-[0.1em] font-mono ${isLight ? 'text-[#64748b]' : 'text-gray-500'}`}>{t.escpos_monitor}</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-black/10 font-bold font-mono text-[#FF5A1F] border border-[#FF5A1F]/30">{formData.paperWidth}</span>
+                  </div>
                   <span className="text-[10px] text-[#FF5A1F] tracking-[0.1em] font-bold font-mono">{t.simulator}</span>
                 </div>
-                <div className="flex-1 bg-white p-4 font-mono text-[10px] text-black leading-relaxed shadow-md border border-[#e2e8f0] rounded">
-                  <p className="text-center font-bold">=== {formData.branchName.toUpperCase() || 'AUREA BISTRO'} ===</p>
-                  <p className="text-center font-bold mb-2">COMANDA: #4088 (MESA 12)</p>
+
+                <div className={`mx-auto bg-white p-4 font-mono text-black leading-relaxed shadow-lg border border-[#e2e8f0] rounded transition-all duration-300 ${
+                  formData.paperWidth === '58mm' ? 'w-[220px] text-[9px]' : 'w-full text-[10px]'
+                } ${testPrintActive ? 'ring-4 ring-[#00FF88]/40 scale-[1.02] shadow-[#00FF88]/20' : ''}`}>
+                  
+                  {/* Status header inside ticket */}
+                  <div className="text-center border-b border-dashed border-gray-400 pb-2 mb-2">
+                    <p className="font-extrabold text-[11px]">=== {formData.branchName.toUpperCase() || 'AUREA BISTRO'} ===</p>
+                    <p className="text-[8px] text-gray-500 font-mono tracking-wider">RUC: {formData.branchRuc || '20608941203'}</p>
+                    <p className="font-bold mt-1 text-[#FF5A1F]">COMANDA: #4088 (MESA 12)</p>
+                  </div>
+
                   <div className="flex justify-between mb-2 pb-1 border-b border-dashed border-gray-400">
                     <span>{t.waiter}: CARLOS R.</span>
                     <span className="font-bold">{formData.timeFormat === '12h' ? '02:28:10 PM' : '14:28:10'}</span>
                   </div>
-                  <div className="flex justify-between font-bold mt-2">
-                    <span>2x LOMO SALTADO NIKKEI</span>
-                    <span>TERM: MED</span>
+
+                  <div className="space-y-1.5 my-2">
+                    <div className="flex justify-between font-bold">
+                      <span>2x LOMO SALTADO</span>
+                      <span>MED</span>
+                    </div>
+                    <p className="pl-2 text-gray-600 text-[8.5px]">- SIN CEBOLLA ROJA</p>
+
+                    <div className="flex justify-between font-bold">
+                      <span>1x CEVICHE PULPO</span>
+                      <span>PIC</span>
+                    </div>
                   </div>
-                  <p className="pl-4 text-gray-600">- SIN CEBOLLA ROJA</p>
-                  <div className="flex justify-between font-bold mt-2 pb-2 border-b border-dashed border-gray-400">
-                    <span>1x CEVICHE PULPO BRASA</span>
-                    <span>PIC: MED</span>
-                  </div>
-                  <div className="flex justify-between font-bold mt-2 text-[10px] pb-1 border-b border-dashed border-gray-300">
+
+                  <div className="flex justify-between font-bold mt-2 pt-1 border-t border-dashed border-gray-400">
                     <span>{t.total_order}:</span>
                     <span className="text-[#FF5A1F] font-bold">{formData.currency.includes('USD') ? '$ 48.00' : 'S/ 124.00'}</span>
                   </div>
-                  <p className="text-center text-gray-500 mt-2 text-[8px]">{t.escpos_ok}</p>
+
+                  <div className="text-center text-gray-500 mt-2 text-[8px] space-y-0.5">
+                    <p>{t.escpos_ok}</p>
+                    <p className="text-[7.5px] text-gray-400 font-mono">IP: {formData.printerIp}:{formData.printerPort}</p>
+                  </div>
+
+                  {/* Auto-cut line simulation */}
+                  {formData.autoCut && (
+                    <div className="mt-3 pt-2 border-t-2 border-dashed border-gray-400 text-center text-gray-500 text-[8px] flex items-center justify-center gap-1">
+                      <span>✂</span>
+                      <span className="tracking-widest font-mono">[ CORTE AUTOMÁTICO ]</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
