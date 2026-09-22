@@ -65,6 +65,449 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
     onShowToast('Logo restaurado al oficial predeterminado', 'restore');
     setShowLogoModal(false);
   };
+  // Función para imprimir de forma aislada sin imprimir el resto del dashboard de configuración
+  const printIsolatedDocument = (html: string, docTitle: string) => {
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = 'none';
+    iframe.style.opacity = '0';
+    iframe.style.pointerEvents = 'none';
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow?.document;
+    if (!doc) {
+      const printWin = window.open('', '_blank', 'width=700,height=900');
+      if (printWin) {
+        printWin.document.write(html);
+        printWin.document.close();
+        printWin.focus();
+        setTimeout(() => {
+          printWin.print();
+        }, 500);
+      }
+      return;
+    }
+
+    doc.open();
+    doc.write(html);
+    doc.close();
+
+    const doPrint = () => {
+      try {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+        onShowToast(formData.language.includes('English') ? 'Sent to print dialog' : 'Enviado al diálogo de impresión', 'print');
+      } catch (err) {
+        console.error('Error al imprimir:', err);
+      } finally {
+        setTimeout(() => {
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe);
+          }
+        }, 3000);
+      }
+    };
+
+    const images = doc.images;
+    let count = 0;
+    const total = images.length;
+
+    if (total === 0) {
+      setTimeout(doPrint, 350);
+    } else {
+      let fired = false;
+      const onImgReady = () => {
+        count++;
+        if (count >= total && !fired) {
+          fired = true;
+          setTimeout(doPrint, 350);
+        }
+      };
+
+      for (let i = 0; i < total; i++) {
+        if (images[i].complete) {
+          onImgReady();
+        } else {
+          images[i].onload = onImgReady;
+          images[i].onerror = onImgReady;
+        }
+      }
+
+      setTimeout(() => {
+        if (!fired) {
+          fired = true;
+          doPrint();
+        }
+      }, 3000);
+    }
+  };
+
+  // Función para imprimir únicamente el atril / standee físico de mesa en 1 sola hoja limpia
+  const handlePrintStandee = () => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+    const tableName = customTableName.trim() || ('MESA ' + selectedTableNumber);
+    const targetMenuUrl = `${origin}/menu?mesa=${encodeURIComponent(tableName)}&zona=${encodeURIComponent(selectedZone)}`;
+    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&color=${qrColor === 'brand' ? 'ff5a1f' : '000000'}&bgcolor=ffffff&data=${encodeURIComponent(targetMenuUrl)}`;
+    const branchName = formData.branchName || 'AUREA Bistro';
+    const logoUrl = formData.logoUrl || '/logo.png';
+    const instructions = t.scan_to_order || 'Escanea con la cámara de tu celular para ver la carta y hacer tu pedido';
+    const nfcLabel = t.nfc_active || 'NTAG213 NFC Chip Linked';
+
+    const htmlContent = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Atril de Mesa - ${tableName} - ${branchName}</title>
+  <style>
+    @page {
+      size: A5 portrait;
+      margin: 8mm;
+    }
+    * {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    body {
+      margin: 0;
+      padding: 10px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: #ffffff;
+      color: #0f172a;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 98vh;
+    }
+    .print-instructions {
+      font-size: 11px;
+      color: #64748b;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: monospace;
+    }
+    .standee-card {
+      width: 310px;
+      border: 2px dashed #94a3b8;
+      border-radius: 24px;
+      padding: 24px 20px 20px;
+      background: #0a0a0c;
+      color: #ffffff;
+      text-align: center;
+      position: relative;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+      page-break-inside: avoid;
+    }
+    .logo-container {
+      width: 48px;
+      height: 48px;
+      margin: 0 auto 8px;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1.5px solid #27272a;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .logo-container img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .branch-title {
+      font-size: 14px;
+      font-weight: 800;
+      margin: 0 0 3px;
+      color: #ffffff;
+      letter-spacing: -0.2px;
+    }
+    .subtitle {
+      font-size: 9px;
+      font-weight: 800;
+      font-family: monospace;
+      color: #ff5a1f;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+      display: block;
+    }
+    .divider {
+      border: none;
+      border-top: 1px dashed rgba(255,255,255,0.2);
+      margin: 10px 0 14px;
+    }
+    .table-pill {
+      display: inline-block;
+      padding: 6px 20px;
+      border-radius: 9999px;
+      background: #ff5a1f;
+      color: #ffffff;
+      font-weight: 800;
+      font-size: 15px;
+      font-family: monospace;
+      letter-spacing: 0.5px;
+      box-shadow: 0 4px 12px rgba(255, 90, 31, 0.4);
+    }
+    .zone-label {
+      font-size: 11px;
+      color: #94a3b8;
+      margin: 5px 0 12px;
+      font-weight: 500;
+    }
+    .qr-frame {
+      background: #ffffff;
+      border-radius: 16px;
+      padding: 10px;
+      display: inline-flex;
+      position: relative;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.2);
+      margin: 0 auto;
+    }
+    .qr-frame img.qr-img {
+      width: 190px;
+      height: 190px;
+      display: block;
+      border-radius: 4px;
+    }
+    .qr-center-logo {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: #ffffff;
+      padding: 2.5px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+      border: 1px solid #e2e8f0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .qr-center-logo img {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+    .order-note {
+      font-size: 10.5px;
+      color: #a1a1aa;
+      line-height: 1.4;
+      max-width: 230px;
+      margin: 12px auto 8px;
+    }
+    .nfc-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      border-radius: 9999px;
+      background: #18181b;
+      border: 1px solid #27272a;
+      color: #34d399;
+      font-size: 9px;
+      font-family: monospace;
+      font-weight: 700;
+    }
+    .nfc-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #34d399;
+    }
+    .crop-mark {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      border-color: #64748b;
+      border-style: solid;
+    }
+    .c-tl { top: -2px; left: -2px; border-width: 2px 0 0 2px; }
+    .c-tr { top: -2px; right: -2px; border-width: 2px 2px 0 0; }
+    .c-bl { bottom: -2px; left: -2px; border-width: 0 0 2px 2px; }
+    .c-br { bottom: -2px; right: -2px; border-width: 0 2px 2px 0; }
+  </style>
+</head>
+<body>
+  <div class="print-instructions">✂ Guía de corte para atril / portavasos acrílico (A6)</div>
+  <div class="standee-card">
+    <div class="crop-mark c-tl"></div>
+    <div class="crop-mark c-tr"></div>
+    <div class="crop-mark c-bl"></div>
+    <div class="crop-mark c-br"></div>
+    
+    <div class="logo-container">
+      <img src="${logoUrl}" alt="Logo" onerror="this.src='/logo.png'" />
+    </div>
+    <div class="branch-title">${branchName}</div>
+    <span class="subtitle">CARTA DIGITAL • AUTO-PEDIDO</span>
+    
+    <div class="divider"></div>
+    
+    <div class="table-pill">${tableName}</div>
+    <div class="zone-label">${selectedZone}</div>
+    
+    <div class="qr-frame">
+      <img class="qr-img" src="${qrCodeUrl}" alt="QR Mesa" />
+      ${includeLogoInQR ? `<div class="qr-center-logo"><img src="${logoUrl}" alt="Logo" onerror="this.src='/logo.png'" /></div>` : ''}
+    </div>
+    
+    <div class="order-note">${instructions}</div>
+    
+    <div class="nfc-indicator">
+      <span class="nfc-dot"></span>
+      <span>${nfcLabel}</span>
+    </div>
+  </div>
+</body>
+</html>`;
+
+    printIsolatedDocument(htmlContent, `Atril-${tableName}`);
+  };
+
+  // Función para imprimir todas las mesas en una cuadrícula optimizada para corte
+  const handlePrintAllTables = () => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+    const branchName = formData.branchName || 'AUREA Bistro';
+    const tables = ['Mesa 01', 'Mesa 02', 'Mesa 03', 'Mesa 04', 'Mesa 05', 'Mesa 06', 'Mesa 07', 'Mesa 08', 'Terraza T1', 'Terraza T2', 'Barra B1', 'Salón VIP'];
+
+    const cardsHtml = tables.map((tbl) => {
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=350x350&color=${qrColor === 'brand' ? 'ff5a1f' : '000000'}&bgcolor=ffffff&data=${encodeURIComponent(origin + '/menu?mesa=' + encodeURIComponent(tbl))}`;
+      return `
+        <div class="batch-card">
+          <div class="batch-header">
+            <span class="batch-branch">${branchName}</span>
+            <span class="batch-tag">CARTA DIGITAL</span>
+          </div>
+          <div class="batch-table-pill">${tbl}</div>
+          <div class="batch-qr">
+            <img src="${qrUrl}" alt="${tbl}" />
+          </div>
+          <div class="batch-nfc">(( · )) NFC LINKED</div>
+        </div>
+      `;
+    }).join('');
+
+    const htmlContent = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Lote de QRs de Mesas - ${branchName}</title>
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 10mm;
+    }
+    * {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    body {
+      margin: 0;
+      padding: 10px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #fff;
+    }
+    .page-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 4px;
+      display: flex;
+      justify-content: space-between;
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: 6px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .batch-card {
+      border: 1.5px dashed #cbd5e1;
+      border-radius: 16px;
+      padding: 14px 10px;
+      background: #0a0a0c;
+      color: #fff;
+      text-align: center;
+      page-break-inside: avoid;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 230px;
+    }
+    .batch-branch {
+      font-size: 11px;
+      font-weight: 700;
+      display: block;
+      color: #fff;
+    }
+    .batch-tag {
+      font-size: 8.5px;
+      font-family: monospace;
+      color: #ff5a1f;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+    .batch-table-pill {
+      display: inline-block;
+      padding: 4px 14px;
+      border-radius: 9999px;
+      background: #ff5a1f;
+      color: #fff;
+      font-weight: 800;
+      font-size: 13px;
+      font-family: monospace;
+      margin: 6px 0;
+    }
+    .batch-qr {
+      background: #fff;
+      border-radius: 10px;
+      padding: 6px;
+      display: inline-block;
+      margin: 2px 0;
+    }
+    .batch-qr img {
+      width: 120px;
+      height: 120px;
+      display: block;
+    }
+    .batch-nfc {
+      font-size: 8.5px;
+      font-family: monospace;
+      color: #34d399;
+      font-weight: 700;
+      margin-top: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div class="page-title">
+    <span>${branchName} — Códigos QR & NFC de Mesas (12 Unidades)</span>
+    <span style="font-family: monospace; font-size: 11px; color: #64748b;">✂ Líneas de corte para atril</span>
+  </div>
+  <div class="grid">
+    ${cardsHtml}
+  </div>
+</body>
+</html>`;
+
+    printIsolatedDocument(htmlContent, `Lote-QRs-${branchName}`);
+  };
+
 
   const t = getTranslations(formData.language);
   const isLight = formData.themeMode === 'light';
@@ -1285,10 +1728,9 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
 
                   <button
                     type="button"
-                    onClick={() => {
-                      window.print();
-                    }}
+                    onClick={handlePrintStandee}
                     className="py-2 px-2.5 rounded-lg bg-[#FF5A1F] text-white hover:bg-[#FF703D] font-bold text-[11px] flex items-center justify-center gap-1 cursor-pointer shadow-md shadow-[#FF5A1F]/20 transition-all"
+                    title="Imprimir solo el atril de esta mesa (1 hoja)"
                   >
                     <span className="material-symbols-outlined text-[15px]">print</span>
                     <span>Imprimir</span>
@@ -1319,8 +1761,9 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
               <div className="flex items-center gap-3">
                 <button
                   type="button"
-                  onClick={() => window.print()}
+                  onClick={handlePrintAllTables}
                   className="px-3.5 py-1.5 bg-[#FF5A1F] text-white font-bold text-[12px] rounded-lg hover:bg-[#FF703D] flex items-center gap-1.5 cursor-pointer shadow-md"
+                  title="Imprimir lote de 12 mesas con guías de corte"
                 >
                   <span className="material-symbols-outlined text-[16px]">print</span>
                   <span>Imprimir Todos</span>
