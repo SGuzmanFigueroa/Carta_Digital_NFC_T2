@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { SystemConfigState } from '../types';
 import { applyTheme } from '@/utils/theme';
 import { getTranslations, getLanguageCode } from '@/utils/i18n';
+import { kitchenAudio } from '@/utils/audio';
 
 interface SystemConfigProps {
   config: SystemConfigState;
@@ -113,7 +114,40 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
   }, []);
 
   const handleToggle = (field: keyof SystemConfigState) => {
-    setFormData((prev) => ({ ...prev, [field]: !prev[field] }));
+    const nextVal = !formData[field];
+    setFormData((prev) => ({ ...prev, [field]: nextVal }));
+
+    const isEn = formData.language.includes('English');
+    if (field === 'soundAlerts') {
+      kitchenAudio.enabled = nextVal;
+      if (nextVal) {
+        kitchenAudio.playCheckItemSound();
+        onShowToast(isEn ? 'Sound alerts enabled' : 'Alertas sonoras de comandas activadas', 'volume_up');
+      } else {
+        onShowToast(isEn ? 'Sound alerts muted' : 'Alertas sonoras silenciadas', 'volume_off');
+      }
+    } else if (field === 'delayAlerts') {
+      onShowToast(
+        nextVal 
+          ? (isEn ? 'Critical delay alert active (+15m)' : 'Alerta de demora crítica activa (+15 min)')
+          : (isEn ? 'Critical delay alert disabled' : 'Alerta de demora crítica desactivada'),
+        'timer'
+      );
+    } else if (field === 'paymentAlerts') {
+      onShowToast(
+        nextVal 
+          ? (isEn ? 'QR payment alerts active' : 'Avisos de pago QR activados')
+          : (isEn ? 'QR payment alerts disabled' : 'Avisos de pago QR desactivados'),
+        'payments'
+      );
+    } else if (field === 'lowStockAlerts') {
+      onShowToast(
+        nextVal 
+          ? (isEn ? 'Low stock alerts active' : 'Alertas de bajo stock activadas')
+          : (isEn ? 'Low stock alerts disabled' : 'Alertas de bajo stock desactivadas'),
+        'inventory_2'
+      );
+    }
   };
 
   const handleSave = () => {
@@ -403,8 +437,8 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
                   </svg>
                   <div>
-                    <h4 className={`text-[13.5px] font-bold mb-1 ${titleColor}`}>Alertas sonoras de comandas nuevas</h4>
-                    <p className={`text-[11.5px] leading-tight ${descColor}`}>Campana acústica en KDS y estación de expedición al entrar comanda.</p>
+                    <h4 className={`text-[13.5px] font-bold mb-1 ${titleColor}`}>{t.sound_alerts_title}</h4>
+                    <p className={`text-[11.5px] leading-tight ${descColor}`}>{t.sound_alerts_desc}</p>
                   </div>
                 </div>
                 <button type="button" onClick={() => handleToggle('soundAlerts')} className={`w-11 h-6 shrink-0 rounded-full transition-colors flex items-center px-0.5 cursor-pointer mt-1 ${formData.soundAlerts ? 'bg-[#FF5A1F]' : isLight ? 'bg-[#cbd5e1]' : 'bg-[#333]'}`}>
@@ -419,8 +453,8 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 3.75h12m-12 16.5h12M7.5 3.75V5.5c0 1.48-.68 2.89-1.85 3.82l-1.3 1.02c-.89.7-1.35 1.77-1.35 2.91s.46 2.21 1.35 2.91l1.3 1.02c1.17.93 1.85 2.34 1.85 3.82v1.75m9-16.5V5.5c0 1.48.68 2.89 1.85 3.82l1.3 1.02c.89.7 1.35 1.77 1.35 2.91s-.46 2.21-1.35 2.91l-1.3 1.02c-1.17.93-1.85 2.34-1.85 3.82v1.75" />
                   </svg>
                   <div>
-                    <h4 className={`text-[13.5px] font-bold mb-1 ${titleColor}`}>Mesa con demora crítica (+15 min)</h4>
-                    <p className={`text-[11.5px] leading-tight ${descColor}`}>Destello rojo pulsante si un plato supera su tiempo límite de preparación.</p>
+                    <h4 className={`text-[13.5px] font-bold mb-1 ${titleColor}`}>{t.critical_delay_title}</h4>
+                    <p className={`text-[11.5px] leading-tight ${descColor}`}>{t.critical_delay_desc}</p>
                   </div>
                 </div>
                 <button type="button" onClick={() => handleToggle('delayAlerts')} className={`w-11 h-6 shrink-0 rounded-full transition-colors flex items-center px-0.5 cursor-pointer mt-1 ${formData.delayAlerts ? 'bg-[#FF5A1F]' : isLight ? 'bg-[#cbd5e1]' : 'bg-[#333]'}`}>
@@ -435,8 +469,8 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 14.25h6M9 11.25h6M9 8.25h6M2.25 5.25A2.25 2.25 0 014.5 3h15a2.25 2.25 0 012.25 2.25v13.5A2.25 2.25 0 0119.5 21h-15A2.25 2.25 0 012.25 18.75V5.25z" />
                   </svg>
                   <div>
-                    <h4 className={`text-[13.5px] font-bold mb-1 ${titleColor}`}>Avisos de pago solicitado por comensal</h4>
-                    <p className={`text-[11.5px] leading-tight ${descColor}`}>Notificación prioritaria al mozo cuando el cliente pide la cuenta vía QR.</p>
+                    <h4 className={`text-[13.5px] font-bold mb-1 ${titleColor}`}>{t.payment_alerts_title}</h4>
+                    <p className={`text-[11.5px] leading-tight ${descColor}`}>{t.payment_alerts_desc}</p>
                   </div>
                 </div>
                 <button type="button" onClick={() => handleToggle('paymentAlerts')} className={`w-11 h-6 shrink-0 rounded-full transition-colors flex items-center px-0.5 cursor-pointer mt-1 ${formData.paymentAlerts ? 'bg-[#FF5A1F]' : isLight ? 'bg-[#cbd5e1]' : 'bg-[#333]'}`}>
@@ -451,8 +485,8 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0l-3-3m3 3l3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
                   </svg>
                   <div>
-                    <h4 className={`text-[13.5px] font-bold mb-1 ${titleColor}`}>Alertas por bajo stock en cocina</h4>
-                    <p className={`text-[11.5px] leading-tight ${descColor}`}>Aviso al Maitre cuando un ingrediente clave o botella descienda de 3 raciones.</p>
+                    <h4 className={`text-[13.5px] font-bold mb-1 ${titleColor}`}>{t.low_stock_title}</h4>
+                    <p className={`text-[11.5px] leading-tight ${descColor}`}>{t.low_stock_desc}</p>
                   </div>
                 </div>
                 <button type="button" onClick={() => handleToggle('lowStockAlerts')} className={`w-11 h-6 shrink-0 rounded-full transition-colors flex items-center px-0.5 cursor-pointer mt-1 ${formData.lowStockAlerts ? 'bg-[#FF5A1F]' : isLight ? 'bg-[#cbd5e1]' : 'bg-[#333]'}`}>
