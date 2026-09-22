@@ -46,6 +46,26 @@ export default function RootLayout({
           rel="stylesheet"
           href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap"
         />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){
+              try {
+                var raw = localStorage.getItem('gastropulse_system_config');
+                if (raw) {
+                  var p = JSON.parse(raw);
+                  var t = p.themeMode || 'obsidian';
+                  document.documentElement.setAttribute('data-theme', t);
+                  if (t === 'light') {
+                    document.documentElement.classList.remove('dark');
+                    document.documentElement.classList.add('light');
+                  }
+                  if (p.colorAccent) document.documentElement.setAttribute('data-accent', p.colorAccent);
+                  if (p.density) document.documentElement.setAttribute('data-density', p.density);
+                }
+              } catch(e) {}
+            })()`,
+          }}
+        />
       </head>
       <body className="min-h-screen flex flex-col bg-[#0b0c0e] text-[#e5e1e4] selection:bg-[#ff5708] selection:text-white">
         <RestaurantProvider>

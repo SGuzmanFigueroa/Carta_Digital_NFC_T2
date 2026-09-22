@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { SystemConfigState } from '../types';
+import { applyTheme } from '@/utils/theme';
 
 interface SystemConfigProps {
   config: SystemConfigState;
@@ -16,7 +17,12 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
   const [testPrintActive, setTestPrintActive] = useState(false);
   const [activeSection, setActiveSection] = useState<'perfil' | 'notificaciones' | 'tema' | 'idioma' | 'impresion'>('perfil');
 
-    // Observador de scroll para actualizar el menú lateral automáticamente
+    useEffect(() => {
+    setFormData({ ...config });
+    applyTheme(config.themeMode, config.colorAccent, config.density);
+  }, [config]);
+
+  // Observador de scroll para actualizar el menú lateral automáticamente
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -399,7 +405,10 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                 
                 {/* Obsidian */}
                 <div 
-                  onClick={() => setFormData({ ...formData, themeMode: 'obsidian' })} 
+                  onClick={() => {
+                  setFormData({ ...formData, themeMode: 'obsidian' });
+                  applyTheme('obsidian', formData.colorAccent, formData.density);
+                }} 
                   className={`p-4 rounded border cursor-pointer transition-all flex flex-col justify-between ${
                     formData.themeMode === 'obsidian' ? 'border-[#FF5A1F] bg-[#161616]' : 'border-[#2A2A2A] bg-[#141414] hover:border-[#444]'
                   }`}
@@ -429,7 +438,10 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
 
                 {/* Claro Minimal */}
                 <div 
-                  onClick={() => setFormData({ ...formData, themeMode: 'light' })} 
+                  onClick={() => {
+                  setFormData({ ...formData, themeMode: 'light' });
+                  applyTheme('light', formData.colorAccent, formData.density);
+                }} 
                   className={`p-4 rounded border cursor-pointer transition-all flex flex-col justify-between ${
                     formData.themeMode === 'light' ? 'border-[#FF5A1F] bg-[#161616]' : 'border-[#2A2A2A] bg-[#141414] hover:border-[#444]'
                   }`}
@@ -458,7 +470,10 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
 
                 {/* Alto Contraste KDS */}
                 <div 
-                  onClick={() => setFormData({ ...formData, themeMode: 'kds-high-contrast' })} 
+                  onClick={() => {
+                  setFormData({ ...formData, themeMode: 'kds-high-contrast' });
+                  applyTheme('kds-high-contrast', formData.colorAccent, formData.density);
+                }} 
                   className={`p-4 rounded border cursor-pointer transition-all flex flex-col justify-between ${
                     formData.themeMode === 'kds-high-contrast' ? 'border-[#FF5A1F] bg-[#161616]' : 'border-[#2A2A2A] bg-[#141414] hover:border-[#444]'
                   }`}
@@ -497,7 +512,10 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                 <div className="grid grid-cols-3 gap-2">
                   <button
                     type="button"
-                    onClick={() => setFormData({ ...formData, colorAccent: 'amber' })}
+                    onClick={() => {
+                    setFormData({ ...formData, colorAccent: 'amber' });
+                    applyTheme(formData.themeMode, 'amber', formData.density);
+                  }}
                     className={`flex items-center justify-center gap-2 py-2 px-3 rounded border text-[12px] font-medium transition-all ${
                       formData.colorAccent === 'amber'
                         ? 'border-[#FF5A1F] bg-[#221A15] text-white'
@@ -510,7 +528,10 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
 
                   <button
                     type="button"
-                    onClick={() => setFormData({ ...formData, colorAccent: 'emerald' })}
+                    onClick={() => {
+                    setFormData({ ...formData, colorAccent: 'emerald' });
+                    applyTheme(formData.themeMode, 'emerald', formData.density);
+                  }}
                     className={`flex items-center justify-center gap-2 py-2 px-3 rounded border text-[12px] font-medium transition-all ${
                       formData.colorAccent === 'emerald'
                         ? 'border-[#00FF88] bg-[#10221A] text-white'
@@ -523,7 +544,10 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
 
                   <button
                     type="button"
-                    onClick={() => setFormData({ ...formData, colorAccent: 'cyan' })}
+                    onClick={() => {
+                    setFormData({ ...formData, colorAccent: 'cyan' });
+                    applyTheme(formData.themeMode, 'cyan', formData.density);
+                  }}
                     className={`flex items-center justify-center gap-2 py-2 px-3 rounded border text-[12px] font-medium transition-all ${
                       formData.colorAccent === 'cyan'
                         ? 'border-[#00B4D8] bg-[#102028] text-white'
@@ -545,7 +569,10 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
             <div className="grid grid-cols-2 gap-2 bg-[#141414] p-1 rounded border border-[#2A2A2A]">
               <button
                 type="button"
-                onClick={() => setFormData({ ...formData, density: 'compact' })}
+                onClick={() => {
+                setFormData({ ...formData, density: 'compact' });
+                applyTheme(formData.themeMode, formData.colorAccent, 'compact');
+              }}
                 className={`flex items-center justify-center gap-2 py-2 px-3 rounded text-[12px] font-medium transition-all ${
                   formData.density === 'compact'
                     ? 'border border-[#FF5A1F] bg-[#221A15] text-white shadow-[0_0_8px_rgba(255,90,31,0.2)]'
@@ -567,7 +594,10 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
 
               <button
                 type="button"
-                onClick={() => setFormData({ ...formData, density: 'touch' })}
+                onClick={() => {
+                setFormData({ ...formData, density: 'touch' });
+                applyTheme(formData.themeMode, formData.colorAccent, 'touch');
+              }}
                 className={`flex items-center justify-center gap-2 py-2 px-3 rounded text-[12px] font-medium transition-all ${
                   formData.density === 'touch'
                     ? 'border border-[#FF5A1F] bg-[#221A15] text-white shadow-[0_0_8px_rgba(255,90,31,0.2)]'
