@@ -679,9 +679,6 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
       
       {/* Header */}
       <div className={`mb-2 border-b pb-6 ${sectionHeaderBorder}`}>
-        <p className={`text-[10px] uppercase tracking-[0.2em] mb-2 font-mono ${isLight ? 'text-[#64748b]' : 'text-gray-500'}`}>
-          {t.sys_code}
-        </p>
         <div className="flex justify-between items-center flex-wrap gap-4">
           <div>
             <h1 className={`text-3xl md:text-4xl font-bold mb-1 tracking-tight ${titleColor}`}>
