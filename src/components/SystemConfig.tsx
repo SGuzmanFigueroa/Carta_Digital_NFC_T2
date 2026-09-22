@@ -770,25 +770,53 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className={`text-[10px] uppercase tracking-[0.1em] font-bold ${labelColor}`}>Zona Horaria (NTP)</label>
-                <input type="text" disabled value={formData.timezone} className={`w-full rounded p-2.5 text-[13px] cursor-not-allowed font-mono ${
-                  isLight ? 'bg-[#f1f5f9] border border-[#e2e8f0] text-[#94a3b8]' : 'bg-[#1A1A1A] border border-[#333] text-gray-500'
-                }`} />
+                <select 
+                  value={formData.timezone} 
+                  onChange={(e) => setFormData({...formData, timezone: e.target.value})} 
+                  className={`w-full rounded p-2.5 text-[13px] font-mono focus:border-[#FF5A1F] focus:outline-none transition ${selectBg}`}
+                >
+                  <option value="America/Lima (UTC-5)">America/Lima (UTC-5)</option>
+                  <option value="America/Bogota (UTC-5)">America/Bogota (UTC-5)</option>
+                  <option value="America/Santiago (UTC-4)">America/Santiago (UTC-4)</option>
+                  <option value="America/Buenos_Aires (UTC-3)">America/Buenos_Aires (UTC-3)</option>
+                  <option value="America/Mexico_City (UTC-6)">America/Mexico_City (UTC-6)</option>
+                  <option value="America/New_York (UTC-5)">America/New_York (UTC-5)</option>
+                  <option value="Europe/Madrid (UTC+1)">Europe/Madrid (UTC+1)</option>
+                </select>
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className={`text-[10px] uppercase tracking-[0.1em] font-bold ${labelColor}`}>Formato Horario</label>
                 <div className={`flex border rounded overflow-hidden p-0.5 ${
                   isLight ? 'bg-[#f1f5f9] border-[#cbd5e1]' : 'bg-[#252525] border-[#333]'
                 }`}>
-                  <button onClick={() => setFormData({...formData, timeFormat: '24h'})} className={`flex-1 text-[11px] font-bold rounded py-2 transition ${
-                    formData.timeFormat === '24h' 
-                      ? isLight ? 'bg-white text-[#0f172a] shadow-sm' : 'bg-[#333] text-white' 
-                      : isLight ? 'text-[#64748b]' : 'text-gray-500'
-                  }`}>24 HORAS</button>
-                  <button onClick={() => setFormData({...formData, timeFormat: '12h'})} className={`flex-1 text-[11px] font-bold rounded py-2 transition ${
-                    formData.timeFormat === '12h' 
-                      ? isLight ? 'bg-white text-[#0f172a] shadow-sm' : 'bg-[#333] text-white' 
-                      : isLight ? 'text-[#64748b]' : 'text-gray-500'
-                  }`}>12H (AM/PM)</button>
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      setFormData({...formData, timeFormat: '24h'});
+                      onShowToast('Formato cambiado a 24 Horas', 'schedule');
+                    }} 
+                    className={`flex-1 text-[11px] font-bold rounded py-2 transition cursor-pointer ${
+                      formData.timeFormat === '24h' 
+                        ? isLight ? 'bg-white text-[#0f172a] shadow-sm font-bold' : 'bg-[#333] text-white font-bold' 
+                        : isLight ? 'text-[#64748b] hover:text-[#0f172a]' : 'text-gray-500 hover:text-gray-300'
+                    }`}
+                  >
+                    24 HORAS
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      setFormData({...formData, timeFormat: '12h'});
+                      onShowToast('Formato cambiado a 12 Horas (AM/PM)', 'schedule');
+                    }} 
+                    className={`flex-1 text-[11px] font-bold rounded py-2 transition cursor-pointer ${
+                      formData.timeFormat === '12h' 
+                        ? isLight ? 'bg-white text-[#0f172a] shadow-sm font-bold' : 'bg-[#333] text-white font-bold' 
+                        : isLight ? 'text-[#64748b] hover:text-[#0f172a]' : 'text-gray-500 hover:text-gray-300'
+                    }`}
+                  >
+                    12H (AM/PM)
+                  </button>
                 </div>
               </div>
             </div>
@@ -866,7 +894,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                   <p className="text-center font-bold mb-2">COMANDA: #4088 (MESA 12)</p>
                   <div className="flex justify-between mb-2 pb-1 border-b border-dashed border-gray-400">
                     <span>MOZO: CARLOS R.</span>
-                    <span>14:28:10</span>
+                    <span className="font-bold">{formData.timeFormat === '12h' ? '02:28:10 PM' : '14:28:10'}</span>
                   </div>
                   <div className="flex justify-between font-bold mt-2">
                     <span>2x LOMO SALTADO NIKKEI</span>
@@ -876,6 +904,10 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                   <div className="flex justify-between font-bold mt-2 pb-2 border-b border-dashed border-gray-400">
                     <span>1x CEVICHE PULPO BRASA</span>
                     <span>PIC: MED</span>
+                  </div>
+                  <div className="flex justify-between font-bold mt-2 text-[10px] pb-1 border-b border-dashed border-gray-300">
+                    <span>TOTAL COMANDA:</span>
+                    <span className="text-[#FF5A1F] font-bold">{formData.currency.includes('USD') ? '$ 48.00' : 'S/ 124.00'}</span>
                   </div>
                   <p className="text-center text-gray-500 mt-2 text-[8px]">-- PROTOCOLO ESC/POS OK --</p>
                 </div>
