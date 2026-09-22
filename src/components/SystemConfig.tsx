@@ -925,7 +925,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                     <span className="w-1.5 h-1.5 rounded-full bg-[#00FF88]"></span>
                     Licencia GastroPulse Enterprise: <strong className={`font-medium ${titleColor}`}>32 Terminales Activas</strong>
                   </p>
-                  <span className="text-[9px] text-[#FF5A1F] font-mono tracking-widest border border-[#FF5A1F]/30 bg-[#FF5A1F]/10 px-2 py-1 rounded font-bold">PLAN OMNI-CHEF</span>
+                  
                 </div>
               </div>
             </div>
