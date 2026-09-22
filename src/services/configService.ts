@@ -32,6 +32,7 @@ export async function fetchSystemConfigFromDb(): Promise<SystemConfigState> {
     const merged: SystemConfigState = {
       branchName: data.branch_name || localConfig?.branchName || INITIAL_CONFIG.branchName,
       branchRuc: data.branch_ruc || localConfig?.branchRuc || INITIAL_CONFIG.branchRuc,
+      logoUrl: (data as any).logo_url || localConfig?.logoUrl || "/logo.png",
       managerName: data.manager_name || localConfig?.managerName || INITIAL_CONFIG.managerName,
       email: data.email || localConfig?.email || INITIAL_CONFIG.email,
       phone: data.phone || localConfig?.phone || INITIAL_CONFIG.phone,
@@ -82,6 +83,7 @@ export async function saveSystemConfigToDb(updated: SystemConfigState): Promise<
         id: 'primary',
         branch_name: updated.branchName,
         branch_ruc: updated.branchRuc,
+        logo_url: updated.logoUrl || "/logo.png",
         manager_name: updated.managerName,
         email: updated.email,
         phone: updated.phone,

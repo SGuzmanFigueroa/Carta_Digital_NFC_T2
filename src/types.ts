@@ -210,6 +210,7 @@ export interface AuthUser {
 export interface SystemConfigState {
   branchName: string;
   branchRuc: string;
+  logoUrl?: string;
   managerName: string;
   email: string;
   phone: string;

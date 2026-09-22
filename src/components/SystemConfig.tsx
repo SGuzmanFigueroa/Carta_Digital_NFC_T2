@@ -17,7 +17,46 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
 }) => {
   const [formData, setFormData] = useState<SystemConfigState>({ ...config });
   const [testPrintActive, setTestPrintActive] = useState(false);
+  const [showLogoModal, setShowLogoModal] = useState(false);
+  const [customLogoInput, setCustomLogoInput] = useState('');
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [activeSection, setActiveSection] = useState<'perfil' | 'notificaciones' | 'tema' | 'idioma' | 'impresion'>('perfil');
+
+  const handleLogoFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      onShowToast('El archivo supera los 5MB permitidos', 'warning');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target?.result as string;
+      if (base64) {
+        setFormData((prev) => ({ ...prev, logoUrl: base64 }));
+        onShowToast('Nuevo logo seleccionado con éxito', 'photo_library');
+        setShowLogoModal(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleApplyLogoUrl = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customLogoInput.trim()) return;
+    setFormData((prev) => ({ ...prev, logoUrl: customLogoInput.trim() }));
+    onShowToast('URL de logo asignada correctamente', 'link');
+    setShowLogoModal(false);
+    setCustomLogoInput('');
+  };
+
+  const handleResetDefaultLogo = () => {
+    setFormData((prev) => ({ ...prev, logoUrl: '/logo.png' }));
+    onShowToast('Logo restaurado al oficial predeterminado', 'restore');
+    setShowLogoModal(false);
+  };
 
   const isLight = formData.themeMode === 'light';
   const isHighContrast = formData.themeMode === 'kds-high-contrast';
@@ -257,22 +296,33 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                   isLight ? 'bg-white border-[#e2e8f0]' : 'bg-[#050505] border-[#1A1A1A]'
                 }`}>
                   <img 
-                    src="/logo.png" 
-                    alt="Logo AUREA Bistro" 
+                    src={formData.logoUrl || '/logo.png'} 
+                    alt={`Logo ${formData.branchName || 'AUREA Bistro'}`} 
                     className="w-full h-full object-cover"
                   />
                 </div>
 
                 <h3 className={`font-bold mb-1 text-[15px] text-center ${titleColor}`}>{formData.branchName || 'AUREA Bistro'}</h3>
                 <p className={`text-[10px] font-mono tracking-widest mb-5 ${descColor}`}>RUC: {formData.branchRuc || '20608941203'}</p>
-                <button className={`text-[11px] px-4 py-2 border rounded transition flex items-center justify-center gap-2 w-full cursor-pointer ${
-                  isLight 
-                    ? 'bg-white hover:bg-[#f1f5f9] border-[#cbd5e1] text-[#334155] shadow-sm' 
-                    : 'bg-[#1A1A1A] hover:bg-[#252525] border-[#333] text-gray-300'
-                }`}>
+                <button 
+                  type="button"
+                  onClick={() => setShowLogoModal(true)}
+                  className={`text-[11px] px-4 py-2 border rounded transition flex items-center justify-center gap-2 w-full cursor-pointer ${
+                    isLight 
+                      ? 'bg-white hover:bg-[#f1f5f9] border-[#cbd5e1] text-[#334155] shadow-sm font-semibold' 
+                      : 'bg-[#1A1A1A] hover:bg-[#252525] border-[#333] text-gray-300'
+                  }`}
+                >
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                   Cambiar Logo
                 </button>
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  onChange={handleLogoFileSelect} 
+                  accept="image/png, image/jpeg, image/webp, image/svg+xml" 
+                  className="hidden" 
+                />
               </div>
 
               {/* Panel Derecho */}
@@ -835,6 +885,85 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
 
         </div>
       </div>
+
+      {/* Modal de Cambio de Logo */}
+      {showLogoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className={`border rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-5 ${
+            isLight ? 'bg-white border-[#cbd5e1] text-[#0f172a]' : 'bg-[#18181b] border-[#3f3f46] text-[#e5e1e4]'
+          }`}>
+            <div className={`flex items-center justify-between pb-3 border-b ${isLight ? 'border-[#e2e8f0]' : 'border-[#27272a]'}`}>
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-[#FF5A1F] text-[22px]">add_photo_alternate</span>
+                <h3 className={`font-bold text-[16px] ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>
+                  Actualizar Logo de la Sucursal
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowLogoModal(false)}
+                className={`p-1 rounded-lg ${isLight ? 'text-[#64748b] hover:bg-[#f1f5f9]' : 'text-[#a1a1aa] hover:text-white hover:bg-[#27272a]'}`}
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-4">
+              {/* Opcion 1: Subir desde PC */}
+              <div 
+                className={`p-4 rounded-xl border flex flex-col items-center justify-center gap-2 cursor-pointer transition-all hover:border-[#FF5A1F] ${
+                  isLight ? 'bg-[#f8fafc] border-[#cbd5e1]' : 'bg-[#121215] border-[#27272a]'
+                }`}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <div className="w-12 h-12 rounded-full bg-[#FF5A1F]/15 text-[#FF5A1F] flex items-center justify-center">
+                  <span className="material-symbols-outlined text-[24px]">upload_file</span>
+                </div>
+                <div className="text-center">
+                  <div className={`text-[13px] font-bold ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>Subir imagen desde el equipo</div>
+                  <div className={`text-[11px] ${isLight ? 'text-[#64748b]' : 'text-gray-400'}`}>PNG, JPG, SVG o WebP (Max. 5MB)</div>
+                </div>
+              </div>
+
+              {/* Opcion 2: URL Externa */}
+              <form onSubmit={handleApplyLogoUrl} className="space-y-2">
+                <label className={`text-[11px] font-bold uppercase tracking-wider block ${isLight ? 'text-[#475569]' : 'text-gray-400'}`}>
+                  O ingresar enlace directo (URL de imagen)
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    placeholder="https://ejemplo.com/logo.png"
+                    value={customLogoInput}
+                    onChange={(e) => setCustomLogoInput(e.target.value)}
+                    className={`flex-1 rounded-lg px-3 py-2 text-[12.5px] border focus:border-[#FF5A1F] focus:outline-none ${
+                      isLight ? 'bg-white border-[#cbd5e1] text-[#0f172a]' : 'bg-[#121215] border-[#27272a] text-white'
+                    }`}
+                  />
+                  <button
+                    type="submit"
+                    className="px-3.5 py-2 bg-[#FF5A1F] text-white font-bold text-[12px] rounded-lg hover:bg-[#FF703D] cursor-pointer"
+                  >
+                    Asignar
+                  </button>
+                </div>
+              </form>
+
+              {/* Opcion 3: Restaurar por defecto */}
+              <button
+                type="button"
+                onClick={handleResetDefaultLogo}
+                className={`w-full py-2.5 rounded-lg border text-[12px] font-medium transition-colors flex items-center justify-center gap-1.5 cursor-pointer ${
+                  isLight ? 'bg-[#f1f5f9] hover:bg-[#e2e8f0] border-[#cbd5e1] text-[#475569]' : 'bg-[#27272a] hover:bg-[#323236] border-[#3f3f46] text-[#a1a1aa]'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[16px]">restart_alt</span>
+                <span>Restaurar Logo Predeterminado (/logo.png)</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
