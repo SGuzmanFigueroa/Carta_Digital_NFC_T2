@@ -22,7 +22,13 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
   const [showLogoModal, setShowLogoModal] = useState(false);
   const [customLogoInput, setCustomLogoInput] = useState('');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const [activeSection, setActiveSection] = useState<'perfil' | 'notificaciones' | 'tema' | 'idioma' | 'impresion'>('perfil');
+    const [activeSection, setActiveSection] = useState<'perfil' | 'notificaciones' | 'tema' | 'idioma' | 'impresion' | 'qr-mesas'>('perfil');
+  const [selectedTableNumber, setSelectedTableNumber] = useState('01');
+  const [selectedZone, setSelectedZone] = useState('Salón Principal');
+  const [customTableName, setCustomTableName] = useState('');
+  const [showAllQRsModal, setShowAllQRsModal] = useState(false);
+  const [qrColor, setQrColor] = useState<'black' | 'brand'>('brand');
+  const [includeLogoInQR, setIncludeLogoInQR] = useState(true);
 
   const handleLogoFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -104,7 +110,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
       { rootMargin: '-20% 0px -60% 0px' }
     );
 
-    const sectionIds = ['perfil', 'notificaciones', 'tema', 'idioma', 'impresion'];
+    const sectionIds = ['perfil', 'notificaciones', 'tema', 'idioma', 'impresion', 'qr-mesas'];
     sectionIds.forEach((id) => {
       const element = document.getElementById(id);
       if (element) observer.observe(element);
@@ -1026,9 +1032,330 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
               </div>
             </div>
           </section>
+          {/* SEC_06: CÓDIGOS QR PARA MESAS & NFC */}
+          <section id="qr-mesas" className={`border rounded-xl scroll-mt-24 ${sectionBg}`}>
+            <div className={`flex justify-between items-start p-6 border-b ${sectionHeaderBorder}`}>
+              <div className="flex items-center gap-3">
+                <svg className="w-6 h-6 text-[#FF5A1F] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                </svg>
+                <div>
+                  <h2 className={`text-lg font-bold mb-0.5 ${titleColor}`}>{t.qr_section_title}</h2>
+                  <p className={`text-[13px] ${descColor}`}>{t.qr_section_desc}</p>
+                </div>
+              </div>
+              <span className={`text-[10px] font-mono px-2 py-1 rounded border tracking-widest uppercase ${badgeStyle}`}>SEC_06</span>
+            </div>
+
+            <div className="p-6 flex flex-col lg:flex-row gap-8">
+              {/* Columna Izquierda: Parámetros y Generador */}
+              <div className="flex-1 space-y-6">
+                
+                {/* Selector rápido de mesas */}
+                <div>
+                  <label className={`text-[10px] uppercase tracking-[0.1em] font-bold block mb-2 ${labelColor}`}>
+                    {t.select_table}
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {['01', '02', '03', '04', '05', '06', 'T1', 'T2', 'Bar-1', 'VIP'].map((tbl) => {
+                      const isActive = selectedTableNumber === tbl && !customTableName;
+                      return (
+                        <button
+                          key={tbl}
+                          type="button"
+                          onClick={() => {
+                            setSelectedTableNumber(tbl);
+                            setCustomTableName('');
+                            onShowToast(`Mesa seleccionada: ${tbl.startsWith('T') ? 'Terraza ' + tbl : tbl.startsWith('B') ? 'Barra ' + tbl : 'Mesa ' + tbl}`, 'qr_code_2');
+                          }}
+                          className={`px-3 py-1.5 rounded-lg border text-[12px] font-mono font-bold transition-all cursor-pointer ${
+                            isActive
+                              ? 'bg-[#FF5A1F] border-[#FF5A1F] text-white shadow-md shadow-[#FF5A1F]/30 scale-105'
+                              : isLight
+                              ? 'bg-white border-[#cbd5e1] text-[#334155] hover:bg-[#f1f5f9]'
+                              : 'bg-[#1C1C1C] border-[#2A2A2A] text-gray-300 hover:border-[#444]'
+                          }`}
+                        >
+                          {tbl.startsWith('T') ? tbl : tbl.startsWith('B') ? tbl : `Mesa ${tbl}`}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Input personalizado de mesa y zona */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className={`text-[10px] uppercase tracking-[0.1em] font-bold ${labelColor}`}>
+                      Nombre o Identificador Personalizado
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ej: Mesa VIP 02, Terraza 05"
+                      value={customTableName}
+                      onChange={(e) => setCustomTableName(e.target.value)}
+                      className={`w-full rounded p-2.5 text-[13px] focus:border-[#FF5A1F] focus:outline-none transition ${selectBg}`}
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className={`text-[10px] uppercase tracking-[0.1em] font-bold ${labelColor}`}>
+                      {t.table_zone}
+                    </label>
+                    <select
+                      value={selectedZone}
+                      onChange={(e) => setSelectedZone(e.target.value)}
+                      className={`w-full rounded p-2.5 text-[13px] focus:border-[#FF5A1F] focus:outline-none transition ${selectBg}`}
+                    >
+                      <option value="Salón Principal">Salón Principal</option>
+                      <option value="Terraza Exterior">Terraza Exterior</option>
+                      <option value="Rooftop Lounge">Rooftop Lounge</option>
+                      <option value="Barra Central">Barra Central</option>
+                      <option value="Salón Privé VIP">Salón Privé VIP</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* URL del comensal vinculada */}
+                <div className="flex flex-col gap-1.5">
+                  <label className={`text-[10px] uppercase tracking-[0.1em] font-bold ${labelColor}`}>
+                    {t.table_url}
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      value={`${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/menu?mesa=${encodeURIComponent(customTableName.trim() || ('MESA ' + selectedTableNumber))}&zona=${encodeURIComponent(selectedZone)}`}
+                      className={`flex-1 rounded p-2.5 text-[12px] font-mono tracking-tight cursor-default ${
+                        isLight ? 'bg-[#f1f5f9] border border-[#cbd5e1] text-[#334155]' : 'bg-[#141414] border border-[#2A2A2A] text-gray-300'
+                      }`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const url = `${window.location.origin}/menu?mesa=${encodeURIComponent(customTableName.trim() || ('MESA ' + selectedTableNumber))}&zona=${encodeURIComponent(selectedZone)}`;
+                        navigator.clipboard.writeText(url);
+                        onShowToast('Enlace de la mesa copiado al portapapeles', 'content_copy');
+                      }}
+                      className="px-3.5 py-2 rounded border bg-[#FF5A1F] text-white hover:bg-[#FF703D] font-bold text-[12px] flex items-center gap-1.5 cursor-pointer shrink-0 transition-all"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">content_copy</span>
+                      <span className="hidden sm:inline">{t.copy_link}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const url = `${window.location.origin}/menu?mesa=${encodeURIComponent(customTableName.trim() || ('MESA ' + selectedTableNumber))}&zona=${encodeURIComponent(selectedZone)}`;
+                        window.open(url, '_blank');
+                      }}
+                      className={`px-3 py-2 rounded border text-[12px] font-semibold flex items-center gap-1 cursor-pointer shrink-0 transition-colors ${
+                        isLight ? 'bg-white border-[#cbd5e1] text-[#334155] hover:bg-[#f8fafc]' : 'bg-[#252525] border-[#333] text-gray-200 hover:bg-[#2e2e2e]'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[16px]">open_in_new</span>
+                      <span className="hidden sm:inline">{t.open_menu}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Personalización y Opciones de Impresión */}
+                <div className={`p-4 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${cardBg}`}>
+                  <div className="flex flex-col gap-2">
+                    <span className={`text-[11px] font-bold uppercase tracking-wider ${labelColor}`}>Opciones del QR</span>
+                    <div className="flex items-center gap-4">
+                      <label className="flex items-center gap-2 text-[12px] cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={qrColor === 'brand'}
+                          onChange={(e) => setQrColor(e.target.checked ? 'brand' : 'black')}
+                          className="w-4 h-4 accent-[#FF5A1F]"
+                        />
+                        <span>Color AURA Naranja</span>
+                      </label>
+                      <label className="flex items-center gap-2 text-[12px] cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={includeLogoInQR}
+                          onChange={(e) => setIncludeLogoInQR(e.target.checked)}
+                          className="w-4 h-4 accent-[#FF5A1F]"
+                        />
+                        <span>Logotipo central</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowAllQRsModal(true)}
+                    className="w-full sm:w-auto px-4 py-2 border rounded-lg text-[12px] font-bold flex items-center justify-center gap-2 bg-[#FF5A1F]/10 border-[#FF5A1F]/40 text-[#FF5A1F] hover:bg-[#FF5A1F]/20 cursor-pointer transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">grid_view</span>
+                    <span>{t.all_tables_grid}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Columna Derecha: Caballete Físico de Mesa (Standee) Preview */}
+              <div className={`w-full lg:w-[320px] shrink-0 border p-5 rounded-2xl flex flex-col items-center justify-between shadow-2xl relative overflow-hidden ${
+                isLight ? 'bg-[#ffffff] border-[#cbd5e1]' : 'bg-[#0A0A0C] border-[#2A2A2A]'
+              }`}>
+                <div className="w-full text-center pb-3 border-b border-dashed border-gray-400/40">
+                  <div className="w-10 h-10 mx-auto rounded-lg overflow-hidden border border-gray-300 shadow-sm mb-1.5 flex items-center justify-center bg-black">
+                    <img src={formData.logoUrl || '/logo.png'} alt="Logo" className="w-full h-full object-cover" />
+                  </div>
+                  <h4 className={`text-[13px] font-extrabold tracking-tight ${titleColor}`}>{formData.branchName || 'AUREA Bistro'}</h4>
+                  <span className="text-[10px] font-mono uppercase tracking-widest text-[#FF5A1F] font-bold">CARTA DIGITAL • AUTO-PEDIDO</span>
+                </div>
+
+                {/* Mesa Badge */}
+                <div className="my-3 text-center">
+                  <div className="inline-block px-4 py-1 rounded-full bg-[#FF5A1F] text-white font-extrabold text-[14px] shadow-md shadow-[#FF5A1F]/30 tracking-wide font-mono">
+                    {customTableName.trim() || ('MESA ' + selectedTableNumber)}
+                  </div>
+                  <p className={`text-[10.5px] mt-1 font-medium ${descColor}`}>{selectedZone}</p>
+                </div>
+
+                {/* Tarjeta de Código QR */}
+                <div className="p-3 bg-white rounded-xl shadow-md border border-gray-200 relative group flex items-center justify-center">
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&color=${qrColor === 'brand' ? 'ff5a1f' : '000000'}&bgcolor=ffffff&data=${encodeURIComponent(
+                      (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000') +
+                      '/menu?mesa=' + encodeURIComponent(customTableName.trim() || ('MESA ' + selectedTableNumber)) +
+                      '&zona=' + encodeURIComponent(selectedZone)
+                    )}`}
+                    alt="Código QR de la Mesa"
+                    className="w-[180px] h-[180px] object-contain rounded"
+                  />
+                  {includeLogoInQR && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <div className="w-10 h-10 rounded-full bg-white p-1 shadow-lg border border-gray-200 flex items-center justify-center">
+                        <img src={formData.logoUrl || '/logo.png'} alt="Mini Logo" className="w-full h-full object-cover rounded-full" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <p className={`text-center text-[10px] max-w-[220px] mt-3 leading-snug ${descColor}`}>
+                  {t.scan_to_order}
+                </p>
+
+                {/* NFC Badge Indicator */}
+                <div className={`mt-2 px-3 py-1 rounded-full border text-[9px] font-mono font-bold flex items-center gap-1.5 ${
+                  isLight ? 'bg-[#f1f5f9] border-[#cbd5e1] text-[#334155]' : 'bg-[#18181b] border-[#3f3f46] text-emerald-400'
+                }`}>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span>{t.nfc_active}</span>
+                </div>
+
+                {/* Botones de Acción */}
+                <div className="grid grid-cols-2 gap-2 w-full mt-4 pt-3 border-t border-gray-300/30">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        const targetUrl = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&color=${qrColor === 'brand' ? 'ff5a1f' : '000000'}&bgcolor=ffffff&data=${encodeURIComponent(
+                          window.location.origin + '/menu?mesa=' + encodeURIComponent(customTableName.trim() || ('MESA ' + selectedTableNumber))
+                        )}`;
+                        const res = await fetch(targetUrl);
+                        const blob = await res.blob();
+                        const blobUrl = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = blobUrl;
+                        a.download = `QR-${(customTableName.trim() || ('MESA_' + selectedTableNumber)).replace(/\s+/g, '_')}.png`;
+                        a.click();
+                        URL.revokeObjectURL(blobUrl);
+                        onShowToast('Imagen QR descargada en alta resolución', 'download');
+                      } catch {
+                        window.open(`https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(window.location.origin + '/menu?mesa=' + (customTableName.trim() || selectedTableNumber))}`, '_blank');
+                      }
+                    }}
+                    className={`py-2 px-2.5 rounded-lg border text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer transition-colors ${
+                      isLight ? 'bg-white border-[#cbd5e1] text-[#0f172a] hover:bg-[#f1f5f9]' : 'bg-[#1C1C1C] border-[#333] text-gray-200 hover:bg-[#252525]'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[15px]">download</span>
+                    <span>Descargar</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      window.print();
+                    }}
+                    className="py-2 px-2.5 rounded-lg bg-[#FF5A1F] text-white hover:bg-[#FF703D] font-bold text-[11px] flex items-center justify-center gap-1 cursor-pointer shadow-md shadow-[#FF5A1F]/20 transition-all"
+                  >
+                    <span className="material-symbols-outlined text-[15px]">print</span>
+                    <span>Imprimir</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+
 
         </div>
       </div>
+
+
+      {/* Modal de Cuadrícula de Todas las Mesas */}
+      {showAllQRsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className={`border rounded-2xl shadow-2xl max-w-4xl w-full p-6 space-y-5 max-h-[90vh] flex flex-col ${
+            isLight ? 'bg-white border-[#cbd5e1] text-[#0f172a]' : 'bg-[#18181b] border-[#3f3f46] text-[#e5e1e4]'
+          }`}>
+            <div className={`flex items-center justify-between pb-3 border-b shrink-0 ${isLight ? 'border-[#e2e8f0]' : 'border-[#27272a]'}`}>
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-[#FF5A1F] text-[22px]">grid_view</span>
+                <h3 className={`font-bold text-[16px] ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>
+                  Lote de Códigos QR para Todas las Mesas
+                </h3>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-3.5 py-1.5 bg-[#FF5A1F] text-white font-bold text-[12px] rounded-lg hover:bg-[#FF703D] flex items-center gap-1.5 cursor-pointer shadow-md"
+                >
+                  <span className="material-symbols-outlined text-[16px]">print</span>
+                  <span>Imprimir Todos</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowAllQRsModal(false)}
+                  className={`p-1 rounded-lg ${isLight ? 'text-[#64748b] hover:bg-[#f1f5f9]' : 'text-[#a1a1aa] hover:text-white hover:bg-[#27272a]'}`}
+                >
+                  <span className="material-symbols-outlined text-[18px]">close</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto pr-2 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+              {['Mesa 01', 'Mesa 02', 'Mesa 03', 'Mesa 04', 'Mesa 05', 'Mesa 06', 'Mesa 07', 'Mesa 08', 'Terraza T1', 'Terraza T2', 'Barra B1', 'Salón VIP'].map((tableLabel) => {
+                const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&color=${qrColor === 'brand' ? 'ff5a1f' : '000000'}&bgcolor=ffffff&data=${encodeURIComponent(
+                  (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000') + '/menu?mesa=' + encodeURIComponent(tableLabel)
+                )}`;
+                return (
+                  <div
+                    key={tableLabel}
+                    className={`p-3.5 rounded-xl border flex flex-col items-center text-center justify-between shadow-sm ${
+                      isLight ? 'bg-[#f8fafc] border-[#cbd5e1]' : 'bg-[#121215] border-[#2A2A2A]'
+                    }`}
+                  >
+                    <div className="w-full text-[10px] font-mono text-[#FF5A1F] font-bold uppercase tracking-wider mb-1">
+                      {formData.branchName || 'AUREA Bistro'}
+                    </div>
+                    <div className="text-[13px] font-bold text-white mb-2">{tableLabel}</div>
+                    <div className="p-2 bg-white rounded-lg shadow-sm border border-gray-200">
+                      <img src={qrUrl} alt={tableLabel} className="w-24 h-24 object-contain" />
+                    </div>
+                    <span className="text-[9px] text-gray-400 mt-2 font-mono">(( · )) NFC LINKED</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal de Cambio de Logo */}
       {showLogoModal && (

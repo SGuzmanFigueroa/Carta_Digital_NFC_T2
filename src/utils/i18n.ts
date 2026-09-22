@@ -30,6 +30,19 @@ export interface TranslationDictionary {
   nav_theme: string;
   nav_region: string;
   nav_hardware: string;
+  nav_qr_tables: string;
+  qr_section_title: string;
+  qr_section_desc: string;
+  select_table: string;
+  table_zone: string;
+  table_url: string;
+  copy_link: string;
+  open_menu: string;
+  download_qr: string;
+  print_standee: string;
+  all_tables_grid: string;
+  scan_to_order: string;
+  nfc_active: string;
   terminal_status: string;
   kds_latency: string;
   local_sync: string;
@@ -139,6 +152,19 @@ export const DICTIONARY: Record<LanguageCode, TranslationDictionary> = {
     nav_theme: 'Tema & Visual',
     nav_region: 'Idioma & Región',
     nav_hardware: 'Hardware ESC/POS',
+    nav_qr_tables: 'QR Mesas & NFC',
+    qr_section_title: 'Códigos QR para Mesas & NFC',
+    qr_section_desc: 'Generación, descarga e impresión de códigos QR y chips NFC para la carta digital de cada mesa.',
+    select_table: 'Seleccionar Mesa',
+    table_zone: 'Zona de Sala',
+    table_url: 'Enlace Directo de la Carta',
+    copy_link: 'Copiar Enlace',
+    open_menu: 'Abrir Carta',
+    download_qr: 'Descargar QR (PNG)',
+    print_standee: 'Imprimir Caballete de Mesa',
+    all_tables_grid: 'Ver Todas las Mesas',
+    scan_to_order: 'Escanea para ver la carta y pedir',
+    nfc_active: 'Chip NFC NTAG213 Vinculado',
     terminal_status: 'Estado de Terminal',
     kds_latency: 'Latencia KDS',
     local_sync: 'Sincro Local',
@@ -240,6 +266,19 @@ export const DICTIONARY: Record<LanguageCode, TranslationDictionary> = {
     nav_theme: 'Theme & Visual',
     nav_region: 'Language & Region',
     nav_hardware: 'Hardware ESC/POS',
+    nav_qr_tables: 'Table QRs & NFC',
+    qr_section_title: 'Table QR Codes & NFC',
+    qr_section_desc: 'Generate, download, and print table QR codes and NFC chips linked to each table digital menu.',
+    select_table: 'Select Table',
+    table_zone: 'Dining Zone',
+    table_url: 'Direct Digital Menu URL',
+    copy_link: 'Copy Link',
+    open_menu: 'Open Menu',
+    download_qr: 'Download QR (PNG)',
+    print_standee: 'Print Table Standee',
+    all_tables_grid: 'View All Tables',
+    scan_to_order: 'Scan to view menu and order',
+    nfc_active: 'NTAG213 NFC Chip Linked',
     terminal_status: 'Terminal Status',
     kds_latency: 'KDS Latency',
     local_sync: 'Local Sync',
