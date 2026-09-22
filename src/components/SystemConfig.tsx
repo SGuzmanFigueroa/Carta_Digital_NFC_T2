@@ -836,7 +836,6 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                   <p className={`text-[13px] ${descColor}`}>{t.profile_desc}</p>
                 </div>
               </div>
-              <span className={`text-[10px] font-mono px-2 py-1 rounded border tracking-widest uppercase ${badgeStyle}`}>SEC_01</span>
             </div>
 
             <div className="flex flex-col md:flex-row p-6 gap-6">
@@ -944,7 +943,6 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                   <p className={`text-[13px] ${descColor}`}>{t.notif_desc}</p>
                 </div>
               </div>
-              <span className={`text-[10px] font-mono px-2 py-1 rounded border tracking-widest uppercase ${badgeStyle}`}>SEC_02</span>
             </div>
             
             <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1026,7 +1024,6 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                   <p className={`text-[13px] ${descColor}`}>Optimizado para legibilidad bajo luces cálidas de salón o el calor intenso de cocina.</p>
                 </div>
               </div>
-              <span className={`text-[10px] font-mono px-2 py-1 rounded border tracking-widest uppercase ${badgeStyle}`}>SEC_03</span>
             </div>
 
             <div className="p-6 flex flex-col gap-6">
@@ -1297,7 +1294,6 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                   <p className={`text-[13px] ${descColor}`}>{t.region_desc}</p>
                 </div>
               </div>
-              <span className={`text-[10px] font-mono px-2 py-1 rounded border tracking-widest uppercase ${badgeStyle}`}>SEC_04</span>
             </div>
             <div className="p-6 grid grid-cols-1 md:grid-cols-4 gap-6">
               <div className="flex flex-col gap-1.5">
@@ -1398,7 +1394,6 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                   <p className={`text-[13px] ${descColor}`}>{t.hardware_desc}</p>
                 </div>
               </div>
-              <span className={`text-[10px] font-mono px-2 py-1 rounded border tracking-widest uppercase ${badgeStyle}`}>SEC_05</span>
             </div>
             <div className="p-6 flex flex-col md:flex-row gap-8">
               <div className="flex-1 space-y-6">
@@ -1532,7 +1527,6 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                   <p className={`text-[13px] ${descColor}`}>{t.qr_section_desc}</p>
                 </div>
               </div>
-              <span className={`text-[10px] font-mono px-2 py-1 rounded border tracking-widest uppercase ${badgeStyle}`}>SEC_06</span>
             </div>
 
             <div className="p-6 flex flex-col lg:flex-row gap-8">
