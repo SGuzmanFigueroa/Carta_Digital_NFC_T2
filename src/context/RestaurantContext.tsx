@@ -24,6 +24,7 @@ interface RestaurantContextType {
   tickets: Ticket[];
   setTickets: React.Dispatch<React.SetStateAction<Ticket[]>>;
   orders: OrderTicket[];
+  setOrders: React.Dispatch<React.SetStateAction<OrderTicket[]>>;
   tables: TableStatus[];
   runners: Runner[];
   setRunners: React.Dispatch<React.SetStateAction<Runner[]>>;
@@ -894,6 +895,7 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
         tickets,
         setTickets,
         orders,
+        setOrders,
         tables,
         runners,
         setRunners,

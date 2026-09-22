@@ -53,7 +53,28 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     }
   ]);
 
-  // Handle Real Camera stream for AR Visor
+  // Sincronizar automáticamente la mesa desde el QR escaneado (?mesa=Mesa 02&zona=Salón)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const mesaParam = params.get('mesa');
+      if (mesaParam && mesaParam.trim()) {
+        const decoded = decodeURIComponent(mesaParam.trim());
+        setSelectedTable(decoded);
+        try {
+          sessionStorage.setItem('gastropulse_active_table', decoded);
+        } catch {}
+        onShowToast(`Mesa vinculada por QR: ${decoded}`, 'qr_code_scanner');
+      } else {
+        try {
+          const saved = sessionStorage.getItem('gastropulse_active_table');
+          if (saved) setSelectedTable(saved);
+        } catch {}
+      }
+    }
+  }, []);
+
+    // Handle Real Camera stream for AR Visor
   useEffect(() => {
     if (!isArModalOpen) {
       if (mediaStreamRef.current) {
@@ -216,7 +237,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                   <span>{selectedTable}</span>
                   <span className="material-symbols-outlined text-[12px] text-[#ff5708]">expand_more</span>
                 </button>
-                <span className="text-[10px] text-[#71717a] hidden xs:inline">• Auto-pedido NFC</span>
+                <span className="text-[10px] text-emerald-400 font-medium hidden xs:inline flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>Auto-pedido QR activo</span>
               </div>
             </div>
           </div>

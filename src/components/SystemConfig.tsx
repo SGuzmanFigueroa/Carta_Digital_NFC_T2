@@ -29,6 +29,9 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
   const [showAllQRsModal, setShowAllQRsModal] = useState(false);
   const [qrColor, setQrColor] = useState<'black' | 'brand'>('brand');
   const [includeLogoInQR, setIncludeLogoInQR] = useState(true);
+  const [totalTablesCount, setTotalTablesCount] = useState<number>(24);
+  const [tableSearchFilter, setTableSearchFilter] = useState('');
+  const [modalZoneFilter, setModalZoneFilter] = useState<string>('all');
 
   const handleLogoFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -379,21 +382,38 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
   const handlePrintAllTables = () => {
     const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
     const branchName = formData.branchName || 'AUREA Bistro';
-    const tables = ['Mesa 01', 'Mesa 02', 'Mesa 03', 'Mesa 04', 'Mesa 05', 'Mesa 06', 'Mesa 07', 'Mesa 08', 'Terraza T1', 'Terraza T2', 'Barra B1', 'Salón VIP'];
+    
+    // Generar dinámicamente todas las mesas configuradas (hasta totalTablesCount o 50+)
+    const generatedTables: string[] = [];
+    for (let i = 1; i <= totalTablesCount; i++) {
+      generatedTables.push(`Mesa ${String(i).padStart(2, '0')}`);
+    }
+    // Agregar mesas de zonas especiales
+    generatedTables.push('Terraza T1', 'Terraza T2', 'Terraza T3', 'Barra B1', 'Barra B2', 'Salón VIP');
 
-    const cardsHtml = tables.map((tbl) => {
+    const filteredForPrint = modalZoneFilter === 'all' 
+      ? generatedTables 
+      : generatedTables.filter(t => {
+          if (modalZoneFilter === 'salon') return t.startsWith('Mesa');
+          if (modalZoneFilter === 'terraza') return t.includes('Terraza');
+          if (modalZoneFilter === 'barra') return t.includes('Barra');
+          if (modalZoneFilter === 'vip') return t.includes('VIP');
+          return true;
+        });
+
+    const cardsHtml = filteredForPrint.map((tbl) => {
       const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=350x350&color=${qrColor === 'brand' ? 'ff5a1f' : '000000'}&bgcolor=ffffff&data=${encodeURIComponent(origin + '/menu?mesa=' + encodeURIComponent(tbl))}`;
       return `
         <div class="batch-card">
           <div class="batch-header">
             <span class="batch-branch">${branchName}</span>
-            <span class="batch-tag">CARTA DIGITAL</span>
+            <span class="batch-tag">CARTA DIGITAL • AUTO-PEDIDO</span>
           </div>
           <div class="batch-table-pill">${tbl}</div>
           <div class="batch-qr">
             <img src="${qrUrl}" alt="${tbl}" />
           </div>
-          <div class="batch-nfc">(( · )) NFC LINKED</div>
+          <div class="batch-nfc">● NTAG213 NFC LINKED</div>
         </div>
       `;
     }).join('');
@@ -402,11 +422,11 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Lote de QRs de Mesas - ${branchName}</title>
+  <title>Lote Completo de QRs de Mesas - ${branchName} (${filteredForPrint.length} Mesas)</title>
   <style>
     @page {
       size: A4 portrait;
-      margin: 10mm;
+      margin: 8mm;
     }
     * {
       box-sizing: border-box;
@@ -420,7 +440,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
       background: #fff;
     }
     .page-title {
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 700;
       color: #0f172a;
       margin-bottom: 4px;
@@ -432,13 +452,13 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
     .grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 12px;
-      margin-top: 12px;
+      gap: 10px;
+      margin-top: 10px;
     }
     .batch-card {
       border: 1.5px dashed #cbd5e1;
-      border-radius: 16px;
-      padding: 14px 10px;
+      border-radius: 14px;
+      padding: 12px 8px;
       background: #0a0a0c;
       color: #fff;
       text-align: center;
@@ -447,16 +467,16 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
       flex-direction: column;
       align-items: center;
       justify-content: space-between;
-      min-height: 230px;
+      min-height: 220px;
     }
     .batch-branch {
-      font-size: 11px;
+      font-size: 10.5px;
       font-weight: 700;
       display: block;
       color: #fff;
     }
     .batch-tag {
-      font-size: 8.5px;
+      font-size: 8px;
       font-family: monospace;
       color: #ff5a1f;
       font-weight: 700;
@@ -471,7 +491,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
       font-weight: 800;
       font-size: 13px;
       font-family: monospace;
-      margin: 6px 0;
+      margin: 5px 0;
     }
     .batch-qr {
       background: #fff;
@@ -481,23 +501,23 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
       margin: 2px 0;
     }
     .batch-qr img {
-      width: 120px;
-      height: 120px;
+      width: 110px;
+      height: 110px;
       display: block;
     }
     .batch-nfc {
-      font-size: 8.5px;
+      font-size: 8px;
       font-family: monospace;
       color: #34d399;
       font-weight: 700;
-      margin-top: 6px;
+      margin-top: 4px;
     }
   </style>
 </head>
 <body>
   <div class="page-title">
-    <span>${branchName} — Códigos QR & NFC de Mesas (12 Unidades)</span>
-    <span style="font-family: monospace; font-size: 11px; color: #64748b;">✂ Líneas de corte para atril</span>
+    <span>${branchName} — Lote Completo de Códigos QR para Mesas (${filteredForPrint.length} Mesas)</span>
+    <span style="font-family: monospace; font-size: 10px; color: #64748b;">✂ Líneas de corte para atril acrílico</span>
   </div>
   <div class="grid">
     ${cardsHtml}
@@ -508,6 +528,25 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
     printIsolatedDocument(htmlContent, `Lote-QRs-${branchName}`);
   };
 
+
+
+  // Lista dinámica de todas las mesas del restaurante basada en la capacidad total configurada
+  const allTablesList = React.useMemo(() => {
+    const list: string[] = [];
+    for (let i = 1; i <= totalTablesCount; i++) {
+      list.push(`Mesa ${String(i).padStart(2, '0')}`);
+    }
+    list.push('Terraza T1', 'Terraza T2', 'Terraza T3', 'Barra B1', 'Barra B2', 'Salón VIP');
+    return list;
+  }, [totalTablesCount]);
+
+  const filteredModalTables = React.useMemo(() => {
+    if (modalZoneFilter === 'salon') return allTablesList.filter(t => t.startsWith('Mesa'));
+    if (modalZoneFilter === 'terraza') return allTablesList.filter(t => t.includes('Terraza'));
+    if (modalZoneFilter === 'barra') return allTablesList.filter(t => t.includes('Barra'));
+    if (modalZoneFilter === 'vip') return allTablesList.filter(t => t.includes('VIP'));
+    return allTablesList;
+  }, [allTablesList, modalZoneFilter]);
 
   const t = getTranslations(formData.language);
   const isLight = formData.themeMode === 'light';
@@ -1500,35 +1539,109 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
               {/* Columna Izquierda: Parámetros y Generador */}
               <div className="flex-1 space-y-6">
                 
-                {/* Selector rápido de mesas */}
-                <div>
-                  <label className={`text-[10px] uppercase tracking-[0.1em] font-bold block mb-2 ${labelColor}`}>
-                    {t.select_table}
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {['01', '02', '03', '04', '05', '06', 'T1', 'T2', 'Bar-1', 'VIP'].map((tbl) => {
-                      const isActive = selectedTableNumber === tbl && !customTableName;
-                      return (
+                {/* Capacidad y Selector Dinámico de Mesas del Restaurante (10, 20, 50 mesas) */}
+                <div className={`p-4 rounded-xl border flex flex-col gap-3.5 ${cardBg}`}>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pb-2.5 border-b border-gray-300/30">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-[#FF5A1F] text-[18px]">table_restaurant</span>
+                        <h4 className={`text-[12px] font-bold uppercase tracking-wider ${titleColor}`}>
+                          Capacidad de Mesas del Restaurante
+                        </h4>
+                      </div>
+                      <p className={`text-[11px] ${descColor}`}>
+                        Ajusta cuántas mesas tiene tu local para generar y numerar todos los códigos QR.
+                      </p>
+                    </div>
+                    
+                    {/* Botones de Presets y selector numérico */}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {[10, 20, 30, 50, 100].map((num) => (
                         <button
-                          key={tbl}
+                          key={num}
                           type="button"
                           onClick={() => {
-                            setSelectedTableNumber(tbl);
-                            setCustomTableName('');
-                            onShowToast(`Mesa seleccionada: ${tbl.startsWith('T') ? 'Terraza ' + tbl : tbl.startsWith('B') ? 'Barra ' + tbl : 'Mesa ' + tbl}`, 'qr_code_2');
+                            setTotalTablesCount(num);
+                            onShowToast(`Capacidad configurada a ${num} mesas`, 'table_restaurant');
                           }}
-                          className={`px-3 py-1.5 rounded-lg border text-[12px] font-mono font-bold transition-all cursor-pointer ${
-                            isActive
-                              ? 'bg-[#FF5A1F] border-[#FF5A1F] text-white shadow-md shadow-[#FF5A1F]/30 scale-105'
+                          className={`px-2.5 py-1 rounded text-[11px] font-mono font-bold border transition-colors cursor-pointer ${
+                            totalTablesCount === num
+                              ? 'bg-[#FF5A1F] text-white border-[#FF5A1F] shadow-sm'
                               : isLight
                               ? 'bg-white border-[#cbd5e1] text-[#334155] hover:bg-[#f1f5f9]'
-                              : 'bg-[#1C1C1C] border-[#2A2A2A] text-gray-300 hover:border-[#444]'
+                              : 'bg-[#1C1C1C] border-[#333] text-gray-300 hover:border-[#555]'
                           }`}
                         >
-                          {tbl.startsWith('T') ? tbl : tbl.startsWith('B') ? tbl : `Mesa ${tbl}`}
+                          {num} Mesas
                         </button>
-                      );
-                    })}
+                      ))}
+                      <div className="flex items-center gap-1 ml-1 bg-black/10 px-2 py-0.5 rounded border border-gray-400/20">
+                        <span className={`text-[10px] uppercase font-bold ${labelColor}`}>Total:</span>
+                        <input
+                          type="number"
+                          min="1"
+                          max="200"
+                          value={totalTablesCount}
+                          onChange={(e) => setTotalTablesCount(Math.max(1, Math.min(200, parseInt(e.target.value) || 1)))}
+                          className={`w-14 text-center py-0.5 text-[11px] font-mono font-bold rounded border focus:border-[#FF5A1F] focus:outline-none ${
+                            isLight ? 'bg-white border-[#cbd5e1] text-[#0f172a]' : 'bg-[#141414] border-[#333] text-white'
+                          }`}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Selector interactivo de mesas */}
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <label className={`text-[10px] uppercase tracking-[0.1em] font-bold ${labelColor}`}>
+                        {t.select_table} ({allTablesList.length} Mesas en Total)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Filtrar mesa (ej: 05, T1, VIP)..."
+                        value={tableSearchFilter}
+                        onChange={(e) => setTableSearchFilter(e.target.value)}
+                        className={`text-[11px] px-2.5 py-1 rounded border focus:border-[#FF5A1F] focus:outline-none w-48 ${
+                          isLight ? 'bg-white border-[#cbd5e1] text-[#0f172a]' : 'bg-[#141414] border-[#333] text-gray-200'
+                        }`}
+                      />
+                    </div>
+
+                    {/* Chips de mesas */}
+                    <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-2 border rounded-lg border-gray-300/30">
+                      {allTablesList
+                        .filter(tbl => !tableSearchFilter || tbl.toLowerCase().includes(tableSearchFilter.toLowerCase()))
+                        .map((tbl) => {
+                          const currentActive = (customTableName.trim() || ('MESA ' + selectedTableNumber)).toUpperCase();
+                          const isActive = currentActive === tbl.toUpperCase() || currentActive === ('MESA ' + tbl).toUpperCase();
+                          return (
+                            <button
+                              key={tbl}
+                              type="button"
+                              onClick={() => {
+                                if (tbl.startsWith('Mesa ')) {
+                                  const num = tbl.replace('Mesa ', '');
+                                  setSelectedTableNumber(num);
+                                  setCustomTableName('');
+                                } else {
+                                  setCustomTableName(tbl);
+                                }
+                                onShowToast(`Mesa seleccionada: ${tbl}`, 'qr_code_2');
+                              }}
+                              className={`px-2.5 py-1.5 rounded-lg border text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                                isActive
+                                  ? 'bg-[#FF5A1F] border-[#FF5A1F] text-white shadow-md shadow-[#FF5A1F]/30 scale-105'
+                                  : isLight
+                                  ? 'bg-white border-[#cbd5e1] text-[#334155] hover:bg-[#f1f5f9]'
+                                  : 'bg-[#18181b] border-[#2A2A2A] text-gray-300 hover:border-[#444]'
+                              }`}
+                            >
+                              {tbl}
+                            </button>
+                          );
+                        })}
+                    </div>
                   </div>
                 </div>
 
@@ -1778,9 +1891,40 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
               </div>
             </div>
 
+            {/* Filtro por Zona en el Modal de Lote */}
+            <div className="flex items-center justify-between gap-3 pb-2 border-b border-gray-500/20 shrink-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {[
+                  { id: 'all', label: `Todas (${allTablesList.length})` },
+                  { id: 'salon', label: `Salón (${totalTablesCount})` },
+                  { id: 'terraza', label: 'Terraza (3)' },
+                  { id: 'barra', label: 'Barra (2)' },
+                  { id: 'vip', label: 'Salón VIP (1)' },
+                ].map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => setModalZoneFilter(f.id)}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-colors cursor-pointer ${
+                      modalZoneFilter === f.id
+                        ? 'bg-[#FF5A1F] text-white border-[#FF5A1F]'
+                        : isLight
+                        ? 'bg-white border-[#cbd5e1] text-[#475569] hover:bg-[#f1f5f9]'
+                        : 'bg-[#18181b] border-[#333] text-gray-300 hover:border-[#555]'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+              <span className={`text-[11px] font-mono ${descColor}`}>
+                Mostrando {filteredModalTables.length} mesas
+              </span>
+            </div>
+
             <div className="flex-1 overflow-y-auto pr-2 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-              {['Mesa 01', 'Mesa 02', 'Mesa 03', 'Mesa 04', 'Mesa 05', 'Mesa 06', 'Mesa 07', 'Mesa 08', 'Terraza T1', 'Terraza T2', 'Barra B1', 'Salón VIP'].map((tableLabel) => {
-                const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&color=${qrColor === 'brand' ? 'ff5a1f' : '000000'}&bgcolor=ffffff&data=${encodeURIComponent(
+              {filteredModalTables.map((tableLabel) => {
+                const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&color=${qrColor === 'brand' ? 'ff5a1f' : '000000'}&bgcolor=ffffff&data=${encodeURIComponent(
                   (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000') + '/menu?mesa=' + encodeURIComponent(tableLabel)
                 )}`;
                 return (
@@ -1793,15 +1937,16 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                     <div className="w-full text-[10px] font-mono text-[#FF5A1F] font-bold uppercase tracking-wider mb-1">
                       {formData.branchName || 'AUREA Bistro'}
                     </div>
-                    <div className="text-[13px] font-bold text-white mb-2">{tableLabel}</div>
+                    <div className={`text-[13px] font-bold mb-2 ${titleColor}`}>{tableLabel}</div>
                     <div className="p-2 bg-white rounded-lg shadow-sm border border-gray-200">
                       <img src={qrUrl} alt={tableLabel} className="w-24 h-24 object-contain" />
                     </div>
-                    <span className="text-[9px] text-gray-400 mt-2 font-mono">(( · )) NFC LINKED</span>
+                    <span className="text-[9px] text-emerald-400 mt-2 font-mono">(( · )) NFC LINKED</span>
                   </div>
                 );
               })}
             </div>
+
           </div>
         </div>
       )}

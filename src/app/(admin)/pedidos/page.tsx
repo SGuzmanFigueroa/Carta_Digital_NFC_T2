@@ -3,19 +3,15 @@
 import React, { useState } from 'react';
 import { OrdersCentral } from '@/components/OrdersCentral';
 import { Header } from '@/components/Header';
-import { INITIAL_ORDERS } from '@/data/mockData';
+import { useRestaurant } from '@/context/RestaurantContext';
 import { OrderTicket } from '@/types';
 import { useRouter } from 'next/navigation';
 
 export default function PedidosPage() {
   const router = useRouter();
-  const [orders, setOrders] = useState<OrderTicket[]>(INITIAL_ORDERS);
-  const [toast, setToast] = useState<{ message: string; icon?: string } | null>(null);
+  const { orders, setOrders, toast, showToast } = useRestaurant();
 
-  const showToast = (message: string, icon = 'info') => {
-    setToast({ message, icon });
-    setTimeout(() => setToast(null), 3000);
-  };
+  // showToast provided by useRestaurant context
 
   const handleUpdateStatus = (orderId: string, newStatus: OrderTicket['status']) => {
     setOrders((prev) =>
