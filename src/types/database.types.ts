@@ -391,44 +391,77 @@ export type Database = {
       }
       system_config: {
         Row: {
+          acoustic_buzzer: boolean | null
+          auto_cut: boolean | null
           branch_name: string
           branch_ruc: string | null
+          color_accent: string | null
           currency: string | null
           delay_alerts: boolean | null
+          density: string | null
           email: string | null
           id: string
+          language: string | null
+          low_stock_alerts: boolean | null
           manager_name: string | null
+          paper_width: string | null
+          payment_alerts: boolean | null
           phone: string | null
+          printer_ip: string | null
+          printer_port: string | null
           sound_alerts: boolean | null
           theme_mode: string | null
+          time_format: string | null
           timezone: string | null
           updated_at: string | null
         }
         Insert: {
+          acoustic_buzzer?: boolean | null
+          auto_cut?: boolean | null
           branch_name?: string
           branch_ruc?: string | null
+          color_accent?: string | null
           currency?: string | null
           delay_alerts?: boolean | null
+          density?: string | null
           email?: string | null
           id?: string
+          language?: string | null
+          low_stock_alerts?: boolean | null
           manager_name?: string | null
+          paper_width?: string | null
+          payment_alerts?: boolean | null
           phone?: string | null
+          printer_ip?: string | null
+          printer_port?: string | null
           sound_alerts?: boolean | null
           theme_mode?: string | null
+          time_format?: string | null
           timezone?: string | null
           updated_at?: string | null
         }
         Update: {
+          acoustic_buzzer?: boolean | null
+          auto_cut?: boolean | null
           branch_name?: string
           branch_ruc?: string | null
+          color_accent?: string | null
           currency?: string | null
           delay_alerts?: boolean | null
+          density?: string | null
           email?: string | null
           id?: string
+          language?: string | null
+          low_stock_alerts?: boolean | null
           manager_name?: string | null
+          paper_width?: string | null
+          payment_alerts?: boolean | null
           phone?: string | null
+          printer_ip?: string | null
+          printer_port?: string | null
           sound_alerts?: boolean | null
           theme_mode?: string | null
+          time_format?: string | null
           timezone?: string | null
           updated_at?: string | null
         }

@@ -1,11 +1,12 @@
-﻿'use client';
+'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { SystemConfig } from '@/components/SystemConfig';
 import { Header } from '@/components/Header';
 import { INITIAL_CONFIG } from '@/data/mockData';
 import { SystemConfigState } from '@/types';
 import { useRouter } from 'next/navigation';
+import { fetchSystemConfigFromDb, saveSystemConfigToDb } from '@/services/configService';
 
 export default function ConfiguracionPage() {
   const router = useRouter();
@@ -17,9 +18,28 @@ export default function ConfiguracionPage() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  const handleSaveConfig = (updated: SystemConfigState) => {
+  useEffect(() => {
+    let mounted = true;
+    async function loadConfig() {
+      const savedConfig = await fetchSystemConfigFromDb();
+      if (mounted) {
+        setConfig(savedConfig);
+      }
+    }
+    loadConfig();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const handleSaveConfig = async (updated: SystemConfigState) => {
     setConfig(updated);
-    showToast('Configuración del sistema guardada con éxito', 'check_circle');
+    const success = await saveSystemConfigToDb(updated);
+    if (success) {
+      showToast('Configuración del sistema guardada con éxito en Supabase y localmente', 'check_circle');
+    } else {
+      showToast('Configuración guardada en caché local del navegador', 'check_circle');
+    }
   };
 
   const handleSelectTab = (tab: string) => {
