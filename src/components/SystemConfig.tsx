@@ -275,12 +275,10 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
           {/* SEC_01: PERFIL */}
           <section id="perfil" className={`border rounded-xl scroll-mt-24 ${sectionBg}`}>
             <div className={`flex justify-between items-start p-6 border-b ${sectionHeaderBorder}`}>
-              <div className="flex items-center gap-4">
-                <div className={`p-2 rounded border ${iconBoxBg}`}>
-                  <svg className="w-5 h-5 text-[#FF5A1F]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13.5 21v-7.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349m-16.5 11.65V9.35m0 0a3.001 3.001 0 003.75-.615A2.993 2.993 0 009.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 002.25 1.016c.896 0 1.7-.393 2.25-1.016a3.001 3.001 0 003.75.614m-16.5 0a3.004 3.004 0 01-.621-4.72L4.318 3.44A1.5 1.5 0 015.378 3h13.243a1.5 1.5 0 011.06.44l1.19 1.189a3 3 0 01-.621 4.72m-13.5 8.65h3.75a.75.75 0 00.75-.75V13.5a.75.75 0 00-.75-.75H6.75a.75.75 0 00-.75.75v3.75c0 .415.336.75.75.75z" />
-                  </svg>
-                </div>
+              <div className="flex items-center gap-3">
+                <svg className="w-6 h-6 text-[#FF5A1F] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M13.5 21v-7.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349m-16.5 11.65V9.35m0 0a3.001 3.001 0 003.75-.615A2.993 2.993 0 009.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 002.25 1.016c.896 0 1.7-.393 2.25-1.016a3.001 3.001 0 003.75.614m-16.5 0a3.004 3.004 0 01-.621-4.72L4.318 3.44A1.5 1.5 0 015.378 3h13.243a1.5 1.5 0 011.06.44l1.19 1.189a3 3 0 01-.621 4.72m-13.5 8.65h3.75a.75.75 0 00.75-.75V13.5a.75.75 0 00-.75-.75H6.75a.75.75 0 00-.75.75v3.75c0 .415.336.75.75.75z" />
+                </svg>
                 <div>
                   <h2 className={`text-lg font-bold mb-0.5 ${titleColor}`}>{t.profile_title}</h2>
                   <p className={`text-[13px] ${descColor}`}>{t.profile_desc}</p>
@@ -385,12 +383,10 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
           {/* SEC_02: NOTIFICACIONES */}
           <section id="notificaciones" className={`border rounded-xl scroll-mt-24 ${sectionBg}`}>
             <div className={`flex justify-between items-start p-6 border-b ${sectionHeaderBorder}`}>
-              <div className="flex items-center gap-4">
-                <div className={`p-2 rounded border ${iconBoxBg}`}>
-                  <svg className="w-5 h-5 text-[#FF5A1F]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0M3.124 7.5A8.969 8.969 0 015.292 3m13.416 0a8.969 8.969 0 012.168 4.5" />
-                  </svg>
-                </div>
+              <div className="flex items-center gap-3">
+                <svg className="w-6 h-6 text-[#FF5A1F] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0M3.124 7.5A8.969 8.969 0 015.292 3m13.416 0a8.969 8.969 0 012.168 4.5" />
+                </svg>
                 <div>
                   <h2 className={`text-lg font-bold mb-0.5 ${titleColor}`}>{t.notif_title}</h2>
                   <p className={`text-[13px] ${descColor}`}>{t.notif_desc}</p>
@@ -469,12 +465,10 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
           {/* SEC_03: TEMA & ERGONOMÍA */}
           <section id="tema" className={`border rounded-xl scroll-mt-24 ${sectionBg}`}>
             <div className={`flex justify-between items-start p-6 border-b ${sectionHeaderBorder}`}>
-              <div className="flex items-center gap-4">
-                <div className={`p-2 rounded border ${iconBoxBg}`}>
-                  <svg className="w-5 h-5 text-[#FF5A1F]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.53 16.122a3 3 0 00-5.78 1.128 2.25 2.25 0 01-2.4 2.245 4.5 4.5 0 008.4-2.245c0-.399-.078-.78-.22-1.128zm0 0a15.998 15.998 0 003.388-1.62m-5.043-.025a15.994 15.994 0 011.622-3.395m3.42 3.42a15.995 15.995 0 004.764-4.648l3.876-5.814a1.151 1.151 0 00-1.597-1.597L14.146 6.32a15.996 15.996 0 00-4.649 4.763m3.42 3.42a6.776 6.776 0 00-3.42-3.42" />
-                  </svg>
-                </div>
+              <div className="flex items-center gap-3">
+                <svg className="w-6 h-6 text-[#FF5A1F] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9.53 16.122a3 3 0 00-5.78 1.128 2.25 2.25 0 01-2.4 2.245 4.5 4.5 0 008.4-2.245c0-.399-.078-.78-.22-1.128zm0 0a15.998 15.998 0 003.388-1.62m-5.043-.025a15.994 15.994 0 011.622-3.395m3.42 3.42a15.995 15.995 0 004.764-4.648l3.876-5.814a1.151 1.151 0 00-1.597-1.597L14.146 6.32a15.996 15.996 0 00-4.649 4.763m3.42 3.42a6.776 6.776 0 00-3.42-3.42" />
+                </svg>
                 <div>
                   <h2 className={`text-lg font-bold mb-0.5 ${titleColor}`}>Tema & Ergonomía Visual</h2>
                   <p className={`text-[13px] ${descColor}`}>Optimizado para legibilidad bajo luces cálidas de salón o el calor intenso de cocina.</p>
@@ -744,10 +738,8 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
           {/* SEC_04: IDIOMA */}
           <section id="idioma" className={`border rounded-xl scroll-mt-24 ${sectionBg}`}>
             <div className={`flex justify-between items-start p-6 border-b ${sectionHeaderBorder}`}>
-              <div className="flex items-center gap-4">
-                <div className={`p-2 rounded border ${iconBoxBg}`}>
-                  <svg className="w-5 h-5 text-[#FF5A1F]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" /></svg>
-                </div>
+              <div className="flex items-center gap-3">
+                <svg className="w-6 h-6 text-[#FF5A1F] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" /></svg>
                 <div>
                   <h2 className={`text-lg font-bold mb-0.5 ${titleColor}`}>{t.region_title}</h2>
                   <p className={`text-[13px] ${descColor}`}>{t.region_desc}</p>
@@ -847,10 +839,8 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
           {/* SEC_05: IMPRESIÓN */}
           <section id="impresion" className={`border rounded-xl scroll-mt-24 ${sectionBg}`}>
             <div className={`flex justify-between items-start p-6 border-b ${sectionHeaderBorder}`}>
-              <div className="flex items-center gap-4">
-                <div className={`p-2 rounded border ${iconBoxBg}`}>
-                  <svg className="w-5 h-5 text-[#FF5A1F]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
-                </div>
+              <div className="flex items-center gap-3">
+                <svg className="w-6 h-6 text-[#FF5A1F] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
                 <div>
                   <h2 className={`text-lg font-bold mb-0.5 ${titleColor}`}>{t.hardware_title}</h2>
                   <p className={`text-[13px] ${descColor}`}>{t.hardware_desc}</p>
