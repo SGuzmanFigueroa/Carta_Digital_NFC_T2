@@ -50,15 +50,24 @@ export default function ConfiguracionPage() {
     else if (tab === 'central_pedidos') router.push('/pedidos');
   };
 
+  const isLight = config.themeMode === 'light';
+  const isHighContrast = config.themeMode === 'kds-high-contrast';
+
   return (
-    <div className="min-h-screen bg-[#0e0e10] text-[#e5e1e4] font-sans">
+    <div className={`min-h-screen font-sans transition-colors duration-200 ${
+      isLight 
+        ? 'bg-[#f4f5f7] text-[#0f172a]' 
+        : isHighContrast 
+        ? 'bg-black text-white' 
+        : 'bg-[#0e0e10] text-[#e5e1e4]'
+    }`}>
       <Header
         currentTab="configuracion"
         onSelectTab={handleSelectTab}
         activeOrdersCount={4}
         urgentCount={1}
       />
-      <main className="w-full pt-16 min-h-screen">
+      <main className="w-full pt-16 min-h-screen transition-colors duration-200">
         <SystemConfig
           config={config}
           onSaveConfig={handleSaveConfig}

@@ -140,142 +140,87 @@ body {
   animation: fadeIn 0.18s ease-out forwards;
 }
 
-
 /* ==========================================================
    GASTROPULSE OS: THEMES & ERGONOMICS (CLARO MINIMAL & KDS)
    ========================================================== */
 
 /* --- CLARO MINIMAL (LIGHT THEME) --- */
 html[data-theme="light"],
-body[data-theme="light"],
-[data-theme="light"] {
-  --color-background: #f4f4f6;
-  --color-foreground: #18181b;
-  --color-surface: #ffffff;
-  --color-surface-dim: #f4f4f6;
-  --color-surface-bright: #ffffff;
-  --color-on-surface: #18181b;
-  --color-on-surface-variant: #52525b;
+body[data-theme="light"] {
+  --color-background: #f4f5f7 !important;
+  --color-foreground: #0f172a !important;
+  background-color: #f4f5f7 !important;
+  color: #0f172a !important;
   color-scheme: light;
 }
 
-html[data-theme="light"] {
-  background-color: #f4f4f6 !important;
-  color: #18181b !important;
-}
-
-html[data-theme="light"] body {
-  background-color: #f4f4f6 !important;
-  color: #18181b !important;
-}
-
-/* Base dark container overrides in light mode */
-[data-theme="light"] .bg-\[\#0b0c0e\],
-[data-theme="light"] .bg-\[\#0e0e10\],
-[data-theme="light"] .bg-\[\#0f0f0f\],
-[data-theme="light"] .bg-\[\#0a0a0a\],
-[data-theme="light"] .bg-\[\#050505\] {
-  background-color: #f4f4f6 !important;
-}
-
-/* Card & Section surfaces */
-[data-theme="light"] .bg-\[\#18181b\],
-[data-theme="light"] .bg-\[\#1a1a1a\],
-[data-theme="light"] .bg-\[\#1c1c1c\],
-[data-theme="light"] .bg-\[\#1c1b1d\],
-[data-theme="light"] .bg-\[\#141414\],
-[data-theme="light"] .bg-\[\#121215\],
-[data-theme="light"] .bg-\[\#161616\],
-[data-theme="light"] .bg-\[\#1e1f26\] {
-  background-color: #ffffff !important;
-}
-
-/* Sub-panels, secondary containers and input backgrounds */
-[data-theme="light"] .bg-\[\#252525\],
-[data-theme="light"] .bg-\[\#27272a\],
-[data-theme="light"] .bg-\[\#2a2a2c\],
-[data-theme="light"] .bg-\[\#323236\],
-[data-theme="light"] .bg-\[\#1e2029\],
-[data-theme="light"] .bg-\[\#202024\]\/50 {
-  background-color: #f0f0f4 !important;
-}
-
-/* Borders in light mode */
-[data-theme="light"] .border-\[\#2a2a2a\],
-[data-theme="light"] .border-\[\#27272a\],
-[data-theme="light"] .border-\[\#333\],
-[data-theme="light"] .border-\[\#353437\],
-[data-theme="light"] .border-\[\#3f3f46\],
-[data-theme="light"] .border-\[\#222\],
-[data-theme="light"] .border-\[\#252525\] {
-  border-color: #e2e2e8 !important;
-}
-
-[data-theme="light"] .divide-\[\#27272a\]\/60 > * + * {
-  border-color: #e2e2e8 !important;
-}
-
-/* Typography in light mode */
-[data-theme="light"] .text-white,
-[data-theme="light"] .text-\[\#e5e1e4\],
-[data-theme="light"] .text-\[\#f3f4f6\] {
-  color: #111827 !important;
-}
-
-[data-theme="light"] .text-gray-200,
-[data-theme="light"] .text-gray-300,
-[data-theme="light"] .text-\[\#bcbbc5\],
-[data-theme="light"] .text-\[\#c6c5cf\] {
-  color: #374151 !important;
-}
-
-[data-theme="light"] .text-gray-400,
-[data-theme="light"] .text-gray-500,
-[data-theme="light"] .text-\[\#a1a1aa\],
-[data-theme="light"] .text-\[\#71717a\] {
-  color: #6b7280 !important;
+html[data-theme="light"] main {
+  background-color: #f4f5f7 !important;
 }
 
 /* Header in light mode */
+html[data-theme="light"] header,
 [data-theme="light"] header {
   background-color: rgba(255, 255, 255, 0.95) !important;
-  border-bottom-color: #e2e2e8 !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
 }
 
-/* Inputs and Selects in light mode */
-[data-theme="light"] input,
-[data-theme="light"] select {
+html[data-theme="light"] header .text-\[\#e5e1e4\],
+[data-theme="light"] header .text-\[\#e5e1e4\],
+html[data-theme="light"] header span.text-\[\#e5e1e4\],
+html[data-theme="light"] header .text-white {
+  color: #0f172a !important;
+}
+
+html[data-theme="light"] header .text-\[\#bcbbc5\],
+[data-theme="light"] header .text-\[\#bcbbc5\],
+html[data-theme="light"] header .text-\[\#c6c5cf\],
+[data-theme="light"] header .text-\[\#c6c5cf\] {
+  color: #64748b !important;
+}
+
+html[data-theme="light"] header .bg-\[\#1c1b1d\],
+[data-theme="light"] header .bg-\[\#1c1b1d\],
+html[data-theme="light"] header .bg-\[\#0e0e10\],
+[data-theme="light"] header .bg-\[\#0e0e10\] {
+  background-color: #f1f5f9 !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+html[data-theme="light"] header nav button:hover {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+html[data-theme="light"] header nav button.bg-\[\#2a2a2c\],
+[data-theme="light"] header nav button.bg-\[\#2a2a2c\] {
+  background-color: #fff7ed !important;
+  color: #ff5708 !important;
+  border-bottom-color: #ff5708 !important;
+}
+
+/* Light mode dropdowns and badges */
+html[data-theme="light"] .bg-\[\#1c1b1d\] {
   background-color: #ffffff !important;
-  color: #111827 !important;
-  border-color: #d1d5db !important;
-}
-
-[data-theme="light"] input:focus,
-[data-theme="light"] select:focus {
-  border-color: #ff5708 !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
 }
 
 /* --- ALTO CONTRASTE KDS --- */
 html[data-theme="kds-high-contrast"],
-body[data-theme="kds-high-contrast"],
-[data-theme="kds-high-contrast"] {
-  --color-background: #000000;
-  --color-foreground: #ffffff;
+body[data-theme="kds-high-contrast"] {
+  --color-background: #000000 !important;
+  --color-foreground: #ffffff !important;
+  background-color: #000000 !important;
+  color: #ffffff !important;
   color-scheme: dark;
 }
 
-html[data-theme="kds-high-contrast"] body {
+html[data-theme="kds-high-contrast"] header {
   background-color: #000000 !important;
-  color: #ffffff !important;
-}
-
-[data-theme="kds-high-contrast"] .bg-\[\#18181b\],
-[data-theme="kds-high-contrast"] .bg-\[\#1a1a1a\],
-[data-theme="kds-high-contrast"] .bg-\[\#1c1c1c\],
-[data-theme="kds-high-contrast"] .bg-\[\#1c1b1d\] {
-  background-color: #000000 !important;
-  border-color: #ffffff !important;
-  border-width: 2px !important;
+  border-bottom: 2px solid #ffffff !important;
 }
 
 /* --- COLOR ACCENTS --- */
