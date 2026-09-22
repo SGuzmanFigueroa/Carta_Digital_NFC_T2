@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { RolePermissionsMatrix } from './RolePermissionsMatrix';
+import { createStaffMemberInDb, createAuditLogInDb } from '@/services/authService';
 import { StaffMember } from '../types';
 
 interface StaffManagementProps {
@@ -70,6 +72,13 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
     };
 
     onAddStaff(newMember);
+    createStaffMemberInDb(newMember);
+    createAuditLogInDb(
+      'Nuevo Colaborador Registrado',
+      newName,
+      `Rol: ${newRole}, Estación: ${newAssignment}`,
+      'info'
+    );
     setIsCreateModalOpen(false);
     setNewName('');
     setNewEmail('');
@@ -228,6 +237,11 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
             </div>
           );
         })}
+      </div>
+
+            {/* Matriz de Permisos y Niveles de Acceso por Rol */}
+      <div className="pt-2">
+        <RolePermissionsMatrix onShowToast={onShowToast} />
       </div>
 
       {/* New Collaborator Modal */}

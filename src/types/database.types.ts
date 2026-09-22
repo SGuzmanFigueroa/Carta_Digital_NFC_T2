@@ -1,4 +1,4 @@
-export type Json =
+﻿export type Json =
   | string
   | number
   | boolean
@@ -281,6 +281,45 @@ export type Database = {
         }
         Relationships: []
       }
+      role_permissions: {
+        Row: {
+          anulacion_comandas: string
+          cobro_pos: string
+          edicion_menu: string
+          id: string
+          kds_cocina: string
+          panel_admin: string
+          role_description: string | null
+          role_id: string
+          role_title: string
+          updated_at: string | null
+        }
+        Insert: {
+          anulacion_comandas?: string
+          cobro_pos?: string
+          edicion_menu?: string
+          id?: string
+          kds_cocina?: string
+          panel_admin?: string
+          role_description?: string | null
+          role_id: string
+          role_title: string
+          updated_at?: string | null
+        }
+        Update: {
+          anulacion_comandas?: string
+          cobro_pos?: string
+          edicion_menu?: string
+          id?: string
+          kds_cocina?: string
+          panel_admin?: string
+          role_description?: string | null
+          role_id?: string
+          role_title?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       staff: {
         Row: {
           avatar_url: string | null
@@ -317,6 +356,36 @@ export type Database = {
           station?: string | null
           status?: string | null
           username?: string
+        }
+        Relationships: []
+      }
+      staff_audit_logs: {
+        Row: {
+          action: string
+          created_at: string | null
+          details: string | null
+          id: string
+          level: string | null
+          performed_by: string | null
+          target: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          details?: string | null
+          id?: string
+          level?: string | null
+          performed_by?: string | null
+          target?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          details?: string | null
+          id?: string
+          level?: string | null
+          performed_by?: string | null
+          target?: string | null
         }
         Relationships: []
       }

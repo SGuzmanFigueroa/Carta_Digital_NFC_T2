@@ -170,6 +170,30 @@ export interface StaffMember {
   specialty?: string;
 }
 
+export type PermissionState = 'allow' | 'read' | 'deny';
+
+export interface RolePermissionItem {
+  id: string;
+  roleId: string;
+  roleTitle: string;
+  roleDescription: string;
+  panelAdmin: PermissionState;
+  kdsCocina: PermissionState;
+  edicionMenu: PermissionState;
+  cobroPos: PermissionState;
+  anulacionComandas: PermissionState;
+}
+
+export interface StaffAuditLogItem {
+  id: string;
+  action: string;
+  performedBy: string;
+  target?: string;
+  details?: string;
+  level: 'info' | 'warning' | 'critical';
+  createdAt: string;
+}
+
 export interface AuthUser {
   id: string;
   name: string;
