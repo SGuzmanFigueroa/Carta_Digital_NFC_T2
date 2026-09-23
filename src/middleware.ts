@@ -49,10 +49,10 @@ export function middleware(request: NextRequest) {
       return NextResponse.redirect(redirectUrl);
     }
 
-    // Kitchen routes require staff role (admin, kitchen, floor, bartender)
-    const isKitchenRoute = pathname.startsWith('/kds');
-    const allowedKitchenRoles = ['admin', 'kitchen', 'floor', 'bartender'];
-    if (isKitchenRoute && !allowedKitchenRoles.includes(role)) {
+    // Staff operations routes require staff role (admin, kitchen, floor, bar, runner, bartender)
+    const isStaffRoute = pathname.startsWith('/kds') || pathname.startsWith('/pedidos');
+    const allowedStaffRoles = ['admin', 'kitchen', 'floor', 'bar', 'bartender', 'runner'];
+    if (isStaffRoute && !allowedStaffRoles.includes(role)) {
       const loginUrl = new URL('/login', request.url);
       loginUrl.searchParams.set('reason', 'unauthorized');
       return NextResponse.redirect(loginUrl);
@@ -68,5 +68,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/kds/:path*', '/personal/:path*', '/configuracion/:path*'],
+  matcher: ['/dashboard/:path*', '/kds/:path*', '/personal/:path*', '/configuracion/:path*', '/pedidos/:path*'],
 };

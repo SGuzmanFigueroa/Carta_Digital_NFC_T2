@@ -1,10 +1,11 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { QRMenuViewer } from '@/components/QRMenuViewer';
 import { INITIAL_MENU_ITEMS } from '@/data/mockData';
 import { useRestaurant } from '@/context/RestaurantContext';
-import { OrderTicket } from '@/types';
+import { OrderTicket, MenuItem } from '@/types';
+import { fetchDishesFromDb } from '@/services/menuService';
 
 export default function MenuPage() {
   const {
@@ -12,22 +13,46 @@ export default function MenuPage() {
     dinerActiveTicket,
     tables,
     toast,
-    showToast
+    showToast,
+    requestTableAccount,
+    callWaiter
   } = useRestaurant();
 
+  const [menuItems, setMenuItems] = useState<MenuItem[]>(INITIAL_MENU_ITEMS);
+
+  useEffect(() => {
+    fetchDishesFromDb()
+      .then((dishes) => {
+        if (dishes && dishes.length > 0) {
+          setMenuItems(dishes);
+        }
+      })
+      .catch((err) => {
+        console.warn('Fallback to INITIAL_MENU_ITEMS:', err);
+      });
+  }, []);
+
   const handleAddNewOrder = (newTicket: OrderTicket) => {
-    // Already handled via sendOrderFromMenu inside QRMenuViewer
+    // Handled via sendOrderFromMenu inside QRMenuViewer
   };
 
   return (
     <div className="min-h-screen bg-[#0e0e10] text-[#e5e1e4]">
       <QRMenuViewer
-        menuItems={INITIAL_MENU_ITEMS}
+        menuItems={menuItems}
         onAddNewOrder={handleAddNewOrder}
         onShowToast={showToast}
         activeTicket={dinerActiveTicket}
         tables={tables}
         onSendOrderFromMenu={sendOrderFromMenu}
+        onRequestTableAccount={requestTableAccount}
+        onCallWaiter={callWaiter}
+        onDishCreated={(newDish) => setMenuItems((prev) => [newDish, ...prev])}
+        onRefreshDishes={() => {
+          fetchDishesFromDb().then((dishes) => {
+            if (dishes && dishes.length > 0) setMenuItems(dishes);
+          }).catch(console.warn);
+        }}
       />
 
       {/* Floating Toast Alert */}

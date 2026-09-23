@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ScreenTab } from '../types';
 import { useRestaurant } from '../context/RestaurantContext';
 import { getTranslations } from '../utils/i18n';
+import { fetchSystemConfigFromDb } from '@/services/configService';
 
 interface HeaderProps {
   currentTab: ScreenTab;
@@ -19,20 +20,94 @@ export const Header: React.FC<HeaderProps> = ({
   language
 }) => {
   const t = getTranslations(language);
-  const { currentUser, lockTerminal, logoutUser } = useRestaurant();
+  const { currentUser, lockTerminal, logoutUser, tickets = [], orders = [] } = useRestaurant();
   const [bistroOpen, setBistroOpen] = useState(false);
   const [selectedBistro, setSelectedBistro] = useState('AUREA Bistro');
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [readNotifications, setReadNotifications] = useState<boolean>(false);
 
-  const notifications = [
-    { id: 1, title: 'Demora Crítica: Mesa 02', desc: 'Comanda #104 supera en 8m el tiempo estándar de pase', time: 'Hace 2m', type: 'urgent' },
-    { id: 2, title: 'Salida simultánea', desc: 'Mesa 04 requiere sincronía entre Frío y Grill', time: 'Hace 4m', type: 'info' },
-    { id: 3, title: 'Runner Mateo asignado', desc: 'Comanda #105 recogida para Terraza Central', time: 'Hace 6m', type: 'success' },
-    { id: 4, title: 'Alérgenos en comanda #104', desc: 'Protocolo frutos secos activo en partida P1', time: 'Hace 15m', type: 'urgent' }
-  ];
+  // Load configured branch name dynamically from Supabase
+  React.useEffect(() => {
+    fetchSystemConfigFromDb().then((cfg) => {
+      if (cfg?.branchName) {
+        setSelectedBistro(cfg.branchName);
+      }
+    }).catch(console.warn);
+  }, []);
 
-  const bistros = ['AUREA Bistro (Principal)', 'AUREA Rooftop Lounge', 'AUREA Privé Salón'];
+  // Compute live operational notifications from active tickets and orders
+  const liveNotifications = React.useMemo(() => {
+    const list: Array<{ id: string; title: string; desc: string; time: string; type: 'urgent' | 'info' | 'success' }> = [];
+
+    // 1. Critical delay alerts
+    tickets
+      .filter((t) => t.status !== 'lista_despachada' && t.status !== 'archivada' && (t.isUrgent || (t.elapsedSeconds || 0) > (t.targetSeconds || 600)))
+      .slice(0, 2)
+      .forEach((t) => {
+        list.push({
+          id: `delay-${t.id}`,
+          title: `Demora Crítica: ${t.table}`,
+          desc: `Comanda #${t.orderNumber} supera tiempo estándar en ${Math.floor(((t.elapsedSeconds || 0) - (t.targetSeconds || 600)) / 60)}m`,
+          time: 'En vivo',
+          type: 'urgent'
+        });
+      });
+
+    // 2. Allergen warnings
+    tickets
+      .filter((t) => t.allergyAlert || t.items.some((it) => it.allergens?.length || it.cookingNotes?.some((n) => n.toLowerCase().includes('alerg'))))
+      .slice(0, 2)
+      .forEach((t) => {
+        list.push({
+          id: `allergen-${t.id}`,
+          title: `Alérgenos: ${t.table}`,
+          desc: t.allergyAlert || 'Protocolo de alérgenos activo en pase',
+          time: 'Activo',
+          type: 'urgent'
+        });
+      });
+
+    // 3. Bill requested
+    orders
+      .filter((o) => o.accountRequested)
+      .slice(0, 2)
+      .forEach((o) => {
+        list.push({
+          id: `bill-${o.id}`,
+          title: `Cuenta Solicitada: ${o.table}`,
+          desc: `Importe S/ ${o.total.toFixed(2)} (${o.paymentMethod || 'POS Móvil / Efectivo'})`,
+          time: o.createdTime || 'Ahora',
+          type: 'info'
+        });
+      });
+
+    // 4. Dispatched runners
+    tickets
+      .filter((t) => t.status === 'lista_despachada')
+      .slice(0, 2)
+      .forEach((t) => {
+        list.push({
+          id: `dispatch-${t.id}`,
+          title: `Pase Listo: ${t.table}`,
+          desc: `Comanda #${t.orderNumber} despachada por ${t.serverOrRunner}`,
+          time: t.timestamp || 'Reciente',
+          type: 'success'
+        });
+      });
+
+    // Fallbacks if quiet service
+    if (list.length === 0) {
+      list.push(
+        { id: 'ok-1', title: 'Servicio en Ritmo Óptimo', desc: 'Todas las partidas operando dentro del tiempo estándar', time: 'En vivo', type: 'success' },
+        { id: 'ok-2', title: 'Sincronización en la Nube', desc: 'Supabase PostgreSQL y KDS sincronizados al 100%', time: 'Activo', type: 'info' }
+      );
+    }
+
+    return list;
+  }, [tickets, orders]);
+
+  const bistros = [selectedBistro, 'AUREA Rooftop Lounge', 'AUREA Privé Salón'];
 
   const roleNameMap: Record<string, string> = {
     admin: 'Gerente General',
@@ -212,15 +287,30 @@ export const Header: React.FC<HeaderProps> = ({
               <div className="absolute top-full mt-2 right-0 w-72 sm:w-96 bg-[#1c1b1d] border border-[#353437] rounded-xl shadow-2xl p-3 z-50">
                 <div className="flex items-center justify-between pb-2 border-b border-[#353437]/60 mb-2">
                   <div className="font-bold text-[13px] text-[#e5e1e4]">Bitácora de Pase en Vivo</div>
-                  <span className="text-[11px] font-mono-code text-[#ff5708]">4 NUEVAS</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-mono-code text-[#ff5708]">
+                      {readNotifications ? '0 NUEVAS' : `${liveNotifications.length} ALERTAS`}
+                    </span>
+                    {!readNotifications && (
+                      <button
+                        onClick={() => setReadNotifications(true)}
+                        className="text-[10px] px-1.5 py-0.5 rounded bg-[#2a2a2c] hover:bg-[#353437] text-[#c6c5cf] hover:text-white transition-colors"
+                        title="Marcar todas como leídas"
+                      >
+                        Marcar leídas
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <div className="flex flex-col gap-2 max-h-80 overflow-y-auto">
-                  {notifications.map((n) => (
+                  {liveNotifications.map((n) => (
                     <div
                       key={n.id}
                       className={`p-2.5 rounded-lg border text-left text-[12px] transition-colors ${
                         n.type === 'urgent'
                           ? 'bg-[#93000a]/20 border-[#ffb4ab]/30 text-white'
+                          : n.type === 'success'
+                          ? 'bg-emerald-950/25 border-emerald-500/30 text-emerald-300'
                           : 'bg-[#201f22] border-[#353437] text-[#e5e1e4]'
                       }`}
                     >

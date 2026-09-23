@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MenuItem, OrderTicket, TableStatus } from '../types';
 import { ThreeDView } from './ThreeDView';
+import { ARTableViewer } from './ARTableViewer';
 
 interface QRMenuViewerProps {
   menuItems: MenuItem[];
@@ -13,6 +14,10 @@ interface QRMenuViewerProps {
     items: Array<{ item: MenuItem; quantity: number; notes?: string }>,
     pax?: number
   ) => OrderTicket;
+  onRequestTableAccount?: (paymentMethod: string) => Promise<boolean> | void;
+  onCallWaiter?: (reason?: string) => Promise<boolean> | void;
+  onDishCreated?: (dish: MenuItem) => void;
+  onRefreshDishes?: () => void;
 }
 
 export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
@@ -21,7 +26,11 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   onShowToast,
   activeTicket,
   tables,
-  onSendOrderFromMenu
+  onSendOrderFromMenu,
+  onRequestTableAccount,
+  onCallWaiter,
+  onDishCreated,
+  onRefreshDishes
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('todos');
   const [searchQuery, setSearchQuery] = useState('');
@@ -29,7 +38,10 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   const [isTableModalOpen, setIsTableModalOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [selectedTable, setSelectedTable] = useState('MESA 04');
-
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'Efectivo' | 'Tarjeta POS (Visa/MC)' | 'Yape / Plin'>('Tarjeta POS (Visa/MC)');
+  const [waiterCalled, setWaiterCalled] = useState(false);
+    
   // 3D Inspector Modal
   const [selectedDishForModal, setSelectedDishForModal] = useState<MenuItem | null>(null);
 
@@ -203,6 +215,23 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     setCart([]);
     setIsCartOpen(false);
     onShowToast(`¡Comanda enviada a Cocina KDS desde ${selectedTable}!`, 'soup_kitchen');
+  };
+
+  const handleConfirmAccountRequest = async () => {
+    if (onRequestTableAccount) {
+      await onRequestTableAccount(selectedPaymentMethod);
+    }
+    setIsPaymentModalOpen(false);
+    onShowToast(`Cuenta solicitada (${selectedPaymentMethod}). Garzón en camino con el comprobante.`, 'receipt_long');
+  };
+
+  const handleTriggerCallWaiter = async () => {
+    setWaiterCalled(true);
+    if (onCallWaiter) {
+      await onCallWaiter('Solicitud de atención general');
+    }
+    onShowToast('¡Garzón alertado! Un miembro del salón se acerca a tu mesa.', 'notifications_active');
+    setTimeout(() => setWaiterCalled(false), 8000);
   };
 
   const heroItem = menuItems[0]; // Arroz Chaufa Wok de Autor
@@ -939,9 +968,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
           {/* Top Bar Overlay */}
           <div className="relative z-20 px-4 pt-safe pt-4 flex items-center justify-between bg-gradient-to-b from-black/80 to-transparent pb-6">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-[#ff5708] flex items-center justify-center text-[#2b0b00] font-bold">
-                <span className="material-symbols-outlined text-[18px]">view_in_ar</span>
-              </div>
+              <span className="material-symbols-outlined text-[24px] text-[#ff5708]">view_in_ar</span>
               <div className="flex flex-col">
                 <span className="text-[13px] font-bold text-white leading-tight">Visor AR en Mesa</span>
                 <span className="text-[10px] font-mono-code text-emerald-400 flex items-center gap-1">

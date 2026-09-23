@@ -5,6 +5,10 @@ import { SystemConfigState } from '../types';
 import { applyTheme } from '@/utils/theme';
 import { getTranslations, getLanguageCode } from '@/utils/i18n';
 import { kitchenAudio } from '@/utils/audio';
+import { MenuItem } from '../types';
+import { fetchDishesFromDb, updateDishPrice, deleteDishFromDb } from '@/services/menuService';
+import { Dish3DScannerModal } from './Dish3DScannerModal';
+import { DishCatalogAdmin } from './DishCatalogAdmin';
 
 interface SystemConfigProps {
   config: SystemConfigState;
@@ -22,7 +26,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
   const [showLogoModal, setShowLogoModal] = useState(false);
   const [customLogoInput, setCustomLogoInput] = useState('');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
-    const [activeSection, setActiveSection] = useState<'perfil' | 'notificaciones' | 'tema' | 'idioma' | 'impresion' | 'qr-mesas'>('perfil');
+    const [activeSection, setActiveSection] = useState<'perfil' | 'notificaciones' | 'tema' | 'idioma' | 'impresion' | 'qr-mesas' | 'carta-platos'>('perfil');
   const [selectedTableNumber, setSelectedTableNumber] = useState('01');
   const [selectedZone, setSelectedZone] = useState('Salón Principal');
   const [customTableName, setCustomTableName] = useState('');
@@ -32,6 +36,63 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
   const [totalTablesCount, setTotalTablesCount] = useState<number>(24);
   const [tableSearchFilter, setTableSearchFilter] = useState('');
   const [modalZoneFilter, setModalZoneFilter] = useState<string>('all');
+  const [dishes, setDishes] = useState<MenuItem[]>([]);
+  const [loadingDishes, setLoadingDishes] = useState(false);
+  const [showScannerModal, setShowScannerModal] = useState(false);
+  const [showCatalogModal, setShowCatalogModal] = useState(false);
+  const [dishSearchFilter, setDishSearchFilter] = useState('');
+  const [editingDishPriceId, setEditingDishPriceId] = useState<string | null>(null);
+  const [tempDishPrice, setTempDishPrice] = useState<string>('');
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadDishes() {
+      try {
+        setLoadingDishes(true);
+        const data = await fetchDishesFromDb();
+        if (isMounted && data && data.length > 0) {
+          setDishes(data);
+        }
+      } catch (err) {
+        console.warn('Error cargando platos en SystemConfig:', err);
+      } finally {
+        if (isMounted) setLoadingDishes(false);
+      }
+    }
+    loadDishes();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const handleSaveDishPrice = async (dishId: string) => {
+    const num = parseFloat(tempDishPrice);
+    if (isNaN(num) || num <= 0) {
+      onShowToast('Ingresa un precio numérico válido', 'warning');
+      return;
+    }
+    const ok = await updateDishPrice(dishId, num);
+    if (ok) {
+      setDishes((prev) => prev.map((d) => (d.id === dishId ? { ...d, price: num } : d)));
+      setEditingDishPriceId(null);
+      onShowToast('Precio actualizado en la carta', 'check_circle');
+    } else {
+      onShowToast('Error al actualizar precio en base de datos', 'error');
+    }
+  };
+
+  const handleDeleteDishItem = async (dishId: string, dishName: string) => {
+    if (!window.confirm(`¿Eliminar el plato "${dishName}" de la carta del restaurante?`)) {
+      return;
+    }
+    const ok = await deleteDishFromDb(dishId);
+    if (ok) {
+      setDishes((prev) => prev.filter((d) => d.id !== dishId));
+      onShowToast(`Plato "${dishName}" eliminado con éxito`, 'delete');
+    } else {
+      onShowToast('Error al eliminar plato', 'error');
+    }
+  };
 
   const handleLogoFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -145,7 +206,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
           fired = true;
           doPrint();
         }
-      }, 3000);
+      }, 5000);
     }
   };
 
@@ -378,28 +439,37 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
     printIsolatedDocument(htmlContent, `Atril-${tableName}`);
   };
 
-  // Función para imprimir todas las mesas en una cuadrícula optimizada para corte
-  const handlePrintAllTables = () => {
+  // Función para imprimir lote de mesas en cuadrícula A4 optimizada para corte
+  const handlePrintAllTables = (customList?: string[], customTitle?: string) => {
     const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
     const branchName = formData.branchName || 'AUREA Bistro';
+    const logoUrl = formData.logoUrl || '/logo.png';
     
-    // Generar dinámicamente todas las mesas configuradas (hasta totalTablesCount o 50+)
-    const generatedTables: string[] = [];
-    for (let i = 1; i <= totalTablesCount; i++) {
-      generatedTables.push(`Mesa ${String(i).padStart(2, '0')}`);
-    }
-    // Agregar mesas de zonas especiales
-    generatedTables.push('Terraza T1', 'Terraza T2', 'Terraza T3', 'Barra B1', 'Barra B2', 'Salón VIP');
-
-    const filteredForPrint = modalZoneFilter === 'all' 
-      ? generatedTables 
-      : generatedTables.filter(t => {
-          if (modalZoneFilter === 'salon') return t.startsWith('Mesa');
+    let filteredForPrint: string[] = [];
+    if (customList && customList.length > 0) {
+      filteredForPrint = customList;
+    } else {
+      // Si no se especifica lista personalizada, tomar las mesas de salón según capacidad configurada
+      const salonTables: string[] = [];
+      for (let i = 1; i <= totalTablesCount; i++) {
+        salonTables.push(`Mesa ${String(i).padStart(2, '0')}`);
+      }
+      
+      if (showAllQRsModal) {
+        if (modalZoneFilter === 'salon') filteredForPrint = salonTables;
+        else if (modalZoneFilter === 'all') filteredForPrint = allTablesList;
+        else filteredForPrint = allTablesList.filter(t => {
           if (modalZoneFilter === 'terraza') return t.includes('Terraza');
           if (modalZoneFilter === 'barra') return t.includes('Barra');
           if (modalZoneFilter === 'vip') return t.includes('VIP');
           return true;
         });
+      } else {
+        filteredForPrint = salonTables;
+      }
+    }
+
+    onShowToast(`Preparando impresión de lote (${filteredForPrint.length} mesas)...`, 'print');
 
     const cardsHtml = filteredForPrint.map((tbl) => {
       const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=350x350&color=${qrColor === 'brand' ? 'ff5a1f' : '000000'}&bgcolor=ffffff&data=${encodeURIComponent(origin + '/menu?mesa=' + encodeURIComponent(tbl))}`;
@@ -412,6 +482,11 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
           <div class="batch-table-pill">${tbl}</div>
           <div class="batch-qr">
             <img src="${qrUrl}" alt="${tbl}" />
+            ${includeLogoInQR && logoUrl ? `
+              <div class="batch-logo-overlay">
+                <img src="${logoUrl}" alt="Logo" />
+              </div>
+            ` : ''}
           </div>
           <div class="batch-nfc">● NTAG213 NFC LINKED</div>
         </div>
@@ -422,7 +497,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Lote Completo de QRs de Mesas - ${branchName} (${filteredForPrint.length} Mesas)</title>
+  <title>${customTitle || `Lote de QRs de Mesas - ${branchName} (${filteredForPrint.length} Mesas)`}</title>
   <style>
     @page {
       size: A4 portrait;
@@ -463,6 +538,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
       color: #fff;
       text-align: center;
       page-break-inside: avoid;
+      break-inside: avoid;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -499,10 +575,33 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
       padding: 6px;
       display: inline-block;
       margin: 2px 0;
+      position: relative;
     }
-    .batch-qr img {
+    .batch-qr > img {
       width: 110px;
       height: 110px;
+      display: block;
+    }
+    .batch-logo-overlay {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 26px;
+      height: 26px;
+      background: #fff;
+      border-radius: 50%;
+      padding: 2px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .batch-logo-overlay img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 50%;
       display: block;
     }
     .batch-nfc {
@@ -516,7 +615,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
 </head>
 <body>
   <div class="page-title">
-    <span>${branchName} — Lote Completo de Códigos QR para Mesas (${filteredForPrint.length} Mesas)</span>
+    <span>${branchName} — ${customTitle || `Lote de Códigos QR para Mesas (${filteredForPrint.length} Mesas)`}</span>
     <span style="font-family: monospace; font-size: 10px; color: #64748b;">✂ Líneas de corte para atril acrílico</span>
   </div>
   <div class="grid">
@@ -759,6 +858,12 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                 num: '06',
                 label: t.nav_qr_tables,
                 icon: 'M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z'
+              },
+              {
+                id: 'carta-platos',
+                num: '07',
+                label: 'Carta & Platos 3D',
+                icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253'
               },
             ].map((item) => {
               const isActive = activeSection === item.id;
@@ -1737,14 +1842,32 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setShowAllQRsModal(true)}
-                    className="w-full sm:w-auto px-4 py-2 border rounded-lg text-[12px] font-bold flex items-center justify-center gap-2 bg-[#FF5A1F]/10 border-[#FF5A1F]/40 text-[#FF5A1F] hover:bg-[#FF5A1F]/20 cursor-pointer transition-colors"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">grid_view</span>
-                    <span>{t.all_tables_grid}</span>
-                  </button>
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <button
+                      type="button"
+                      onClick={() => setShowAllQRsModal(true)}
+                      className="flex-1 sm:flex-initial px-3.5 py-2 border rounded-lg text-[12px] font-bold flex items-center justify-center gap-1.5 bg-[#FF5A1F]/10 border-[#FF5A1F]/40 text-[#FF5A1F] hover:bg-[#FF5A1F]/20 cursor-pointer transition-colors"
+                      title="Ver cuadrícula interactiva de todas las mesas"
+                    >
+                      <span className="material-symbols-outlined text-[17px]">grid_view</span>
+                      <span>{t.all_tables_grid}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const salonTables = [];
+                        for (let i = 1; i <= totalTablesCount; i++) {
+                          salonTables.push(`Mesa ${String(i).padStart(2, '0')}`);
+                        }
+                        handlePrintAllTables(salonTables, `Lote de ${totalTablesCount} Mesas de Salón`);
+                      }}
+                      className="flex-1 sm:flex-initial px-3.5 py-2 rounded-lg text-[12px] font-bold flex items-center justify-center gap-1.5 bg-[#FF5A1F] text-white hover:bg-[#FF703D] cursor-pointer shadow-md shadow-[#FF5A1F]/20 transition-all"
+                      title={`Imprimir las ${totalTablesCount} mesas configuradas en hoja de corte`}
+                    >
+                      <span className="material-symbols-outlined text-[17px]">print</span>
+                      <span>Imprimir Lote ({totalTablesCount})</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -1801,46 +1924,294 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                 </div>
 
                 {/* Botones de Acción */}
-                <div className="grid grid-cols-2 gap-2 w-full mt-4 pt-3 border-t border-gray-300/30">
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      try {
-                        const targetUrl = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&color=${qrColor === 'brand' ? 'ff5a1f' : '000000'}&bgcolor=ffffff&data=${encodeURIComponent(
-                          window.location.origin + '/menu?mesa=' + encodeURIComponent(customTableName.trim() || ('MESA ' + selectedTableNumber))
-                        )}`;
-                        const res = await fetch(targetUrl);
-                        const blob = await res.blob();
-                        const blobUrl = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = blobUrl;
-                        a.download = `QR-${(customTableName.trim() || ('MESA_' + selectedTableNumber)).replace(/\s+/g, '_')}.png`;
-                        a.click();
-                        URL.revokeObjectURL(blobUrl);
-                        onShowToast('Imagen QR descargada en alta resolución', 'download');
-                      } catch {
-                        window.open(`https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(window.location.origin + '/menu?mesa=' + (customTableName.trim() || selectedTableNumber))}`, '_blank');
-                      }
-                    }}
-                    className={`py-2 px-2.5 rounded-lg border text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer transition-colors ${
-                      isLight ? 'bg-white border-[#cbd5e1] text-[#0f172a] hover:bg-[#f1f5f9]' : 'bg-[#1C1C1C] border-[#333] text-gray-200 hover:bg-[#252525]'
-                    }`}
-                  >
-                    <span className="material-symbols-outlined text-[15px]">download</span>
-                    <span>Descargar</span>
-                  </button>
+                <div className="flex flex-col gap-2 w-full mt-4 pt-3 border-t border-gray-300/30">
+                  <div className="grid grid-cols-2 gap-2 w-full">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const targetUrl = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&color=${qrColor === 'brand' ? 'ff5a1f' : '000000'}&bgcolor=ffffff&data=${encodeURIComponent(
+                            window.location.origin + '/menu?mesa=' + encodeURIComponent(customTableName.trim() || ('MESA ' + selectedTableNumber))
+                          )}`;
+                          const res = await fetch(targetUrl);
+                          const blob = await res.blob();
+                          const blobUrl = URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = blobUrl;
+                          a.download = `QR-${(customTableName.trim() || ('MESA_' + selectedTableNumber)).replace(/\s+/g, '_')}.png`;
+                          a.click();
+                          URL.revokeObjectURL(blobUrl);
+                          onShowToast('Imagen QR descargada en alta resolución', 'download');
+                        } catch {
+                          window.open(`https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(window.location.origin + '/menu?mesa=' + (customTableName.trim() || selectedTableNumber))}`, '_blank');
+                        }
+                      }}
+                      className={`py-2 px-2 rounded-lg border text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer transition-colors ${
+                        isLight ? 'bg-white border-[#cbd5e1] text-[#0f172a] hover:bg-[#f1f5f9]' : 'bg-[#1C1C1C] border-[#333] text-gray-200 hover:bg-[#252525]'
+                      }`}
+                      title="Descargar imagen QR en alta resolución"
+                    >
+                      <span className="material-symbols-outlined text-[15px]">download</span>
+                      <span>Descargar QR</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handlePrintStandee}
+                      className={`py-2 px-2 rounded-lg border text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer transition-colors ${
+                        isLight ? 'bg-white border-[#cbd5e1] text-[#0f172a] hover:bg-[#f1f5f9]' : 'bg-[#1C1C1C] border-[#333] text-gray-200 hover:bg-[#252525]'
+                      }`}
+                      title="Imprimir solo el atril individual de esta mesa (1 hoja)"
+                    >
+                      <span className="material-symbols-outlined text-[15px]">print</span>
+                      <span>Mesa Actual</span>
+                    </button>
+                  </div>
 
                   <button
                     type="button"
-                    onClick={handlePrintStandee}
-                    className="py-2 px-2.5 rounded-lg bg-[#FF5A1F] text-white hover:bg-[#FF703D] font-bold text-[11px] flex items-center justify-center gap-1 cursor-pointer shadow-md shadow-[#FF5A1F]/20 transition-all"
-                    title="Imprimir solo el atril de esta mesa (1 hoja)"
+                    onClick={() => {
+                      const salonTables = [];
+                      for (let i = 1; i <= totalTablesCount; i++) {
+                        salonTables.push(`Mesa ${String(i).padStart(2, '0')}`);
+                      }
+                      handlePrintAllTables(salonTables, `Lote de ${totalTablesCount} Mesas de Salón`);
+                    }}
+                    className="w-full py-2.5 px-3 rounded-lg bg-gradient-to-r from-[#FF5A1F] to-[#FF7A3D] text-white hover:opacity-95 font-bold text-[12px] flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[#FF5A1F]/25 transition-all active:scale-[0.98]"
+                    title={`Imprimir todas las ${totalTablesCount} mesas configuradas en hojas A4 con guías de corte`}
                   >
-                    <span className="material-symbols-outlined text-[15px]">print</span>
-                    <span>Imprimir</span>
+                    <span className="material-symbols-outlined text-[16px]">receipt_long</span>
+                    <span>Imprimir Lote ({totalTablesCount} Mesas)</span>
                   </button>
                 </div>
               </div>
+            </div>
+          </section>
+
+          {/* SEC_07: CARTA DIGITAL & ESCANEO 3D DE PLATOS (SETUP ONBOARDING) */}
+          <section id="carta-platos" className={`border rounded-xl scroll-mt-24 ${sectionBg}`}>
+            <div className={`flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-6 border-b ${sectionHeaderBorder}`}>
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-[28px] text-[#ff5708] shrink-0">view_in_ar</span>
+                <div>
+                  <h2 className={`text-lg font-bold mb-0.5 ${titleColor}`}>Carta Digital & Escaneo 3D</h2>
+                  <p className={`text-[13px] ${descColor}`}>
+                    Digitalización 360° para visualización 3D y Realidad Aumentada (AR) en mesa
+                  </p>
+                </div>
+              </div>
+
+              {/* Action Buttons Header */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setShowCatalogModal(true)}
+                  className={`px-3 py-2 rounded-xl text-[12px] font-bold border transition-colors flex items-center gap-1.5 cursor-pointer ${
+                    isLight ? 'bg-white border-[#cbd5e1] text-[#334155] hover:bg-[#f1f5f9]' : 'bg-[#1e1f26] border-[#383a48] text-white hover:border-[#ff5708]/50'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[17px] text-[#ff5708]">format_list_bulleted</span>
+                  <span>Gestionar Catálogo</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowScannerModal(true)}
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#ff5708] to-[#ff7a3d] hover:from-[#ff6924] hover:to-[#ff8d57] text-[#2b0b00] text-[12px] font-mono-code font-bold flex items-center gap-2 shadow-[0_0_15px_rgba(255,87,8,0.35)] transition-all cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[18px]">3d_rotation</span>
+                  <span>Escanear Nuevo Plato 360°</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Card Explicativa de Onboarding: Se cocina y escanea 1 sola vez */}
+              <div className={`p-4 rounded-xl border flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${
+                isLight ? 'bg-[#fff7ed] border-[#fed7aa]' : 'bg-[#1f1712] border-[#7c2d12]/40'
+              }`}>
+                <div className="flex items-start gap-3">
+                  <span className="material-symbols-outlined text-[22px] text-[#ea580c] shrink-0 mt-0.5">info</span>
+                  <div>
+                    <h4 className="text-[13px] font-bold text-[#ea580c]">
+                      Configuración Inicial del Menú (Proceso Único por Plato)
+                    </h4>
+                    <p className={`text-[12px] leading-relaxed mt-0.5 ${isLight ? 'text-[#7c2d12]' : 'text-[#fed7aa]/80'}`}>
+                      El chef cocina cada plato muestra <strong>una sola vez</strong> durante el setup del restaurante. Se coloca en el centro de la mesa o base giratoria y se realiza el escaneo 360° con la cámara del dispositivo móvil. Una vez procesado y guardado en Supabase, el plato queda grabado en la carta con su modelo 3D y proyección en Realidad Aumentada (AR) para los comensales.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="shrink-0 flex items-center gap-2">
+                  <span className="px-2.5 py-1 rounded-full text-[11px] font-mono font-bold bg-[#ea580c]/15 text-[#ea580c] border border-[#ea580c]/30">
+                    Setup Único
+                  </span>
+                </div>
+              </div>
+
+              {/* Estadísticas de la Carta y Platos */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className={`p-4 rounded-xl border ${cardBg}`}>
+                  <div className="flex items-center justify-between">
+                    <span className={`text-[11px] font-bold uppercase tracking-wider ${descColor}`}>Total Platos en Carta</span>
+                    <span className="material-symbols-outlined text-[#ff5708] text-[20px]">restaurant</span>
+                  </div>
+                  <div className={`text-2xl font-bold font-mono-code mt-2 ${titleColor}`}>{dishes.length}</div>
+                  <span className="text-[11px] text-emerald-400 font-medium">Sincronizados en Supabase</span>
+                </div>
+
+                <div className={`p-4 rounded-xl border ${cardBg}`}>
+                  <div className="flex items-center justify-between">
+                    <span className={`text-[11px] font-bold uppercase tracking-wider ${descColor}`}>Modelos 3D Escaneados</span>
+                    <span className="material-symbols-outlined text-purple-400 text-[20px]">view_in_ar</span>
+                  </div>
+                  <div className={`text-2xl font-bold font-mono-code mt-2 ${titleColor}`}>
+                    {dishes.filter((d) => d.has3D).length}
+                  </div>
+                  <span className="text-[11px] text-purple-400 font-medium">Listos para Realidad Aumentada</span>
+                </div>
+
+                <div className={`p-4 rounded-xl border ${cardBg}`}>
+                  <div className="flex items-center justify-between">
+                    <span className={`text-[11px] font-bold uppercase tracking-wider ${descColor}`}>Categorías Activas</span>
+                    <span className="material-symbols-outlined text-blue-400 text-[20px]">category</span>
+                  </div>
+                  <div className={`text-2xl font-bold font-mono-code mt-2 ${titleColor}`}>
+                    {Array.from(new Set(dishes.map((d) => d.category))).length || 4}
+                  </div>
+                  <span className={`text-[11px] font-medium ${descColor}`}>Estructura gastronómica</span>
+                </div>
+              </div>
+
+              {/* Buscador y Filtro Rápido */}
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="relative flex-1 min-w-[240px]">
+                  <span className="material-symbols-outlined absolute left-3 top-2.5 text-[18px] text-gray-400">search</span>
+                  <input
+                    type="text"
+                    placeholder="Buscar plato por nombre, descripción o categoría..."
+                    value={dishSearchFilter}
+                    onChange={(e) => setDishSearchFilter(e.target.value)}
+                    className={`w-full pl-9 pr-4 py-2 rounded-xl text-[12.5px] border focus:border-[#ff5708] focus:outline-none transition-colors ${
+                      isLight ? 'bg-white border-[#cbd5e1] text-[#0f172a]' : 'bg-[#16171d] border-[#2f313d] text-white'
+                    }`}
+                  />
+                </div>
+                <span className={`text-[12px] font-mono ${descColor}`}>
+                  Mostrando {dishes.filter(d => !dishSearchFilter || d.name.toLowerCase().includes(dishSearchFilter.toLowerCase())).length} platos
+                </span>
+              </div>
+
+              {/* Lista de Platos Configurados */}
+              {loadingDishes ? (
+                <div className="py-12 flex flex-col items-center justify-center gap-3">
+                  <div className="w-8 h-8 rounded-full border-2 border-[#ff5708] border-t-transparent animate-spin"></div>
+                  <span className={`text-[12px] font-mono ${descColor}`}>Cargando platos desde Supabase...</span>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                  {dishes
+                    .filter((d) => !dishSearchFilter || d.name.toLowerCase().includes(dishSearchFilter.toLowerCase()) || d.description.toLowerCase().includes(dishSearchFilter.toLowerCase()))
+                    .map((dish) => (
+                      <div
+                        key={dish.id}
+                        className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 transition-all hover:border-[#ff5708]/40 shadow-sm ${
+                          isLight ? 'bg-white border-[#e2e8f0]' : 'bg-[#181921] border-[#292a35]'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-14 h-14 rounded-lg bg-[#252632] overflow-hidden shrink-0 relative flex items-center justify-center border border-[#373948]">
+                            {dish.image ? (
+                              <img src={dish.image} alt={dish.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <span className="material-symbols-outlined text-[24px] text-gray-500">restaurant</span>
+                            )}
+                            {dish.has3D && (
+                              <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-black" title="3D & AR Activo"></span>
+                            )}
+                          </div>
+
+                          <div className="flex flex-col min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className={`text-[13px] font-bold truncate ${titleColor}`}>{dish.name}</span>
+                              {dish.has3D && (
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-[#ff5708]/15 text-[#ff5708] border border-[#ff5708]/30">
+                                  3D / AR
+                                </span>
+                              )}
+                            </div>
+                            <span className={`text-[11px] truncate mt-0.5 ${descColor}`}>
+                              {dish.description}
+                            </span>
+                            <span className="text-[10px] font-mono text-gray-400 capitalize mt-1">
+                              Cat: {dish.category}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Price & Actions */}
+                        <div className="flex flex-col items-end gap-1.5 shrink-0">
+                          {editingDishPriceId === dish.id ? (
+                            <div className="flex items-center gap-1">
+                              <span className="text-[11px] font-mono text-[#ff5708] font-bold">S/</span>
+                              <input
+                                type="number"
+                                step="0.5"
+                                value={tempDishPrice}
+                                onChange={(e) => setTempDishPrice(e.target.value)}
+                                className={`w-16 px-1.5 py-0.5 rounded text-[12px] font-mono font-bold border focus:border-[#ff5708] focus:outline-none ${
+                                  isLight ? 'bg-white border-[#cbd5e1] text-black' : 'bg-[#101116] border-[#383a48] text-white'
+                                }`}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleSaveDishPrice(dish.id)}
+                                className="p-1 rounded bg-[#ff5708] text-black hover:bg-[#ff7a3d] cursor-pointer"
+                                title="Guardar Precio"
+                              >
+                                <span className="material-symbols-outlined text-[14px]">check</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingDishPriceId(null)}
+                                className="p-1 rounded bg-gray-600/30 text-gray-400 hover:text-white cursor-pointer"
+                                title="Cancelar"
+                              >
+                                <span className="material-symbols-outlined text-[14px]">close</span>
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[13px] font-mono-code font-bold text-[#ff5708]">
+                                S/ {dish.price.toFixed(2)}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingDishPriceId(dish.id);
+                                  setTempDishPrice(dish.price.toString());
+                                }}
+                                className="p-1 text-gray-400 hover:text-[#ff5708] transition-colors cursor-pointer"
+                                title="Editar precio"
+                              >
+                                <span className="material-symbols-outlined text-[14px]">edit</span>
+                              </button>
+                            </div>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteDishItem(dish.id, dish.name)}
+                            className="p-1 text-gray-500 hover:text-rose-400 transition-colors cursor-pointer"
+                            title="Eliminar plato de la carta"
+                          >
+                            <span className="material-symbols-outlined text-[15px]">delete</span>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
             </div>
           </section>
 
@@ -1865,12 +2236,14 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
               <div className="flex items-center gap-3">
                 <button
                   type="button"
-                  onClick={handlePrintAllTables}
+                  onClick={() => {
+                    handlePrintAllTables(filteredModalTables, `Lote de ${filteredModalTables.length} Mesas (${modalZoneFilter.toUpperCase()})`);
+                  }}
                   className="px-3.5 py-1.5 bg-[#FF5A1F] text-white font-bold text-[12px] rounded-lg hover:bg-[#FF703D] flex items-center gap-1.5 cursor-pointer shadow-md"
-                  title="Imprimir lote de 12 mesas con guías de corte"
+                  title="Imprimir las mesas visibles con guías de corte"
                 >
                   <span className="material-symbols-outlined text-[16px]">print</span>
-                  <span>Imprimir Todos</span>
+                  <span>Imprimir {filteredModalTables.length} Mesas</span>
                 </button>
                 <button
                   type="button"
@@ -1942,6 +2315,36 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
         </div>
       )}
 
+      {/* Modal Escáner 3D de Platos (Cámara / 360 Photogrammetry) */}
+      {showScannerModal && (
+        <Dish3DScannerModal
+          onClose={() => setShowScannerModal(false)}
+          onDishCreated={(newDish) => {
+            setDishes((prev) => [newDish, ...prev.filter((d) => d.id !== newDish.id)]);
+            setShowScannerModal(false);
+            onShowToast(`Plato "${newDish.name}" escaneado y publicado con éxito`, '3d_rotation');
+          }}
+          onShowToast={onShowToast}
+        />
+      )}
+
+      {/* Modal Gestor Completo de Catálogo de Platos */}
+      {showCatalogModal && (
+        <DishCatalogAdmin
+          dishes={dishes}
+          onClose={() => setShowCatalogModal(false)}
+          onOpenScanner={() => {
+            setShowCatalogModal(false);
+            setShowScannerModal(true);
+          }}
+          onRefreshDishes={async () => {
+            const list = await fetchDishesFromDb();
+            if (list) setDishes(list);
+          }}
+          onShowToast={onShowToast}
+        />
+      )}
+
       {/* Modal de Cambio de Logo */}
       {showLogoModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
@@ -1972,9 +2375,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                 }`}
                 onClick={() => fileInputRef.current?.click()}
               >
-                <div className="w-12 h-12 rounded-full bg-[#FF5A1F]/15 text-[#FF5A1F] flex items-center justify-center">
-                  <span className="material-symbols-outlined text-[24px]">upload_file</span>
-                </div>
+                <span className="material-symbols-outlined text-[32px] text-[#FF5A1F]">upload_file</span>
                 <div className="text-center">
                   <div className={`text-[13px] font-bold ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>{t.upload_pc}</div>
                   <div className={`text-[11px] ${isLight ? 'text-[#64748b]' : 'text-gray-400'}`}>{t.upload_specs}</div>

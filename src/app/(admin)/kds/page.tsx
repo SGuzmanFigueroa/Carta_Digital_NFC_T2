@@ -1,24 +1,17 @@
 'use client';
 
-import { useState } from 'react';
-import { ScreenTab } from '@/types';
+import { useRouter } from 'next/navigation';
 import { Header } from '@/components/Header';
 import { KDSBoard } from '@/components/KDSBoard';
-import { CentralPedidos } from '@/components/CentralPedidos';
-import { PanelAdmin } from '@/components/PanelAdmin';
-import { GestionUsuarios } from '@/components/GestionUsuarios';
-import { Configuracion } from '@/components/Configuracion';
 import { useRestaurant } from '@/context/RestaurantContext';
 
 export default function KDSRefinedPage() {
-  const [currentTab, setCurrentTab] = useState<ScreenTab>('cocina_kds');
+  const router = useRouter();
   const {
     tickets,
     setTickets,
     runners,
     setRunners,
-    simulateNewOrder,
-    resetAllDemoData,
     toast
   } = useRestaurant();
 
@@ -32,49 +25,32 @@ export default function KDSRefinedPage() {
       (t.isUrgent || t.elapsedSeconds > t.targetSeconds)
   ).length;
 
-  const handleCreateTicket = (newTicket: any) => {
-    setTickets((prev) => [newTicket, ...prev]);
+  const handleSelectTab = (tab: string) => {
+    if (tab === 'cocina_kds') router.push('/kds');
+    else if (tab === 'gestion_usuarios') router.push('/personal');
+    else if (tab === 'configuracion') router.push('/configuracion');
+    else if (tab === 'panel_admin') router.push('/dashboard');
+    else if (tab === 'central_pedidos') router.push('/pedidos');
   };
 
   return (
     <div className="min-h-screen bg-[#0e0e10] text-[#e5e1e4] font-sans">
       {/* Top Main Navigation Header */}
       <Header
-        currentTab={currentTab}
-        onSelectTab={setCurrentTab}
+        currentTab="cocina_kds"
+        onSelectTab={handleSelectTab}
         activeOrdersCount={activeCount}
         urgentCount={urgentCount}
       />
 
       {/* Main View Area */}
       <main className="w-full pt-16 min-h-screen">
-        {currentTab === 'cocina_kds' && (
-          <KDSBoard
-            tickets={tickets}
-            runners={runners}
-            onUpdateTickets={setTickets}
-            onUpdateRunners={setRunners}
-          />
-        )}
-
-        {currentTab === 'central_pedidos' && (
-          <CentralPedidos
-            tickets={tickets}
-            onCreateTicket={handleCreateTicket}
-            onOpenKDS={() => setCurrentTab('cocina_kds')}
-          />
-        )}
-
-        {currentTab === 'panel_admin' && <PanelAdmin />}
-
-        {currentTab === 'gestion_usuarios' && <GestionUsuarios />}
-
-        {currentTab === 'configuracion' && (
-          <Configuracion
-            onResetData={resetAllDemoData}
-            onSimulateNewOrder={simulateNewOrder}
-          />
-        )}
+        <KDSBoard
+          tickets={tickets}
+          runners={runners}
+          onUpdateTickets={setTickets}
+          onUpdateRunners={setRunners}
+        />
       </main>
 
       {/* Floating Toast Alert */}

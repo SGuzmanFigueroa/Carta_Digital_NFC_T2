@@ -100,6 +100,150 @@ export const ThreeDView: React.FC<ThreeDViewProps> = ({
       slate.position.y = -0.3;
       slate.receiveShadow = true;
       dishGroup.add(slate);
+    } else if (dishId === 'aji-de-gallina') {
+      // 🍗 AJÍ DE GALLINA CLÁSICO: Creamy golden yellow ají sauce with shredded chicken, quail eggs, botija olives, pecans
+      const moundGeo = new THREE.CylinderGeometry(1.7, 1.8, 0.35, 32);
+      const moundMat = new THREE.MeshStandardMaterial({
+        color: 0xf59e0b, // Warm golden ají amarillo sauce
+        roughness: 0.35,
+        metalness: 0.08
+      });
+      const mound = new THREE.Mesh(moundGeo, moundMat);
+      mound.position.y = 0.05;
+      mound.receiveShadow = true;
+      dishGroup.add(mound);
+
+      // Shredded chicken breast texture
+      const chickenGeo = new THREE.BoxGeometry(0.12, 0.08, 0.45);
+      const chickenMat = new THREE.MeshStandardMaterial({ color: 0xfef3c7, roughness: 0.6 });
+      for (let i = 0; i < 28; i++) {
+        const ch = new THREE.Mesh(chickenGeo, chickenMat);
+        const angle = Math.random() * Math.PI * 2;
+        const r = 0.2 + Math.random() * 1.25;
+        ch.position.set(Math.cos(angle) * r, 0.22 + Math.random() * 0.15, Math.sin(angle) * r);
+        ch.rotation.set(Math.random() * 0.4, Math.random() * Math.PI, Math.random() * 0.4);
+        dishGroup.add(ch);
+      }
+
+      // Hard-boiled Quail Egg Halves (Yellow yolk + white base)
+      const eggWhiteGeo = new THREE.SphereGeometry(0.24, 16, 16, 0, Math.PI * 2, 0, Math.PI * 0.5);
+      const eggWhiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2 });
+      const eggYolkGeo = new THREE.SphereGeometry(0.14, 16, 16);
+      const eggYolkMat = new THREE.MeshStandardMaterial({ color: 0xfbbf24, roughness: 0.3 });
+
+      const egg1 = new THREE.Group();
+      egg1.add(new THREE.Mesh(eggWhiteGeo, eggWhiteMat));
+      egg1.add(new THREE.Mesh(eggYolkGeo, eggYolkMat));
+      egg1.position.set(-0.4, 0.25, 0.4);
+      dishGroup.add(egg1);
+
+      const egg2 = new THREE.Group();
+      egg2.add(new THREE.Mesh(eggWhiteGeo, eggWhiteMat));
+      egg2.add(new THREE.Mesh(eggYolkGeo, eggYolkMat));
+      egg2.position.set(0.5, 0.25, -0.3);
+      dishGroup.add(egg2);
+
+      // Botija Black Olives (Glossy dark purple)
+      const oliveGeo = new THREE.SphereGeometry(0.18, 16, 16);
+      const oliveMat = new THREE.MeshStandardMaterial({ color: 0x1e152a, roughness: 0.1, metalness: 0.2 });
+      const olive1 = new THREE.Mesh(oliveGeo, oliveMat);
+      olive1.position.set(0.1, 0.32, 0.55);
+      olive1.scale.set(1, 1.25, 1);
+      dishGroup.add(olive1);
+
+      // Toasted Pecans
+      const pecanGeo = new THREE.SphereGeometry(0.14, 12, 12);
+      const pecanMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.7 });
+      for (let i = 0; i < 5; i++) {
+        const pec = new THREE.Mesh(pecanGeo, pecanMat);
+        const angle = (i / 5) * Math.PI * 2;
+        pec.position.set(Math.cos(angle) * 0.9, 0.26, Math.sin(angle) * 0.9);
+        pec.scale.set(1.4, 0.6, 0.9);
+        dishGroup.add(pec);
+      }
+    } else if (dishId === 'causa-limena') {
+      // 🥔 CAUSA LIMEÑA DE CANGREJO REAL & PALTA: Yellow pressed potato terrine with layers
+      const potatoBaseGeo = new THREE.CylinderGeometry(1.35, 1.35, 0.25, 32);
+      const potatoMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.65 });
+      const pBase = new THREE.Mesh(potatoBaseGeo, potatoMat);
+      pBase.position.y = -0.05;
+      dishGroup.add(pBase);
+
+      // Avocado middle layer
+      const avoGeo = new THREE.CylinderGeometry(1.3, 1.3, 0.22, 32);
+      const avoMat = new THREE.MeshStandardMaterial({ color: 0x65a30d, roughness: 0.5 });
+      const avoLayer = new THREE.Mesh(avoGeo, avoMat);
+      avoLayer.position.y = 0.16;
+      dishGroup.add(avoLayer);
+
+      // King crab meat layer
+      const crabGeo = new THREE.CylinderGeometry(1.25, 1.25, 0.22, 32);
+      const crabMat = new THREE.MeshStandardMaterial({ color: 0xffedd5, roughness: 0.4 });
+      const crabLayer = new THREE.Mesh(crabGeo, crabMat);
+      crabLayer.position.y = 0.36;
+      dishGroup.add(crabLayer);
+
+      // Top potato crown
+      const topGeo = new THREE.CylinderGeometry(1.2, 1.2, 0.18, 32);
+      const pTop = new THREE.Mesh(topGeo, potatoMat);
+      pTop.position.y = 0.54;
+      dishGroup.add(pTop);
+
+      // Black olive droplet
+      const oliveTop = new THREE.Mesh(new THREE.SphereGeometry(0.14, 16, 16), new THREE.MeshStandardMaterial({ color: 0x1e152a, roughness: 0.1 }));
+      oliveTop.position.set(0, 0.68, 0);
+      dishGroup.add(oliveTop);
+    } else if (dishId === 'risotto-porcini') {
+      // 🍄 RISOTTO DE HONGOS PORCINI & TRUFA
+      const risottoGeo = new THREE.CylinderGeometry(1.65, 1.75, 0.35, 32);
+      const risottoMat = new THREE.MeshStandardMaterial({ color: 0xd6c4b2, roughness: 0.5 });
+      const rMound = new THREE.Mesh(risottoGeo, risottoMat);
+      rMound.position.y = 0.05;
+      dishGroup.add(rMound);
+
+      // Sautéed Porcini Mushroom Slices
+      const mushGeo = new THREE.CylinderGeometry(0.35, 0.32, 0.1, 16);
+      const mushMat = new THREE.MeshStandardMaterial({ color: 0x543d2b, roughness: 0.4 });
+      for (let i = 0; i < 9; i++) {
+        const m = new THREE.Mesh(mushGeo, mushMat);
+        const angle = (i / 9) * Math.PI * 2;
+        m.position.set(Math.cos(angle) * 0.85, 0.28, Math.sin(angle) * 0.85);
+        m.rotation.set(0.3, Math.random() * Math.PI, 0.2);
+        dishGroup.add(m);
+      }
+
+      // Shaved Black Truffle flakes
+      const trufGeo = new THREE.BoxGeometry(0.2, 0.02, 0.15);
+      const trufMat = new THREE.MeshStandardMaterial({ color: 0x171717, roughness: 0.8 });
+      for (let i = 0; i < 14; i++) {
+        const t = new THREE.Mesh(trufGeo, trufMat);
+        t.position.set((Math.random() - 0.5) * 1.5, 0.28 + Math.random() * 0.06, (Math.random() - 0.5) * 1.5);
+        t.rotation.y = Math.random() * Math.PI;
+        dishGroup.add(t);
+      }
+    } else if (dishId === 'pollo-brasa') {
+      // 🍗 POLLO A LA BRASA: Roasted quarter with crispy skin and french fries
+      const chickenGeo = new THREE.SphereGeometry(1.2, 24, 24);
+      const chickenMat = new THREE.MeshStandardMaterial({
+        color: 0x78350f, // Golden charred roasted skin
+        roughness: 0.35,
+        metalness: 0.15
+      });
+      const ch = new THREE.Mesh(chickenGeo, chickenMat);
+      ch.position.set(0, 0.35, 0);
+      ch.scale.set(1.3, 0.7, 1);
+      ch.castShadow = true;
+      dishGroup.add(ch);
+
+      // Golden Fries on the side
+      const fryGeo = new THREE.BoxGeometry(0.14, 0.14, 1.2);
+      const fryMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.4 });
+      for (let i = 0; i < 16; i++) {
+        const fry = new THREE.Mesh(fryGeo, fryMat);
+        fry.position.set(-0.9 + Math.random() * 0.4, 0.2 + Math.random() * 0.2, -0.6 + i * 0.08);
+        fry.rotation.set(0.2, Math.random() * 0.4, Math.random() * 0.3);
+        dishGroup.add(fry);
+      }
     } else if (dishId === 'smoked-old-fashioned') {
       // Transparent Coaster
       const coasterGeo = new THREE.CylinderGeometry(1.6, 1.6, 0.08, 36);

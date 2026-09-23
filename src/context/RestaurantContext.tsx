@@ -6,8 +6,16 @@ import { INITIAL_TICKETS, INITIAL_RUNNERS } from '../data/initialData';
 import { INITIAL_ORDERS, INITIAL_TABLES, INITIAL_MENU_ITEMS } from '../data/mockData';
 import { kitchenAudio } from '../utils/audio';
 import { supabase } from '@/lib/supabase';
-import { fetchTablesFromDb, settleTableInDb } from '@/services/tableService';
-import { fetchOrdersFromDb, createOrderInDb, updateOrderStatusInDb } from '@/services/orderService';
+import { fetchTablesFromDb, settleTableInDb, updateTableStateInDb } from '@/services/tableService';
+import {
+  fetchOrdersFromDb,
+  createOrderInDb,
+  updateOrderStatusInDb,
+  requestTableAccountInDb,
+  callWaiterForTableInDb,
+  settleOrdersForTableInDb,
+  updateOrderItemCheckInDb
+} from '@/services/orderService';
 import { loginStaffWithPin } from '@/services/authService';
 import {
   sanitizeText,
@@ -58,6 +66,10 @@ interface RestaurantContextType {
   lockTerminal: () => void;
   unlockTerminalWithPin: (pin: string) => boolean;
   logSecurityEvent: (entry: Omit<AuditLogEntry, 'id' | 'timestamp' | 'isoDate'>) => AuditLogEntry;
+  updateOrderStatus: (orderId: string, newStatus: OrderTicket['status']) => Promise<void>;
+  addOrderNote: (orderId: string, note: string) => void;
+  requestTableAccount: (paymentMethod?: string) => Promise<boolean>;
+  callWaiter: (reason?: string) => Promise<boolean>;
 }
 
 const RestaurantContext = createContext<RestaurantContextType | undefined>(undefined);
@@ -76,7 +88,8 @@ const ALLOWED_BROADCAST_ACTIONS = [
   'UPDATE_RUNNERS',
   'DINER_STATUS_UPDATE',
   'PRIORITIZE_TABLE',
-  'RUNNER_ALERT'
+  'RUNNER_ALERT',
+  'UPDATE_ORDERS'
 ];
 
 export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -223,6 +236,13 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
           setTables(freshTables);
         }
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'staff' }, async () => {
+        // Staff changes trigger cross-terminal notification
+        showToast('Personal actualizado en el sistema', 'badge');
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'system_config' }, async () => {
+        showToast('Configuración del sistema actualizada', 'tune');
+      })
       .subscribe();
 
     return () => {
@@ -324,6 +344,9 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
       } else if (action === 'RUNNER_ALERT') {
         kitchenAudio.playRunnerAlertSound();
         showToast('¡Aviso a Runners en mesa de pase central!', 'campaign');
+      } else if (action === 'UPDATE_ORDERS' && Array.isArray(payload?.orders)) {
+        setOrders(payload.orders);
+        if (Array.isArray(payload?.tickets)) setTickets(payload.tickets);
       }
     };
 
@@ -517,6 +540,11 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
 
       persistState(updatedTickets, updatedOrders, updatedTables, undefined, newDinerOrder);
 
+      // Persist order to Supabase in background
+      createOrderInDb(safeTable, cartItems, safePax, cmdId).catch((err) => {
+        console.warn('Failed to sync new order to Supabase:', err);
+      });
+
       kitchenAudio.playDispatchSound();
 
       broadcastSync('NEW_ORDER', {
@@ -562,6 +590,12 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
       persistState(updated);
       kitchenAudio.playCheckItemSound();
       broadcastSync('UPDATE_TICKETS', { tickets: updated });
+
+      // Persist item check in Supabase in background
+      const checkedVal = explicitChecked !== undefined ? explicitChecked : true;
+      updateOrderItemCheckInDb(itemId, checkedVal).catch((err) => {
+        console.warn('Error updating item check in DB:', err);
+      });
 
       if (isTicketAllReady && targetTable) {
         showToast(`Todos los platos listos para ${targetTable}`, 'done_all');
@@ -650,6 +684,14 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
       broadcastSync('UPDATE_TICKETS', { tickets: updatedTickets });
       broadcastSync('UPDATE_TABLES', { tables: updatedTables });
 
+      // Update matching order in Supabase
+      const matchingOrder = orders.find((o) => o.table.toUpperCase() === cleanTable.toUpperCase());
+      if (matchingOrder) {
+        updateOrderStatusInDb(matchingOrder.id, 'pase-listo').catch((err) => {
+          console.warn('Error updating order to pase-listo in DB:', err);
+        });
+      }
+
       showToast(`Comanda #${ticketToDispatch.orderNumber} despachada al Pase Central`, 'done_all');
     },
     [tickets, orders, tables, dinerActiveTicket, persistState, broadcastSync, showToast]
@@ -695,6 +737,9 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
       setTables(updatedTables);
       persistState(updatedTickets, undefined, updatedTables);
 
+      // Persist table priority alert in Supabase
+      updateTableStateInDb(tableNumber, { status: 'demora' }).catch(console.warn);
+
       AuditLogger.log({
         eventType: 'TABLE_PRIORITIZED',
         severity: 'WARN',
@@ -713,8 +758,9 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
   // 7. Collect Table Bill and Free Table (Corte / Cobro)
   const collectTableBill = useCallback(
     (tableNumber: string, amount?: number) => {
-      // Settle in Supabase DB
+      // Settle in Supabase DB (Table + Orders)
       settleTableInDb(tableNumber).catch(console.warn);
+      settleOrdersForTableInDb(tableNumber).catch(console.warn);
       const cleanNum = tableNumber.replace(/\D/g, '');
       const billAmount = amount || 165.00;
 
@@ -793,6 +839,13 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
       persistState(undefined, undefined, updatedTables);
       broadcastSync('UPDATE_TABLES', { tables: updatedTables });
       showToast(`Mesa ${tableNumber} abierta y comensales asignados`, 'table_restaurant');
+
+      // Persist table status in Supabase
+      updateTableStateInDb(tableNumber, {
+        status: 'comiendo',
+        pax,
+        waiter: safeWaiter
+      }).catch(console.warn);
     },
     [tables, persistState, broadcastSync, showToast]
   );
@@ -876,17 +929,228 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
     sendOrderFromMenu(`MESA ${tableNum.toString().padStart(2, '0')}`, [{ item, quantity: 1 }], 2);
   }, [sendOrderFromMenu]);
 
+  // 16. Update Order Status from Central de Pedidos with Persistence
+  const updateOrderStatus = useCallback(
+    async (orderId: string, newStatus: OrderTicket['status']) => {
+      let targetTable = '';
+      const updatedOrders = orders.map((ord) => {
+        if (ord.id === orderId) {
+          targetTable = ord.table;
+          return { ...ord, status: newStatus };
+        }
+        return ord;
+      });
+
+      // Synchronize corresponding KDS ticket state
+      let updatedTickets = tickets;
+      if (newStatus === 'en-cocina') {
+        updatedTickets = tickets.map((t) => {
+          if (t.table.toUpperCase() === targetTable.toUpperCase() || targetTable.includes(t.table)) {
+            return { ...t, status: 'en_fuego' as const };
+          }
+          return t;
+        });
+        setTickets(updatedTickets);
+      } else if (newStatus === 'pase-listo') {
+        updatedTickets = tickets.map((t) => {
+          if (t.table.toUpperCase() === targetTable.toUpperCase() || targetTable.includes(t.table)) {
+            return {
+              ...t,
+              status: 'lista_despachada' as const,
+              items: t.items.map((i) => ({ ...i, checked: true, status: 'listo' as const }))
+            };
+          }
+          return t;
+        });
+        setTickets(updatedTickets);
+      } else if (newStatus === 'entregado') {
+        updatedTickets = tickets.map((t) => {
+          if (t.table.toUpperCase() === targetTable.toUpperCase() || targetTable.includes(t.table)) {
+            return { ...t, status: 'archivada' as const };
+          }
+          return t;
+        });
+        setTickets(updatedTickets);
+      }
+
+      setOrders(updatedOrders);
+      persistState(updatedTickets, updatedOrders);
+      broadcastSync('UPDATE_ORDERS', { orders: updatedOrders, tickets: updatedTickets });
+
+      try {
+        await updateOrderStatusInDb(orderId, newStatus);
+      } catch (err) {
+        console.warn('Error updating order status in Supabase:', err);
+      }
+
+      kitchenAudio.playCheckItemSound();
+    },
+    [orders, tickets, persistState, broadcastSync]
+  );
+
+  // 17. Add Note to Order with Persistence
+  const addOrderNote = useCallback(
+    (orderId: string, note: string) => {
+      const updatedOrders = orders.map((ord) => {
+        if (ord.id === orderId) {
+          const updatedItems = ord.items.map((item, idx) => {
+            if (idx === 0) {
+              return { ...item, notes: item.notes ? `${item.notes} | ${note}` : note };
+            }
+            return item;
+          });
+          return { ...ord, items: updatedItems };
+        }
+        return ord;
+      });
+      setOrders(updatedOrders);
+      persistState(undefined, updatedOrders);
+      broadcastSync('UPDATE_ORDERS', { orders: updatedOrders });
+      showToast('Nota agregada a la comanda', 'edit_note');
+    },
+    [orders, persistState, broadcastSync, showToast]
+  );
+
   // 15. Create New Manual Ticket in KDS
   const createNewKdsTicket = useCallback(
     (ticket: Ticket) => {
       const updated = [ticket, ...tickets];
+      const newOrder: OrderTicket = {
+        id: `cmd-${ticket.orderNumber}`,
+        table: ticket.table,
+        pax: 2,
+        timeAgo: 'Justo ahora',
+        createdTime: ticket.timestamp || new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }),
+        origin: 'GARZÓN',
+        waiter: ticket.serverOrRunner || 'Personal',
+        status: 'en-cocina',
+        isCritical: Boolean(ticket.isUrgent),
+        preparationPercent: 25,
+        items: ticket.items.map((i) => ({
+          id: i.id,
+          name: i.name,
+          quantity: i.quantity,
+          price: i.price,
+          notes: i.cookingNotes?.join(' | '),
+          station: i.stationBadge || 'Cocina',
+          allergen: ticket.allergyAlert || i.allergens?.join(', ')
+        })),
+        subtotal: ticket.totalAmount,
+        total: ticket.totalAmount
+      };
+      const updatedOrders = [newOrder, ...orders];
+
       setTickets(updated);
-      persistState(updated);
+      setOrders(updatedOrders);
+      persistState(updated, updatedOrders);
+
+      // Persist order and order items to Supabase in background
+      (async () => {
+        try {
+          await supabase.from('orders').insert({
+            id: newOrder.id,
+            table_number: newOrder.table,
+            pax: newOrder.pax,
+            origin: newOrder.origin,
+            status: newOrder.status,
+            subtotal: newOrder.subtotal,
+            total: newOrder.total,
+            waiter: newOrder.waiter,
+            is_critical: newOrder.isCritical
+          });
+
+          const itemsToInsert = ticket.items.map((i, idx) => ({
+            id: `item-${newOrder.id}-${idx}`,
+            order_id: newOrder.id,
+            name: i.name,
+            quantity: i.quantity,
+            price: i.price,
+            notes: i.cookingNotes?.join(' | ') || null,
+            station: i.stationBadge || 'Cocina',
+            item_status: 'pendiente' as const,
+            checked: false
+          }));
+
+          await supabase.from('order_items').insert(itemsToInsert);
+        } catch (err) {
+          console.warn('Error syncing KDS order to Supabase:', err);
+        }
+      })();
+
       kitchenAudio.playDispatchSound();
       broadcastSync('UPDATE_TICKETS', { tickets: updated });
-      showToast(`Comanda #${ticket.orderNumber} creada en KDS`, 'add_circle');
+      broadcastSync('UPDATE_ORDERS', { orders: updatedOrders, tickets: updated });
+      showToast(`Comanda #${ticket.orderNumber} creada en KDS y sincronizada con Pedidos`, 'add_circle');
     },
-    [tickets, persistState, broadcastSync, showToast]
+    [tickets, orders, persistState, broadcastSync, showToast]
+  );
+
+
+  // 18. Request Table Account from Mobile Diner Menu
+  const requestTableAccount = useCallback(
+    async (paymentMethod: string = 'Efectivo'): Promise<boolean> => {
+      const activeTable = dinerActiveTicket?.table || 'MESA 04';
+      
+      let updatedDiner = dinerActiveTicket
+        ? { ...dinerActiveTicket, accountRequested: true, paymentMethod }
+        : null;
+      setDinerActiveTicket(updatedDiner);
+
+      const updatedOrders = orders.map((o) => {
+        if (o.table.toUpperCase() === activeTable.toUpperCase() || activeTable.includes(o.table)) {
+          return { ...o, accountRequested: true, paymentMethod };
+        }
+        return o;
+      });
+      setOrders(updatedOrders);
+
+      const cleanNum = activeTable.replace(/\D/g, '');
+      const updatedTables = tables.map((tbl) => {
+        if (tbl.number === cleanNum || tbl.number === activeTable) {
+          return { ...tbl, status: 'cuenta' as const };
+        }
+        return tbl;
+      });
+      setTables(updatedTables);
+
+      persistState(undefined, updatedOrders, updatedTables, undefined, updatedDiner);
+      kitchenAudio.playCheckItemSound();
+      broadcastSync('UPDATE_ORDERS', { orders: updatedOrders });
+      broadcastSync('UPDATE_TABLES', { tables: updatedTables });
+      if (updatedDiner) {
+        broadcastSync('DINER_STATUS_UPDATE', { ticket: updatedDiner });
+      }
+
+      await requestTableAccountInDb(activeTable, paymentMethod);
+      showToast(`Cuenta solicitada (${paymentMethod}). Garzón en camino.`, 'receipt');
+      return true;
+    },
+    [dinerActiveTicket, orders, tables, persistState, broadcastSync, showToast]
+  );
+
+  // 19. Call Waiter from Mobile Diner Menu
+  const callWaiter = useCallback(
+    async (reason: string = 'Atención en mesa'): Promise<boolean> => {
+      const activeTable = dinerActiveTicket?.table || 'MESA 04';
+      const cleanNum = activeTable.replace(/\D/g, '');
+
+      const updatedTables = tables.map((tbl) => {
+        if (tbl.number === cleanNum || tbl.number === activeTable) {
+          return { ...tbl, status: 'demora' as const };
+        }
+        return tbl;
+      });
+      setTables(updatedTables);
+      persistState(undefined, undefined, updatedTables);
+      kitchenAudio.playAllergyWarning();
+      broadcastSync('UPDATE_TABLES', { tables: updatedTables });
+      broadcastSync('RUNNER_ALERT', { message: `Llamada de mozo para ${activeTable}` });
+
+      await callWaiterForTableInDb(activeTable, reason);
+      showToast(`Garzón notificado para ${activeTable}. En camino.`, 'notifications_active');
+      return true;
+    },
+    [dinerActiveTicket, tables, persistState, broadcastSync, showToast]
   );
 
   return (
@@ -926,7 +1190,11 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
         logoutUser,
         lockTerminal,
         unlockTerminalWithPin,
-        logSecurityEvent
+        logSecurityEvent,
+        updateOrderStatus,
+        addOrderNote,
+        requestTableAccount,
+        callWaiter
       }}
     >
       {children}

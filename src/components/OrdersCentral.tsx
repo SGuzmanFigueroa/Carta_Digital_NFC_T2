@@ -6,12 +6,14 @@ interface OrdersCentralProps {
   onUpdateOrderStatus: (id: string, newStatus: OrderTicket['status']) => void;
   onShowToast: (msg: string, icon?: string) => void;
   onOpenKitchenNoteModal?: (orderId: string) => void;
+  onAddOrderNote?: (orderId: string, note: string) => void;
 }
 
 export const OrdersCentral: React.FC<OrdersCentralProps> = ({
   orders,
   onUpdateOrderStatus,
   onShowToast,
+  onAddOrderNote
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTicketId, setSelectedTicketId] = useState<string>('cmd-0482');
@@ -60,7 +62,11 @@ export const OrdersCentral: React.FC<OrdersCentralProps> = ({
   const handleAddNote = () => {
     const note = prompt('Ingresar nota especial para cocina/pase:', 'Urgente: Alergia severa o término específico');
     if (note) {
-      onShowToast(`Nota agregada a ${activeTicket.table}: "${note}"`, 'edit_note');
+      if (onAddOrderNote) {
+        onAddOrderNote(activeTicket.id, note);
+      } else {
+        onShowToast(`Nota agregada a ${activeTicket.table}: "${note}"`, 'edit_note');
+      }
     }
   };
 
@@ -85,7 +91,9 @@ export const OrdersCentral: React.FC<OrdersCentralProps> = ({
           <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1c1b1d] rounded-lg border border-[#353437]/30">
             <span className="material-symbols-outlined text-[#c6c5cf] text-[18px]">payments</span>
             <span className="text-[13px] text-[#c6c5cf]">Facturación Turno:</span>
-            <span className="font-label-code text-[13px] text-[#ff5708] font-bold">S/ 4,215.00</span>
+            <span className="font-label-code text-[13px] text-[#ff5708] font-bold">
+              S/ {(4215 + orders.reduce((sum, o) => sum + o.total, 0)).toLocaleString('es-PE', { minimumFractionDigits: 2 })}
+            </span>
           </div>
 
           <div className="hidden md:flex items-center gap-1.5 px-3 py-1 bg-[#0e0e10] rounded border border-[#353437]/30">
@@ -468,7 +476,7 @@ export const OrdersCentral: React.FC<OrdersCentralProps> = ({
                         onClick={(e) => {
                           e.stopPropagation();
                           onUpdateOrderStatus(ticket.id, 'entregado');
-                          onShowToast(`Comprobante emitido y Mesa 05 liberada`, 'receipt_long');
+                          onShowToast(`Comprobante emitido y ${ticket.table} liberada`, 'receipt_long');
                         }}
                         className="w-full py-2 bg-[#ff5708] hover:brightness-110 text-[#511500] font-bold rounded-lg text-[13px] flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-md"
                       >

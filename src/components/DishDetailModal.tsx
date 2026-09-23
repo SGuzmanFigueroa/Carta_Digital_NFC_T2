@@ -31,7 +31,7 @@ export const DishDetailModal: React.FC<DishDetailModalProps> = ({
               {tableNumber}
             </span>
             <span className="text-[13px] font-mono-code text-[#a1a1aa]">
-              COMநேNDA #{orderNumber}
+              COMANDA #{orderNumber}
             </span>
           </div>
           <button

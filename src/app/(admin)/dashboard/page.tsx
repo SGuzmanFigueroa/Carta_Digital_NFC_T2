@@ -37,6 +37,7 @@ export default function DashboardPage() {
     else if (tab === 'gestion_usuarios') router.push('/personal');
     else if (tab === 'configuracion') router.push('/configuracion');
     else if (tab === 'panel_admin') router.push('/dashboard');
+    else if (tab === 'central_pedidos') router.push('/pedidos');
   };
 
   return (

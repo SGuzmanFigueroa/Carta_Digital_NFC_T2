@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { OrdersCentral } from '@/components/OrdersCentral';
 import { Header } from '@/components/Header';
 import { useRestaurant } from '@/context/RestaurantContext';
@@ -9,14 +9,10 @@ import { useRouter } from 'next/navigation';
 
 export default function PedidosPage() {
   const router = useRouter();
-  const { orders, setOrders, toast, showToast } = useRestaurant();
-
-  // showToast provided by useRestaurant context
+  const { orders, updateOrderStatus, addOrderNote, toast, showToast } = useRestaurant();
 
   const handleUpdateStatus = (orderId: string, newStatus: OrderTicket['status']) => {
-    setOrders((prev) =>
-      prev.map((ord) => (ord.id === orderId ? { ...ord, status: newStatus } : ord))
-    );
+    updateOrderStatus(orderId, newStatus);
     showToast(`Comanda actualizada a estado: ${newStatus}`, 'check_circle');
   };
 
@@ -41,6 +37,7 @@ export default function PedidosPage() {
           orders={orders}
           onUpdateOrderStatus={handleUpdateStatus}
           onShowToast={showToast}
+          onAddOrderNote={addOrderNote}
         />
       </main>
 

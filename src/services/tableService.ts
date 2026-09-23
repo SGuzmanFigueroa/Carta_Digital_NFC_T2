@@ -36,6 +36,7 @@ export async function updateTableStateInDb(
   updates: Partial<{ status: string; amount: number; pax: number; waiter: string | null }>
 ): Promise<boolean> {
   try {
+    const digits = tableNumber.replace(/\D/g, '').padStart(2, '0');
     const { error } = await supabase
       .from('restaurant_tables')
       .update({
@@ -45,7 +46,7 @@ export async function updateTableStateInDb(
         ...(updates.waiter !== undefined && { waiter: updates.waiter }),
         updated_at: new Date().toISOString()
       })
-      .eq('number', tableNumber);
+      .or(`number.ilike.%${digits}%,number.eq.${tableNumber}`);
 
     return !error;
   } catch (err) {

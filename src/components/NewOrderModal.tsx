@@ -1,6 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CATALOG_DISHES } from '../data/initialData';
-import { Ticket, TicketItem } from '../types';
+import { Ticket, TicketItem, MenuItem, TableStatus, StaffMember } from '../types';
+import { fetchDishesFromDb } from '@/services/menuService';
+import { fetchTablesFromDb } from '@/services/tableService';
+import { getPersistedStaffList } from '@/services/authService';
 
 interface NewOrderModalProps {
   onClose: () => void;
@@ -11,6 +14,13 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
   onClose,
   onCreateTicket
 }) => {
+  const [catalog, setCatalog] = useState(CATALOG_DISHES);
+  const [availableTables, setAvailableTables] = useState<string[]>([
+    'MESA 01', 'MESA 02', 'MESA 03', 'MESA 04', 'MESA 05', 'MESA 08', 'MESA 12', 'MESA 14', 'MESA 20', 'BARRA 02'
+  ]);
+  const [availableWaiters, setAvailableWaiters] = useState<string[]>([
+    'Carlos M.', 'Valeria P.', 'Mateo C.', 'Sofía R.', 'Rodrigo S.'
+  ]);
   const [table, setTable] = useState('MESA 05');
   const [zone, setZone] = useState('SALÓN PRINCIPAL');
   const [serviceType, setServiceType] = useState('Servicio Almuerzo');
@@ -21,6 +31,41 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
     'cat-3': 1,
     'cat-1': 1
   });
+
+  // Sync catalog, tables, and staff dynamically from Supabase
+  useEffect(() => {
+    fetchDishesFromDb().then((dbDishes) => {
+      if (dbDishes && dbDishes.length > 0) {
+        const mapped = dbDishes.map((d) => ({
+          id: d.id,
+          name: d.name,
+          category: d.category === 'fondos' ? 'Fuego & Wok' : d.category === 'entradas' ? 'Entradas Nikkei' : d.category === 'bebidas' ? 'Barra & Mixología' : 'Pastelería',
+          station: (d.category === 'fondos' ? 'wok_saute' : d.category === 'entradas' ? 'frio_nikkei' : d.category === 'bebidas' ? 'barra_mixologia' : 'pasteleria') as any,
+          stationBadge: d.category === 'fondos' ? 'WOK & SAUTÉ' : d.category === 'entradas' ? 'CUARTO FRÍO' : d.category === 'bebidas' ? 'BARRA' : 'PASTELERÍA',
+          price: d.price,
+          photoUrl: d.image,
+          prepTime: d.prepTime || '12 min',
+          allergens: d.dietary ? [d.dietary] : ['Ninguno reportado'],
+          notes: d.description || ''
+        }));
+        setCatalog(mapped);
+      }
+    }).catch(console.warn);
+
+    fetchTablesFromDb().then((dbTables) => {
+      if (dbTables && dbTables.length > 0) {
+        const names = dbTables.map((t) => `MESA ${t.number.replace(/\D/g, '').padStart(2, '0')}`);
+        setAvailableTables(Array.from(new Set(names)));
+      }
+    }).catch(console.warn);
+
+    getPersistedStaffList().then((dbStaff) => {
+      if (dbStaff && dbStaff.length > 0) {
+        const names = dbStaff.map((s) => s.name);
+        setAvailableWaiters(Array.from(new Set(names)));
+      }
+    }).catch(console.warn);
+  }, []);
 
   const handleQtyChange = (dishId: string, delta: number) => {
     setSelectedDishes((prev) => {
@@ -37,7 +82,7 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
 
   const calculateTotal = () => {
     return Object.entries(selectedDishes).reduce((sum, [dishId, qty]) => {
-      const dish = CATALOG_DISHES.find((d) => d.id === dishId);
+      const dish = catalog.find((d) => d.id === dishId);
       return sum + (dish ? dish.price * qty : 0);
     }, 0);
   };
@@ -51,7 +96,7 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
     const randomOrderNum = Math.floor(Math.random() * 80) + 110;
 
     const items: TicketItem[] = dishEntries.map(([dishId, qty], idx) => {
-      const dish = CATALOG_DISHES.find((d) => d.id === dishId)!;
+      const dish = catalog.find((d) => d.id === dishId)!;
       return {
         id: `item-${newTicketId}-${idx}`,
         name: `${qty}x ${dish.name}`,
@@ -144,15 +189,9 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
                 onChange={(e) => setTable(e.target.value)}
                 className="w-full bg-[#121215] border border-[#27272a] rounded-lg px-3 py-2 text-[13px] text-white focus:border-[#ff5708] focus:outline-none"
               >
-                <option value="MESA 01">Mesa 01</option>
-                <option value="MESA 03">Mesa 03</option>
-                <option value="MESA 05">Mesa 05</option>
-                <option value="MESA 08">Mesa 08</option>
-                <option value="MESA 12">Mesa 12</option>
-                <option value="MESA 14">Mesa 14 (VIP)</option>
-                <option value="MESA 20">Mesa 20 (Terraza)</option>
-                <option value="BARRA 02">Barra 02</option>
-                <option value="DELIVERY #D-501">Delivery #D-501</option>
+                {availableTables.map((tNum) => (
+                  <option key={tNum} value={tNum}>{tNum}</option>
+                ))}
               </select>
             </div>
 
@@ -182,11 +221,9 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
                 onChange={(e) => setWaiter(e.target.value)}
                 className="w-full bg-[#121215] border border-[#27272a] rounded-lg px-3 py-2 text-[13px] text-white focus:border-[#ff5708] focus:outline-none"
               >
-                <option value="Carlos M.">Carlos M.</option>
-                <option value="Valeria P.">Valeria P.</option>
-                <option value="Mateo C.">Mateo C.</option>
-                <option value="Sofía R.">Sofía R.</option>
-                <option value="Rodrigo S.">Rodrigo S.</option>
+                {availableWaiters.map((wName) => (
+                  <option key={wName} value={wName}>{wName}</option>
+                ))}
               </select>
             </div>
           </div>
@@ -203,7 +240,7 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-60 overflow-y-auto pr-1">
-              {CATALOG_DISHES.map((dish) => {
+              {catalog.map((dish) => {
                 const qty = selectedDishes[dish.id] || 0;
                 return (
                   <div
