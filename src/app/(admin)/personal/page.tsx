@@ -1,11 +1,19 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StaffManagement } from '@/components/StaffManagement';
 import { Header } from '@/components/Header';
 import { INITIAL_STAFF } from '@/data/mockData';
 import { StaffMember } from '@/types';
 import { useRouter } from 'next/navigation';
+import {
+  getPersistedStaffList,
+  saveStaffListToLocalStorage,
+  createStaffMemberInDb,
+  updateStaffMemberInDb,
+  deleteStaffMemberFromDb,
+  createAuditLogInDb
+} from '@/services/authService';
 
 export default function PersonalPage() {
   const router = useRouter();
@@ -17,9 +25,60 @@ export default function PersonalPage() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  const handleAddStaff = (newStaff: StaffMember) => {
-    setStaffList((prev) => [...prev, newStaff]);
-    showToast(`Empleado ${newStaff.name} registrado con éxito`, 'person_add');
+  // Carga persistente inicial desde Supabase y localStorage
+  useEffect(() => {
+    getPersistedStaffList()
+      .then((list) => {
+        if (list && list.length > 0) {
+          setStaffList(list);
+        }
+      })
+      .catch(console.warn);
+  }, []);
+
+  const handleAddStaff = async (newStaff: StaffMember) => {
+    const updated = [...staffList, newStaff];
+    setStaffList(updated);
+    saveStaffListToLocalStorage(updated);
+    await createStaffMemberInDb(newStaff);
+    await createAuditLogInDb(
+      'Nuevo Colaborador Registrado',
+      newStaff.name,
+      `Rol: ${newStaff.role}, Asignación: ${newStaff.assignment}`,
+      'info'
+    );
+    showToast(`Colaborador ${newStaff.name} guardado con éxito`, 'person_add');
+  };
+
+  const handleUpdateStaff = async (updatedStaff: StaffMember) => {
+    const updated = staffList.map((st) => (st.id === updatedStaff.id ? updatedStaff : st));
+    setStaffList(updated);
+    saveStaffListToLocalStorage(updated);
+    await updateStaffMemberInDb(updatedStaff);
+    await createAuditLogInDb(
+      'Actualización de Colaborador',
+      updatedStaff.name,
+      'Datos o PIN modificados',
+      'info'
+    );
+    showToast(`Datos de ${updatedStaff.name} actualizados`, 'check_circle');
+  };
+
+  const handleDeleteStaff = async (staffId: string) => {
+    const target = staffList.find((s) => s.id === staffId);
+    const updated = staffList.filter((st) => st.id !== staffId);
+    setStaffList(updated);
+    saveStaffListToLocalStorage(updated);
+    await deleteStaffMemberFromDb(staffId);
+    if (target) {
+      await createAuditLogInDb(
+        'Colaborador Dado de Baja',
+        target.name,
+        `Usuario ${target.username} retirado del sistema`,
+        'warning'
+      );
+    }
+    showToast('Colaborador eliminado del sistema', 'delete');
   };
 
   const handleSelectTab = (tab: string) => {
@@ -42,6 +101,8 @@ export default function PersonalPage() {
         <StaffManagement
           staffList={staffList}
           onAddStaff={handleAddStaff}
+          onUpdateStaff={handleUpdateStaff}
+          onDeleteStaff={handleDeleteStaff}
           onShowToast={showToast}
         />
       </main>

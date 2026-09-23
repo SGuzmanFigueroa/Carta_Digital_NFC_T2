@@ -1,8 +1,21 @@
-import React, { useState } from 'react';
-import { TableStatus } from '../types';
+import React, { useState, useMemo } from 'react';
+import { TableStatus, Ticket, OrderTicket } from '../types';
+import { INITIAL_MENU_ITEMS } from '../data/mockData';
+
+const getTableDigits = (num: string): string => {
+  const digits = num.replace(/^[^\d]+/i, '').trim();
+  return digits || num;
+};
+
+const formatTableTitle = (num: string): string => {
+  const clean = num.replace(/^Mesa\s*/i, '').trim();
+  return `Mesa ${clean}`;
+};
 
 interface AdminFloorPanelProps {
   tables: TableStatus[];
+  tickets?: Ticket[];
+  orders?: OrderTicket[];
   totalShiftRevenue?: number;
   onShowToast: (msg: string, icon?: string) => void;
   onSelectTable?: (tableId: string) => void;
@@ -13,6 +26,8 @@ interface AdminFloorPanelProps {
 
 export const AdminFloorPanel: React.FC<AdminFloorPanelProps> = ({
   tables,
+  tickets = [],
+  orders = [],
   totalShiftRevenue,
   onShowToast,
   onSelectTable,
@@ -22,6 +37,170 @@ export const AdminFloorPanel: React.FC<AdminFloorPanelProps> = ({
 }) => {
   const [activeZone, setActiveZone] = useState<'all' | 'salon' | 'terraza' | 'barra'>('all');
   const [selectedTableDetail, setSelectedTableDetail] = useState<TableStatus | null>(null);
+  // 1. Dynamic Top Selection / Popular Dishes
+  const popularDishes = useMemo(() => {
+    const dishMap: Record<
+      string,
+      { name: string; count: number; revenue: number; image: string; isBar: boolean }
+    > = {};
+
+    INITIAL_MENU_ITEMS.forEach((item) => {
+      const clean = item.name.replace(/^\d+x\s*/i, '').trim();
+      dishMap[clean] = {
+        name: clean,
+        count: item.ordersCount || 12,
+        revenue: (item.ordersCount || 12) * item.price,
+        image: item.image,
+        isBar: item.category === 'bebidas' || (item.category as string) === 'cocteles'
+      };
+    });
+
+    (orders || []).forEach((ord) => {
+      ord.items?.forEach((it) => {
+        const clean = it.name.replace(/^\d+x\s*/i, '').trim();
+        const existingKey = Object.keys(dishMap).find(
+          (k) => k.toLowerCase() === clean.toLowerCase() || clean.toLowerCase().includes(k.toLowerCase())
+        );
+        const key = existingKey || clean;
+        if (!dishMap[key]) {
+          dishMap[key] = {
+            name: clean,
+            count: 0,
+            revenue: 0,
+            image: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=800&auto=format&fit=crop&q=80',
+            isBar: false
+          };
+        }
+        dishMap[key].count += it.quantity || 1;
+        dishMap[key].revenue += (it.quantity || 1) * (it.price || 48);
+      });
+    });
+
+    (tickets || []).forEach((t) => {
+      t.items?.forEach((it) => {
+        const clean = it.name.replace(/^\d+x\s*/i, '').trim();
+        const existingKey = Object.keys(dishMap).find(
+          (k) => k.toLowerCase() === clean.toLowerCase() || clean.toLowerCase().includes(k.toLowerCase())
+        );
+        const key = existingKey || clean;
+        if (!dishMap[key]) {
+          dishMap[key] = {
+            name: clean,
+            count: 0,
+            revenue: 0,
+            image: it.photoUrl || 'https://images.unsplash.com/photo-1544025162-d76694265947?w=800&auto=format&fit=crop&q=80',
+            isBar: it.station === 'barra_mixologia'
+          };
+        }
+        dishMap[key].count += it.quantity || 1;
+        dishMap[key].revenue += (it.quantity || 1) * (it.price || 48);
+      });
+    });
+
+    const totalOrdersCount = Object.values(dishMap).reduce((acc, d) => acc + d.count, 0) || 1;
+
+    return Object.values(dishMap)
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 4)
+      .map((d, idx) => ({
+        ...d,
+        share: Math.min(100, Math.round((d.count / totalOrdersCount) * 100)),
+        colorClass: idx === 0 ? 'bg-[#ff5708]' : idx === 1 ? 'bg-[#ffb59c]' : idx === 2 ? 'bg-[#0494fc]' : 'bg-[#c6c5cf]',
+        textClass: idx === 0 ? 'text-[#ff5708]' : idx === 1 ? 'text-[#e5e1e4]' : idx === 2 ? 'text-[#0494fc]' : 'text-[#e5e1e4]'
+      }));
+  }, [tickets, orders]);
+
+  // 2. Dynamic KDS Station Workload
+  const stationWorkloads = useMemo(() => {
+    let grillActive = 0;
+    let coldActive = 0;
+    let barActive = 0;
+
+    const activeTickets = (tickets || []).filter(
+      (t) => t.status !== 'lista_despachada' && t.status !== 'archivada'
+    );
+
+    activeTickets.forEach((t) => {
+      t.items?.forEach((item) => {
+        if (!item.checked && item.status !== 'listo') {
+          const qty = item.quantity || 1;
+          if (item.station === 'fuego_grill' || item.station === 'wok_saute') {
+            grillActive += qty;
+          } else if (item.station === 'frio_nikkei' || item.station === 'pasteleria') {
+            coldActive += qty;
+          } else if (item.station === 'barra_mixologia') {
+            barActive += qty;
+          }
+        }
+      });
+    });
+
+    const calcPct = (active: number, baseRate: number) => {
+      const pct = baseRate + active * 15;
+      return Math.min(95, Math.max(15, pct));
+    };
+
+    const grillPct = calcPct(grillActive, 55);
+    const coldPct = calcPct(coldActive, 25);
+    const barPct = calcPct(barActive, 20);
+
+    const getStatus = (pct: number) => {
+      if (pct >= 75) return { label: 'Alta Presión', textCol: 'text-[#ffb4ab]', barCol: 'bg-[#ff5708]' };
+      if (pct >= 40) return { label: 'Óptimo', textCol: 'text-[#ffb59c]', barCol: 'bg-[#ffb59c]' };
+      return { label: 'Fluido', textCol: 'text-[#a1c9ff]', barCol: 'bg-[#0494fc]' };
+    };
+
+    return [
+      {
+        name: 'Parrilla & Horno Josper',
+        percentage: grillPct,
+        activeCount: grillActive,
+        status: getStatus(grillPct)
+      },
+      {
+        name: 'Cuarto Frío & Entrantes',
+        percentage: coldPct,
+        activeCount: coldActive,
+        status: getStatus(coldPct)
+      },
+      {
+        name: 'Barra & Coctelería de Autor',
+        percentage: barPct,
+        activeCount: barActive,
+        status: getStatus(barPct)
+      }
+    ];
+  }, [tickets]);
+
+  // 3. Dynamic AI Recommendation
+  const aiRecommendation = useMemo(() => {
+    const grill = stationWorkloads[0];
+    const cold = stationWorkloads[1];
+    const bar = stationWorkloads[2];
+
+    const urgentTicket = (tickets || []).find(
+      (t) => (t.isUrgent || t.elapsedSeconds > t.targetSeconds) && t.status !== 'lista_despachada'
+    );
+
+    if (urgentTicket) {
+      return `Alerta urgente en ${formatTableTitle(urgentTicket.table)} (${urgentTicket.allergyAlert ? 'Alérgenos' : 'Sobretiempo en KDS'}). Priorizar despacho en el pase antes de ingresar nuevas órdenes.`;
+    }
+
+    if (grill.percentage >= 75) {
+      return `Derivar entrantes fríos y ensaladas para nivelar el tiempo de salida de carnes en parrilla y desahogar el pase térmico (${grill.activeCount} comandas en fuego).`;
+    }
+
+    if (cold.percentage >= 60) {
+      return `Mayor flujo en Cuarto Frío (${cold.activeCount} platos activos). Priorizar montaje de ceviches y entradas frescas para acompañar platos calientes.`;
+    }
+
+    if (bar.percentage >= 50) {
+      return `Barra con cola activa de cócteles (${bar.activeCount} bebidas). Apoyar con mise en place y hielo para agilizar aperitivos de bienvenida.`;
+    }
+
+    return `Flujo de partidas equilibrado. Las 3 estaciones KDS operan con ritmo óptimo y tiempos promedio inferiores a 12 minutos.`;
+  }, [stationWorkloads, tickets]);
+
 
   const filteredTables = tables.filter((t) => {
     if (activeZone === 'all') return true;
@@ -51,7 +230,7 @@ export const AdminFloorPanel: React.FC<AdminFloorPanelProps> = ({
     if (onPrioritizeTable) {
       onPrioritizeTable(tableNum);
     } else {
-      onShowToast(`Alerta de prioridad enviada a Parrilla para Mesa ${tableNum}`, 'priority_high');
+      onShowToast(`Alerta de prioridad enviada a Parrilla para ${formatTableTitle(tableNum)}`, 'priority_high');
     }
   };
 
@@ -59,7 +238,7 @@ export const AdminFloorPanel: React.FC<AdminFloorPanelProps> = ({
     if (onCollectTableBill) {
       onCollectTableBill(tableNum, amount);
     } else {
-      onShowToast(`Cobro registrado para Mesa ${tableNum}: S/ ${(amount || 0).toFixed(2)}`, 'point_of_sale');
+      onShowToast(`Cobro registrado para ${formatTableTitle(tableNum)}: S/ ${(amount || 0).toFixed(2)}`, 'point_of_sale');
     }
   };
 
@@ -67,12 +246,12 @@ export const AdminFloorPanel: React.FC<AdminFloorPanelProps> = ({
     if (onOpenTable) {
       onOpenTable(tableNum);
     } else {
-      onShowToast(`Mesa ${tableNum} abierta. Comensales asignados.`, 'table_restaurant');
+      onShowToast(`${formatTableTitle(tableNum)} abierta. Comensales asignados.`, 'table_restaurant');
     }
   };
 
   const handleCheckIn = (tableNum: string, guest: string) => {
-    onShowToast(`Check-In completado para reserva de ${guest} en Mesa ${tableNum}`, 'how_to_reg');
+    onShowToast(`Check-In completado para reserva de ${guest} en ${formatTableTitle(tableNum)}`, 'how_to_reg');
   };
 
   return (
@@ -389,11 +568,11 @@ export const AdminFloorPanel: React.FC<AdminFloorPanelProps> = ({
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-2.5">
                         <div className="w-10 h-10 rounded-lg bg-[#93000a]/30 border border-[#ffb4ab]/30 flex items-center justify-center font-label-code text-[18px] font-bold text-[#ffb4ab]">
-                          {tbl.number}
+                          {getTableDigits(tbl.number)}
                         </div>
                         <div className="flex flex-col">
                           <div className="flex items-center gap-1">
-                            <span className="text-[17px] font-medium text-[#e5e1e4]">Mesa {tbl.number}</span>
+                            <span className="text-[17px] font-medium text-[#e5e1e4]">{formatTableTitle(tbl.number)}</span>
                             <span className="font-label-code text-[11px] text-[#c6c5cf]">[{tbl.pax} PAX]</span>
                           </div>
                           <span className="text-[12px] text-[#c6c5cf]">Mesero: {tbl.waiter}</span>
@@ -449,11 +628,11 @@ export const AdminFloorPanel: React.FC<AdminFloorPanelProps> = ({
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-2.5">
                         <div className="w-10 h-10 rounded-lg bg-[#ffb59c]/20 border border-[#ffb59c]/30 flex items-center justify-center font-label-code text-[18px] font-bold text-[#ffb59c]">
-                          {tbl.number}
+                          {getTableDigits(tbl.number)}
                         </div>
                         <div className="flex flex-col">
                           <div className="flex items-center gap-1">
-                            <span className="text-[17px] font-medium text-[#e5e1e4]">Mesa {tbl.number}</span>
+                            <span className="text-[17px] font-medium text-[#e5e1e4]">{formatTableTitle(tbl.number)}</span>
                             <span className="font-label-code text-[11px] text-[#c6c5cf]">[{tbl.pax} PAX]</span>
                           </div>
                           <span className="text-[12px] text-[#c6c5cf]">Mesero: {tbl.waiter}</span>
@@ -505,11 +684,11 @@ export const AdminFloorPanel: React.FC<AdminFloorPanelProps> = ({
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-2.5">
                         <div className="w-10 h-10 rounded-lg bg-[#0494fc]/20 flex items-center justify-center font-label-code text-[18px] font-bold text-[#a1c9ff]">
-                          {tbl.number}
+                          {getTableDigits(tbl.number)}
                         </div>
                         <div className="flex flex-col">
                           <div className="flex items-center gap-1">
-                            <span className="text-[17px] font-medium text-[#e5e1e4]">Mesa {tbl.number}</span>
+                            <span className="text-[17px] font-medium text-[#e5e1e4]">{formatTableTitle(tbl.number)}</span>
                             <span className="font-label-code text-[11px] text-[#c6c5cf]">[{tbl.pax} PAX]</span>
                           </div>
                           <span className="text-[12px] text-[#a1c9ff]">{tbl.waiter}</span>
@@ -538,7 +717,7 @@ export const AdminFloorPanel: React.FC<AdminFloorPanelProps> = ({
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          onShowToast(`Abriendo comanda QR de Mesa ${tbl.number}`, 'open_in_new');
+                          onShowToast(`Abriendo comanda QR de ${formatTableTitle(tbl.number)}`, 'open_in_new');
                         }}
                         className="p-1.5 rounded-lg bg-[#2a2a2c] hover:bg-[#353437] text-[#c6c5cf] hover:text-[#e5e1e4] transition-colors cursor-pointer"
                       >
@@ -562,11 +741,11 @@ export const AdminFloorPanel: React.FC<AdminFloorPanelProps> = ({
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-2.5">
                         <div className="w-10 h-10 rounded-lg bg-[#2a2a2c] flex items-center justify-center font-label-code text-[18px] font-bold text-[#c6c5cf]">
-                          {tbl.number}
+                          {getTableDigits(tbl.number)}
                         </div>
                         <div className="flex flex-col">
                           <div className="flex items-center gap-1">
-                            <span className="text-[17px] font-medium text-[#e5e1e4]">Mesa {tbl.number}</span>
+                            <span className="text-[17px] font-medium text-[#e5e1e4]">{formatTableTitle(tbl.number)}</span>
                             <span className="font-label-code text-[11px] text-[#c6c5cf]">[{tbl.capacity} PAX]</span>
                           </div>
                           <span className="text-[12px] text-[#c6c5cf]">{tbl.waiter}</span>
@@ -630,11 +809,11 @@ export const AdminFloorPanel: React.FC<AdminFloorPanelProps> = ({
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-2.5">
                       <div className="w-10 h-10 rounded-lg bg-[#2a2a2c] flex items-center justify-center font-label-code text-[18px] font-bold text-[#e5e1e4]">
-                        {tbl.number}
+                        {getTableDigits(tbl.number)}
                       </div>
                       <div className="flex flex-col">
                         <div className="flex items-center gap-1">
-                          <span className="text-[17px] font-medium text-[#e5e1e4]">Mesa {tbl.number}</span>
+                          <span className="text-[17px] font-medium text-[#e5e1e4]">{formatTableTitle(tbl.number)}</span>
                           <span className="font-label-code text-[11px] text-[#c6c5cf]">[{tbl.pax} PAX]</span>
                         </div>
                         <span className="text-[12px] text-[#c6c5cf]">Mesero: {tbl.waiter}</span>
@@ -666,7 +845,7 @@ export const AdminFloorPanel: React.FC<AdminFloorPanelProps> = ({
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          onShowToast(`Visualizando comanda activa de Mesa ${tbl.number}`, 'visibility');
+                          onShowToast(`Visualizando comanda activa de ${formatTableTitle(tbl.number)}`, 'visibility');
                         }}
                         className="p-1.5 rounded-lg bg-[#2a2a2c] hover:bg-[#353437] text-[#c6c5cf] hover:text-[#e5e1e4] transition-colors cursor-pointer"
                         title="Ver Comanda"
@@ -707,93 +886,37 @@ export const AdminFloorPanel: React.FC<AdminFloorPanelProps> = ({
             </div>
 
             <div className="flex flex-col gap-2.5">
-              {/* Dish 1 */}
-              <div className="p-2 rounded-lg bg-[#201f22] hover:bg-[#2a2a2c] transition-colors flex items-center gap-3">
-                <img
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuDcYPFrcetdgC1dazh0ANWzgwRHx4V-L3cnceNamoMrs5PbK6Pj0OxoLpB3w9BBpc-2x3NTwXneDFMMfHNl2qNkle7Y1vbe6ziJYqyI84o_9MSrl4zNTm-VJKLATujDUKDux_S5dT5aDZ4eKuxcyNs-D4iIMfoEElxRqe49eBMjs0yIVqMaNq_iYLU5IJf8tPiNhU1LTXAGOUwV9q6fYDF9ZXhbcu1x3Ou4VX1ebIGsV9pHlD-fwZNFJQ"
-                  alt="Wagyu Ribeye A5"
-                  className="w-12 h-12 rounded-lg object-cover shrink-0"
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-[13px] text-[#e5e1e4] font-medium truncate">Wagyu Ribeye A5</h3>
-                    <span className="font-label-code text-[12px] text-[#ff5708] font-bold">S/ 361.00</span>
-                  </div>
-                  <div className="w-full bg-[#0e0e10] h-1.5 rounded-full mt-1.5 overflow-hidden">
-                    <div className="bg-[#ff5708] h-full rounded-full" style={{ width: '41%' }} />
-                  </div>
-                  <div className="flex items-center justify-between font-label-code text-[10px] text-[#c6c5cf] mt-1">
-                    <span>24 órdenes</span>
-                    <span>41% share</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Dish 2 */}
-              <div className="p-2 rounded-lg bg-[#201f22] hover:bg-[#2a2a2c] transition-colors flex items-center gap-3">
-                <img
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuA4aai31UClJq9jeVmvV9BCGReZlaeCyrj4ntsAczyaUucISIFKWxMcAsGrzch_4sLC7hilL5ojNXjDM5lE90-Nn5tM7CYc2Fxk5s71v_P2UAXvh2f5yOaKMuaDcXhF6v2cReqmoT6WzMxjdMPzmuXSvxzAfNiYPs9ntMkbVL5JEcB_RxcjskoiN4iZxFYOnWV7whfJyKbajABDeDU2-9gJ4Xdj1o-s2nwDXJ5UcWtMKADa5zx2H2P4VA"
-                  alt="Tartar Nikkei Atún"
-                  className="w-12 h-12 rounded-lg object-cover shrink-0"
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-[13px] text-[#e5e1e4] font-medium truncate">Tartar Nikkei Atún</h3>
-                    <span className="font-label-code text-[12px] text-[#e5e1e4] font-bold">S/ 361.00</span>
-                  </div>
-                  <div className="w-full bg-[#0e0e10] h-1.5 rounded-full mt-1.5 overflow-hidden">
-                    <div className="bg-[#ffb59c] h-full rounded-full" style={{ width: '32%' }} />
-                  </div>
-                  <div className="flex items-center justify-between font-label-code text-[10px] text-[#c6c5cf] mt-1">
-                    <span>19 órdenes</span>
-                    <span>32% share</span>
+              {popularDishes.map((dish) => (
+                <div
+                  key={dish.name}
+                  onClick={() => onShowToast(`${dish.name}: ${dish.count} órdenes registradas hoy`, 'local_fire_department')}
+                  className="p-2 rounded-lg bg-[#201f22] hover:bg-[#2a2a2c] transition-colors flex items-center gap-3 cursor-pointer group"
+                >
+                  <img
+                    src={dish.image}
+                    alt={dish.name}
+                    className="w-12 h-12 rounded-lg object-cover shrink-0 border border-[#353437]/50 group-hover:border-[#ff5708]/50 transition-colors"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-[13px] text-[#e5e1e4] font-medium truncate group-hover:text-white transition-colors">{dish.name}</h3>
+                      <span className={`font-label-code text-[12px] font-bold ${dish.textClass}`}>
+                        S/ {dish.revenue.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="w-full bg-[#0e0e10] h-1.5 rounded-full mt-1.5 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${dish.colorClass}`}
+                        style={{ width: `${dish.share}%` }}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between font-label-code text-[10px] text-[#c6c5cf] mt-1">
+                      <span>{dish.count} órdenes {dish.isBar ? '(Bar)' : ''}</span>
+                      <span>{dish.share}% share</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-
-              {/* Dish 3 */}
-              <div className="p-2 rounded-lg bg-[#201f22] hover:bg-[#2a2a2c] transition-colors flex items-center gap-3">
-                <img
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuAMKtviznLSzjme1WY4qwziJVcdvyRsrswTTveII2tFwGTpfeAPDBaSKFv5dMvO0m4VftFrK5Fas1JHet4bb1c2lVAe0xVWz9kvh-tYOG8K3v06o9Js5bMI9SsRCT20Dz7-BORwOTllIxwuSiu3-w4PyQ7Iz-zFbyc0-B1XoiCR9ZHXL-mNSU5lYZhs5AL0AgYE3upip_vS1hhdj_-VGpsnU7B-3i1cWmVRfdPS4KBKVfbeF723hWlY2Q"
-                  alt="Smoked Old Fashioned"
-                  className="w-12 h-12 rounded-lg object-cover shrink-0"
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-[13px] text-[#e5e1e4] font-medium truncate">Smoked Old Fashioned</h3>
-                    <span className="font-label-code text-[12px] text-[#0494fc] font-bold">S/ 434.00</span>
-                  </div>
-                  <div className="w-full bg-[#0e0e10] h-1.5 rounded-full mt-1.5 overflow-hidden">
-                    <div className="bg-[#0494fc] h-full rounded-full" style={{ width: '54%' }} />
-                  </div>
-                  <div className="flex items-center justify-between font-label-code text-[10px] text-[#c6c5cf] mt-1">
-                    <span>31 órdenes (Bar)</span>
-                    <span>54% share</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Dish 4 */}
-              <div className="p-2 rounded-lg bg-[#201f22] hover:bg-[#2a2a2c] transition-colors flex items-center gap-3">
-                <img
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuAmpeSzAzpL0X6rxaGI6vuZscglQ_dMm_6EV-6bcY2LVaBxN4wVcqQnZI6Vc1zK3r8nnjF9lAEunz1lTMIEPJD7aA__RCksdcKUwYi6kwfhs-qSueHQzt44hnE8oeqtWgwpNc02b6ry1W5t86EkjocLNSZAslwyNO4bO9iLVoBppJ-V30Ez9H5V6pN8Kk-wPVqXcp0Zq0aP10dwuxMW0NVxzsMBnpV_5HT2FG2EwwS0PDTM9zRFTi2ZSA"
-                  alt="Pulpo a la Brasa"
-                  className="w-12 h-12 rounded-lg object-cover shrink-0"
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-[13px] text-[#e5e1e4] font-medium truncate">Pulpo a la Brasa</h3>
-                    <span className="font-label-code text-[12px] text-[#e5e1e4] font-bold">S/ 336.00</span>
-                  </div>
-                  <div className="w-full bg-[#0e0e10] h-1.5 rounded-full mt-1.5 overflow-hidden">
-                    <div className="bg-[#c6c5cf] h-full rounded-full" style={{ width: '24%' }} />
-                  </div>
-                  <div className="flex items-center justify-between font-label-code text-[10px] text-[#c6c5cf] mt-1">
-                    <span>14 órdenes</span>
-                    <span>24% share</span>
-                  </div>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
 
@@ -807,35 +930,22 @@ export const AdminFloorPanel: React.FC<AdminFloorPanelProps> = ({
             </div>
 
             <div className="flex flex-col gap-3">
-              <div className="flex flex-col gap-1">
-                <div className="flex justify-between text-[13px]">
-                  <span className="text-[#e5e1e4]">Parrilla & Horno Josper</span>
-                  <span className="font-label-code text-[12px] text-[#ffb4ab] font-bold">85% (Alta Presión)</span>
+              {stationWorkloads.map((st) => (
+                <div key={st.name} className="flex flex-col gap-1">
+                  <div className="flex justify-between text-[13px]">
+                    <span className="text-[#e5e1e4]">{st.name}</span>
+                    <span className={`font-label-code text-[12px] font-bold ${st.status.textCol}`}>
+                      {st.percentage}% ({st.status.label})
+                    </span>
+                  </div>
+                  <div className="w-full bg-[#2a2a2c] h-2 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${st.status.barCol}`}
+                      style={{ width: `${st.percentage}%` }}
+                    />
+                  </div>
                 </div>
-                <div className="w-full bg-[#2a2a2c] h-2 rounded-full overflow-hidden">
-                  <div className="bg-[#ff5708] h-full rounded-full" style={{ width: '85%' }} />
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <div className="flex justify-between text-[13px]">
-                  <span className="text-[#e5e1e4]">Cuarto Frío & Entrantes</span>
-                  <span className="font-label-code text-[12px] text-[#ffb59c] font-bold">40% (Óptimo)</span>
-                </div>
-                <div className="w-full bg-[#2a2a2c] h-2 rounded-full overflow-hidden">
-                  <div className="bg-[#ffb59c] h-full rounded-full" style={{ width: '40%' }} />
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <div className="flex justify-between text-[13px]">
-                  <span className="text-[#e5e1e4]">Barra & Coctelería de Autor</span>
-                  <span className="font-label-code text-[12px] text-[#a1c9ff] font-bold">25% (Fluido)</span>
-                </div>
-                <div className="w-full bg-[#2a2a2c] h-2 rounded-full overflow-hidden">
-                  <div className="bg-[#0494fc] h-full rounded-full" style={{ width: '25%' }} />
-                </div>
-              </div>
+              ))}
             </div>
 
             {/* AI Recommendation callout */}
@@ -844,7 +954,7 @@ export const AdminFloorPanel: React.FC<AdminFloorPanelProps> = ({
                 smart_toy
               </span>
               <p className="text-[12px] text-[#c6c5cf] leading-relaxed">
-                <strong className="text-[#e5e1e4]">Sugerencia IA:</strong> Derivar entrantes fríos para nivelar el tiempo de salida de carnes en parrilla y desahogar el pase térmico.
+                <strong className="text-[#e5e1e4]">Sugerencia IA:</strong> {aiRecommendation}
               </p>
             </div>
           </div>
@@ -858,10 +968,10 @@ export const AdminFloorPanel: React.FC<AdminFloorPanelProps> = ({
             <div className="flex items-center justify-between pb-2 border-b border-[#353437]">
               <div className="flex items-center gap-2">
                 <span className="w-10 h-10 rounded-xl bg-[#ff5708] text-[#511500] font-bold font-label-code text-[18px] flex items-center justify-center">
-                  {selectedTableDetail.number}
+                  {getTableDigits(selectedTableDetail.number)}
                 </span>
                 <div>
-                  <h3 className="text-[17px] font-bold text-white">Mesa {selectedTableDetail.number}</h3>
+                  <h3 className="text-[17px] font-bold text-white">{formatTableTitle(selectedTableDetail.number)}</h3>
                   <span className="text-[11px] font-label-code text-[#c6c5cf] uppercase">
                     Zona: {selectedTableDetail.zone} • {selectedTableDetail.pax || selectedTableDetail.capacity} PAX
                   </span>

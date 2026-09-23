@@ -13,6 +13,7 @@ export default function DashboardPage() {
   const {
     tables,
     tickets,
+    orders,
     totalShiftRevenue,
     prioritizeTable,
     collectTableBill,
@@ -87,6 +88,8 @@ export default function DashboardPage() {
         {viewMode === 'floor' ? (
           <AdminFloorPanel
             tables={tables}
+            tickets={tickets}
+            orders={orders}
             totalShiftRevenue={totalShiftRevenue}
             onShowToast={showToast}
             onPrioritizeTable={prioritizeTable}

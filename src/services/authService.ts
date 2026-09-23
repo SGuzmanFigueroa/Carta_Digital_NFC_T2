@@ -43,7 +43,7 @@ export async function fetchStaffFromDb(): Promise<StaffMember[]> {
 
     if (error || !data || data.length === 0) return [];
 
-    return data.map((s) => ({
+    return data.map((s: any) => ({
       id: s.id,
       name: s.name,
       initials: s.name.charAt(0).toUpperCase(),
@@ -54,9 +54,11 @@ export async function fetchStaffFromDb(): Promise<StaffMember[]> {
       status: s.status || 'Activo',
       station: s.station || undefined,
       assignment: s.station || 'Salón Principal',
-      permissions: 'Acceso Estándar TPV & Comandas',
+      permissions: s.custom_permissions ? 'Permisos Personalizados' : 'Acceso Estándar TPV & Comandas',
       avatarUrl: s.avatar_url || undefined,
-      email: `${s.username}@aureabistro.pe`
+      email: s.email || `${s.username}@aureabistro.pe`,
+      customPermissions: s.custom_permissions || undefined,
+      password: s.password || s.pin || '1234'
     }));
   } catch (err) {
     console.error('Error fetching staff from DB:', err);
@@ -66,18 +68,45 @@ export async function fetchStaffFromDb(): Promise<StaffMember[]> {
 
 export async function createStaffMemberInDb(staff: StaffMember): Promise<boolean> {
   try {
-    const { error } = await supabase
+    const basePayload = {
+      name: staff.name,
+      username: staff.username || staff.name.toLowerCase().replace(/\s+/g, '.'),
+      role: staff.role as any,
+      role_title: staff.roleTitle || 'Personal GastroPulse',
+      pin: staff.pin || '1234',
+      status: staff.status || 'Activo',
+      station: staff.assignment || staff.station || 'General',
+      avatar_url: staff.avatarUrl || null
+    };
+
+    // Intentar primero con email, custom_permissions y password
+    let { error } = await supabase
       .from('staff')
       .insert({
-        name: staff.name,
-        username: staff.username || staff.name.toLowerCase().replace(/\s+/g, '.'),
-        role: staff.role as any,
-        role_title: staff.roleTitle || 'Personal GastroPulse',
-        pin: staff.pin || '1234',
-        status: staff.status || 'Activo',
-        station: staff.assignment || staff.station || 'General',
-        avatar_url: staff.avatarUrl || null
-      });
+        ...basePayload,
+        email: staff.email || null,
+        custom_permissions: staff.customPermissions || null,
+        password: staff.password || staff.pin || null
+      } as any);
+
+    if (error && (error as any).code === 'PGRST204') {
+      const retryNoPass = await supabase
+        .from('staff')
+        .insert({
+          ...basePayload,
+          email: staff.email || null,
+          custom_permissions: staff.customPermissions || null
+        } as any);
+      error = retryNoPass.error;
+    }
+
+    // Si las columnas aún no existen en Postgres (PGRST204), hacer fallback a columnas base
+    if (error && (error as any).code === 'PGRST204') {
+      const fallbackRes = await supabase
+        .from('staff')
+        .insert(basePayload as any);
+      error = fallbackRes.error;
+    }
 
     if (error) {
       console.error('Error inserting staff to Supabase:', error);
@@ -101,6 +130,156 @@ export async function updateStaffStatusInDb(staffId: string, status: string): Pr
   } catch (err) {
     console.error('Error updating staff status in DB:', err);
     return false;
+  }
+}
+
+
+export async function updateStaffMemberInDb(staff: StaffMember): Promise<boolean> {
+  try {
+    const basePayload = {
+      name: staff.name,
+      username: staff.username,
+      role: staff.role as any,
+      role_title: staff.roleTitle,
+      pin: staff.pin,
+      status: staff.status,
+      station: staff.assignment || staff.station
+    };
+
+    let { error } = await supabase
+      .from('staff')
+      .update({
+        ...basePayload,
+        email: staff.email,
+        custom_permissions: staff.customPermissions,
+        password: staff.password
+      } as any)
+      .eq('id', staff.id);
+
+    // Si la columna password aún no existe en Postgres, reintentar sin password
+    if (error && (error as any).code === 'PGRST204') {
+      const retryRes = await supabase
+        .from('staff')
+        .update({
+          ...basePayload,
+          email: staff.email,
+          custom_permissions: staff.customPermissions
+        } as any)
+        .eq('id', staff.id);
+      error = retryRes.error;
+
+      // Si email/custom_permissions tampoco existieran, fallback a columnas base
+      if (error && (error as any).code === 'PGRST204') {
+        const fallbackRes = await supabase
+          .from('staff')
+          .update(basePayload as any)
+          .eq('id', staff.id);
+        error = fallbackRes.error;
+      }
+    }
+
+    return !error;
+  } catch (err) {
+    console.error('Error updating staff member in DB:', err);
+    return false;
+  }
+}
+
+export async function deleteStaffMemberFromDb(staffId: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('staff')
+      .delete()
+      .eq('id', staffId);
+
+    return !error;
+  } catch (err) {
+    console.error('Error deleting staff member from DB:', err);
+    return false;
+  }
+}
+
+const STORAGE_KEY_STAFF = 'gastropulse_staff_list_v1';
+
+export async function getPersistedStaffList(): Promise<StaffMember[]> {
+  try {
+    // 1. Cargar caché local primero para preservar correos y permisos en F5
+    let localSaved: StaffMember[] = [];
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(STORAGE_KEY_STAFF);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            localSaved = parsed;
+          }
+        } catch {}
+      }
+    }
+
+    // 2. Cargar desde Supabase
+    const dbStaff = await fetchStaffFromDb();
+    if (dbStaff && dbStaff.length > 0) {
+      // Combinar datos de Supabase con los correos y permisos guardados en local
+      const mergedStaff: StaffMember[] = dbStaff.map((dbMember): StaffMember => {
+        const localMatch = localSaved.find(
+          (loc) => loc.id === dbMember.id || loc.username === dbMember.username
+        );
+        const res: StaffMember = {
+          ...dbMember
+        };
+        if (localMatch?.email || dbMember.email) {
+          res.email = localMatch?.email || dbMember.email;
+        }
+        if (localMatch?.customPermissions || dbMember.customPermissions) {
+          res.customPermissions = localMatch?.customPermissions || dbMember.customPermissions;
+        }
+        if (localMatch?.password || dbMember.password) {
+          res.password = localMatch?.password || dbMember.password;
+        } else {
+          res.password = res.pin;
+        }
+        return res;
+      });
+
+      // Incluir también colaboradores creados localmente que aún no sincronicen con la nube
+      localSaved.forEach((loc) => {
+        if (!mergedStaff.some((m) => m.id === loc.id || m.username === loc.username)) {
+          mergedStaff.push(loc);
+        }
+      });
+
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(STORAGE_KEY_STAFF, JSON.stringify(mergedStaff));
+      }
+      return mergedStaff;
+    }
+
+    // Si Supabase no tiene datos o está offline, usar localStorage
+    if (localSaved.length > 0) {
+      return localSaved;
+    }
+  } catch (err) {
+    console.warn('Error loading staff list:', err);
+  }
+
+  // 3. Fallback a datos iniciales
+  if (typeof window !== 'undefined') {
+    const { INITIAL_STAFF } = await import('@/data/mockData');
+    localStorage.setItem(STORAGE_KEY_STAFF, JSON.stringify(INITIAL_STAFF));
+    return INITIAL_STAFF;
+  }
+  const { INITIAL_STAFF } = await import('@/data/mockData');
+  return INITIAL_STAFF;
+}
+
+export function saveStaffListToLocalStorage(staffList: StaffMember[]) {
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(STORAGE_KEY_STAFF, JSON.stringify(staffList));
+    } catch (e) {
+      console.warn('Storage save error:', e);
+    }
   }
 }
 

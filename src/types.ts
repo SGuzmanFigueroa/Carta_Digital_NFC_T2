@@ -168,6 +168,7 @@ export interface StaffMember {
   phone?: string;
   shiftHours?: string;
   specialty?: string;
+  customPermissions?: Partial<Record<'panelAdmin' | 'kdsCocina' | 'edicionMenu' | 'cobroPos' | 'anulacionComandas', PermissionState>>;
 }
 
 export type PermissionState = 'allow' | 'read' | 'deny';

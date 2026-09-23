@@ -4,12 +4,22 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { LoginScreen } from '@/components/LoginScreen';
 import { INITIAL_STAFF } from '@/data/mockData';
-import { AuthUser } from '@/types';
+import { AuthUser, StaffMember } from '@/types';
+import { getPersistedStaffList } from '@/services/authService';
 
 function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [toast, setToast] = useState<{ message: string; icon?: string } | null>(null);
+  const [staffList, setStaffList] = useState<StaffMember[]>(INITIAL_STAFF);
+
+  useEffect(() => {
+    getPersistedStaffList().then((list) => {
+      if (list && list.length > 0) {
+        setStaffList(list);
+      }
+    }).catch(console.warn);
+  }, []);
 
   const showToast = (message: string, icon = 'info') => {
     setToast({ message, icon });
@@ -49,7 +59,7 @@ function LoginContent() {
   return (
     <div className="relative min-h-screen bg-[#0e0e10]">
       <LoginScreen
-        staffList={INITIAL_STAFF}
+        staffList={staffList}
         onLoginSuccess={handleLoginSuccess}
         onExploreAsGuest={handleExploreAsGuest}
         onShowToast={showToast}

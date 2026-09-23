@@ -2,6 +2,8 @@
 import { setAuthSessionCookie, AuditLogger, sanitizeText } from '../utils/security';
 import { kitchenAudio } from '../utils/audio';
 import { AuthUser, StaffMember } from '../types';
+import { getPersistedStaffList } from '../services/authService';
+import { INITIAL_STAFF } from '../data/mockData';
 
 interface LoginScreenProps {
   staffList: StaffMember[];
@@ -16,6 +18,27 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   onExploreAsGuest,
   onShowToast,
 }) => {
+  const [activeStaff, setActiveStaff] = useState<StaffMember[]>(staffList);
+
+  useEffect(() => {
+    if (staffList && staffList.length > 0) {
+      setActiveStaff(staffList);
+    }
+  }, [staffList]);
+
+  useEffect(() => {
+    getPersistedStaffList().then((list) => {
+      if (list && list.length > 0) {
+        setActiveStaff((prev) => {
+          const map = new Map<string, StaffMember>();
+          prev.forEach((s) => map.set(s.id || s.username || Math.random().toString(), s));
+          list.forEach((s) => map.set(s.id || s.username || Math.random().toString(), s));
+          return Array.from(map.values());
+        });
+      }
+    }).catch(console.warn);
+  }, []);
+
   const [authMode, setAuthMode] = useState<'credentials' | 'pin'>('credentials');
   const [usernameOrEmail, setUsernameOrEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -63,11 +86,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
     setTimeout(() => {
       const trimmedInput = sanitizedUser.toLowerCase();
-      const matched = staffList.find((st) => {
+      const matched = activeStaff.find((st) => {
         const emailMatches = st.email && st.email.toLowerCase() === trimmedInput;
         const userMatches = st.username && st.username.toLowerCase() === trimmedInput;
         const nameMatches = st.name.toLowerCase() === trimmedInput;
-        const passMatches = st.password === password;
+        // Permite autenticación con la contraseña definida o con su PIN de 4 dígitos
+        const passMatches = (st.password && st.password === password) || st.pin === password;
         return (emailMatches || userMatches || nameMatches) && passMatches;
       });
 
@@ -164,7 +188,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           matched = selectedStaffForPin;
         }
       } else {
-        matched = staffList.find((st) => st.pin === enteredPin);
+        matched = activeStaff.find((st) => st.pin === enteredPin);
       }
 
       if (matched) {
@@ -226,20 +250,58 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     }, 380);
   };
 
-  const fillQuickDemoUser = (staffId: string) => {
-    const user = staffList.find((s) => s.id === staffId);
-    if (!user) return;
+  const fillQuickDemoUser = (targetRole: 'admin' | 'kitchen' | 'floor' | 'bar') => {
+    let user = activeStaff.find((s) => s.role === targetRole);
 
-    if (authMode === 'credentials') {
-      setUsernameOrEmail(user.email || user.username || '');
-      setPassword(user.password || 'admin123');
-      setErrorMessage('');
-      onShowToast(`Credenciales autocompletadas: ${user.name}`, 'badge');
-    } else {
-      setSelectedStaffForPin(user);
-      setPinDigits(user.pin || '');
-      validatePin(user.pin || '');
+    if (!user && targetRole === 'admin') {
+      user = activeStaff.find((s) => s.role === 'admin' || s.username === 'admin') || INITIAL_STAFF.find((s) => s.role === 'admin');
+    } else if (!user && targetRole === 'kitchen') {
+      user = activeStaff.find((s) => s.role === 'kitchen' || s.username?.includes('chef')) || INITIAL_STAFF.find((s) => s.role === 'kitchen');
+    } else if (!user && targetRole === 'floor') {
+      user = activeStaff.find((s) => s.username === 'darvin' || s.name.toLowerCase().includes('darvin')) || activeStaff.find((s) => s.role === 'floor') || INITIAL_STAFF.find((s) => s.role === 'floor');
+    } else if (!user && targetRole === 'bar') {
+      user = activeStaff.find((s) => s.role === 'bar' || s.role === 'runner' || s.username?.includes('bar')) || INITIAL_STAFF.find((s) => s.role === 'bar');
     }
+
+    if (!user) {
+      user = INITIAL_STAFF[0];
+    }
+
+    // Populate input visual states
+    setUsernameOrEmail(user.email || user.username || 'admin');
+    setPassword(user.password || user.pin || 'admin123');
+    setPinDigits(user.pin || '9021');
+    setErrorMessage('');
+
+    // Instant seamless login for test
+    const authUser: AuthUser = {
+      id: user.id,
+      name: user.name,
+      username: user.username || user.name.toLowerCase().replace(/\s+/g, '.'),
+      email: user.email || `${user.username || 'user'}@aureabistro.pe`,
+      role: (user.role as AuthUser['role']) || 'admin',
+      roleTitle: user.roleTitle || 'Personal GastroPulse',
+      pin: user.pin || '1234',
+      assignment: user.assignment || 'Salón Principal',
+      terminal: 'TERM-04',
+      loginTime: new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
+    };
+
+    try {
+      localStorage.setItem('gastropulse_auth_user', JSON.stringify(authUser));
+      setAuthSessionCookie(authUser);
+    } catch (e) {}
+
+    AuditLogger.log({
+      eventType: 'LOGIN_SUCCESS',
+      severity: 'INFO',
+      user: user.name,
+      role: user.role,
+      details: `Acceso rápido demo ejecutado para ${user.name} (${user.role})`
+    });
+
+    onShowToast(`Acceso concedido: ${user.name} (${user.roleTitle})`, 'verified');
+    onLoginSuccess(authUser);
   };
 
   return (
@@ -532,7 +594,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
-                  onClick={() => fillQuickDemoUser('st-1')}
+                  onClick={() => fillQuickDemoUser('admin')}
                   className="p-2.5 rounded-xl bg-[#0e0e10] hover:bg-[#201f22] border border-[#353437]/60 hover:border-[#ff5708]/50 text-left transition-all cursor-pointer group"
                 >
                   <div className="flex items-center gap-2">
@@ -548,7 +610,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
                 <button
                   type="button"
-                  onClick={() => fillQuickDemoUser('st-4')}
+                  onClick={() => fillQuickDemoUser('kitchen')}
                   className="p-2.5 rounded-xl bg-[#0e0e10] hover:bg-[#201f22] border border-[#353437]/60 hover:border-[#ff5708]/50 text-left transition-all cursor-pointer group"
                 >
                   <div className="flex items-center gap-2">
@@ -564,7 +626,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
                 <button
                   type="button"
-                  onClick={() => fillQuickDemoUser('st-2')}
+                  onClick={() => fillQuickDemoUser('floor')}
                   className="p-2.5 rounded-xl bg-[#0e0e10] hover:bg-[#201f22] border border-[#353437]/60 hover:border-[#ff5708]/50 text-left transition-all cursor-pointer group"
                 >
                   <div className="flex items-center gap-2">
@@ -580,7 +642,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
                 <button
                   type="button"
-                  onClick={() => fillQuickDemoUser('st-5')}
+                  onClick={() => fillQuickDemoUser('bar')}
                   className="p-2.5 rounded-xl bg-[#0e0e10] hover:bg-[#201f22] border border-[#353437]/60 hover:border-[#ff5708]/50 text-left transition-all cursor-pointer group"
                 >
                   <div className="flex items-center gap-2">
