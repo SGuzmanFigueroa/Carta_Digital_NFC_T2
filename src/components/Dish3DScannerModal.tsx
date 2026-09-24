@@ -62,38 +62,80 @@ export const Dish3DScannerModal: React.FC<Dish3DScannerModalProps> = ({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
-  // Initialize camera
-  useEffect(() => {
-    let mounted = true;
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [isRequestingCamera, setIsRequestingCamera] = useState(false);
 
-    const startCamera = async () => {
+  // Robust Mobile Camera Launcher with fallback cascade
+  const requestCameraAccess = async () => {
+    setIsRequestingCamera(true);
+    setCameraError(null);
+
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Navegador incompatible con cámara web.');
+      }
+
+      let stream: MediaStream | null = null;
+
+      // Try 1: Ideal rear environment camera (best for mobile scanning)
       try {
-        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-              facingMode: { ideal: 'environment' },
-              width: { ideal: 1280 },
-              height: { ideal: 720 }
-            },
-            audio: false
-          });
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: 'environment' }
+          },
+          audio: false
+        });
+      } catch (err1) {
+        console.warn('Fallback 1 failed, trying generic camera:', err1);
+        // Try 2: Generic video constraint
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false
+        });
+      }
 
-          if (mounted) {
-            streamRef.current = stream;
-            if (videoRef.current) {
-              videoRef.current.srcObject = stream;
-              videoRef.current.play();
-            }
-            setCameraActive(true);
+      if (stream) {
+        streamRef.current = stream;
+        if (videoRef.current) {
+          const video = videoRef.current;
+          video.srcObject = stream;
+          video.setAttribute('playsinline', 'true');
+          video.setAttribute('autoplay', 'true');
+          video.setAttribute('muted', 'true');
+          try {
+            await video.play();
+          } catch (e) {
+            console.warn('Autoplay error on video:', e);
           }
         }
-      } catch (err) {
-        console.warn('Camera access denied or unavailable:', err);
-        setCameraActive(false);
+        setCameraActive(true);
+        setCameraError(null);
+        onShowToast('Cámara trasera conectada con éxito', 'videocam');
       }
-    };
+    } catch (err: any) {
+      console.warn('Camera request error:', err);
+      setCameraActive(false);
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        setCameraError('Permiso de cámara bloqueado. Toca el candado 🔒 en la barra superior de tu navegador y activa "Cámara".');
+      } else if (err.name === 'NotFoundError') {
+        setCameraError('No se encontró cámara disponible en este dispositivo.');
+      } else {
+        setCameraError(err.message || 'Error al conectar con la cámara.');
+      }
+    } finally {
+      setIsRequestingCamera(false);
+    }
+  };
 
-    startCamera();
+  // Auto request on mount
+  useEffect(() => {
+    let mounted = true;
+    requestCameraAccess();
 
     return () => {
       mounted = false;
@@ -310,13 +352,42 @@ export const Dish3DScannerModal: React.FC<Dish3DScannerModalProps> = ({
               className="absolute inset-0 w-full h-full object-cover z-0"
             />
 
-            {/* Fallback if camera is blocked */}
+            {/* Fallback if camera is blocked with Direct Permission Button */}
             {!cameraActive && (
-              <div className="absolute inset-0 bg-gradient-to-b from-[#14151b] via-[#1c1d25] to-[#121318] flex flex-col items-center justify-center text-center p-6 space-y-3 z-0">
-                <span className="material-symbols-outlined text-amber-400 text-[48px]">videocam_off</span>
-                <p className="text-[13px] text-[#a1a1aa] max-w-xs">
-                  Cámara no detectada o permisos denegados. Puedes usar la simulación guiada para probar el escaneo 360°.
-                </p>
+              <div className="absolute inset-0 bg-gradient-to-b from-[#14151b] via-[#1a1c25] to-[#101116] flex flex-col items-center justify-center text-center p-6 space-y-4 z-10 pointer-events-auto">
+                <span className="material-symbols-outlined text-amber-400 text-[56px] animate-pulse">videocam</span>
+                
+                <div className="space-y-1 max-w-sm">
+                  <h3 className="text-white font-bold text-[16px]">Activar Cámara del Celular</h3>
+                  <p className="text-[12px] text-gray-300 leading-relaxed">
+                    {cameraError || 'Para escanear tu plato en 360°, permite el acceso a la cámara trasera.'}
+                  </p>
+                </div>
+
+                <div className="flex flex-col items-center gap-2 w-full max-w-xs">
+                  <button
+                    type="button"
+                    onClick={requestCameraAccess}
+                    disabled={isRequestingCamera}
+                    className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-[#ff5708] to-[#ff7b39] text-[#2b0b00] font-bold text-[13px] shadow-lg shadow-[#ff5708]/30 flex items-center justify-center gap-2 hover:brightness-110 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    {isRequestingCamera ? (
+                      <>
+                        <div className="w-4 h-4 rounded-full border-2 border-black border-t-transparent animate-spin" />
+                        <span>Solicitando permiso...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="material-symbols-outlined text-[20px]">photo_camera</span>
+                        <span>Permitir y Encender Cámara</span>
+                      </>
+                    )}
+                  </button>
+
+                  <div className="p-2.5 rounded-lg bg-black/40 border border-white/10 text-[10.5px] font-mono-code text-gray-400 text-left">
+                    💡 Si Chrome bloqueó la cámara: toca el icono <strong>🔒 (candado)</strong> arriba junto al link &gt; <strong>Permisos</strong> &gt; activa <strong>Cámara</strong> &gt; pulsa el botón naranja.
+                  </div>
+                </div>
               </div>
             )}
 
