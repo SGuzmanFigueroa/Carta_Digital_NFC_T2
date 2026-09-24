@@ -429,7 +429,8 @@ export const Dish3DScannerModal: React.FC<Dish3DScannerModalProps> = ({
               </div>
             )}
 
-            {/* Holographic Circular Scanning Reticle */}
+            {/* Holographic Circular Scanning Reticle - Only shown when camera is active */}
+            {cameraActive && (
             <div className="relative z-20 flex flex-col items-center justify-center pointer-events-none">
               {/* Radar ring with angle markers */}
               <div className="relative w-64 h-64 sm:w-80 sm:h-80 rounded-full border-2 border-dashed border-[#ff5708]/60 flex items-center justify-center shadow-[0_0_30px_rgba(255,87,8,0.25)]">
@@ -468,8 +469,10 @@ export const Dish3DScannerModal: React.FC<Dish3DScannerModalProps> = ({
                 <span>{guideMessage}</span>
               </div>
             </div>
+            )}
 
-            {/* Bottom Floating Control: Start continuous scan */}
+            {/* Bottom Floating Control: Start continuous scan - Only when camera is active */}
+            {cameraActive && (
             <div className="absolute bottom-6 inset-x-0 z-30 px-6 flex flex-col items-center gap-3">
               {stage === 'calibrate' ? (
                 <div className="flex flex-col items-center gap-2">
@@ -500,6 +503,7 @@ export const Dish3DScannerModal: React.FC<Dish3DScannerModalProps> = ({
                 </div>
               )}
             </div>
+            )}
           </div>
         )}
 
