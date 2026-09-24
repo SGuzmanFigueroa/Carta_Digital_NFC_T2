@@ -61,6 +61,24 @@ export const Dish3DScannerModal: React.FC<Dish3DScannerModalProps> = ({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const fileCameraInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Native phone camera capture handler (100% reliable on all Android / iOS devices)
+  const handleNativePhotoCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target?.result as string;
+      if (base64) {
+        setDishPhotoUrl(base64);
+        setCameraActive(true);
+        setCameraError(null);
+        onShowToast('Foto del plato capturada con éxito', 'photo_camera');
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [isRequestingCamera, setIsRequestingCamera] = useState(false);
@@ -82,21 +100,24 @@ export const Dish3DScannerModal: React.FC<Dish3DScannerModalProps> = ({
 
       let stream: MediaStream | null = null;
 
-      // Try 1: Ideal rear environment camera (best for mobile scanning)
+      // 3-step cascade: Rear -> Front (webcam/laptop) -> Any camera
       try {
         stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: 'environment' }
-          },
+          video: { facingMode: { ideal: 'environment' } },
           audio: false
         });
-      } catch (err1) {
-        console.warn('Fallback 1 failed, trying generic camera:', err1);
-        // Try 2: Generic video constraint
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: false
-        });
+      } catch {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'user' },
+            audio: false
+          });
+        } catch {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: false
+          });
+        }
       }
 
       if (stream) {
