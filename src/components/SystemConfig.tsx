@@ -2014,37 +2014,35 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                   <span>Gestionar Catálogo</span>
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => setShowScannerModal(true)}
-                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#ff5708] to-[#ff7a3d] hover:from-[#ff6924] hover:to-[#ff8d57] text-[#2b0b00] text-[12px] font-mono-code font-bold flex items-center gap-2 shadow-[0_0_15px_rgba(255,87,8,0.35)] transition-all cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-[18px]">3d_rotation</span>
-                  <span>Escanear Nuevo Plato 360°</span>
-                </button>
+                <div className={`px-3 py-2 rounded-xl border text-[11.5px] font-mono-code flex items-center gap-2 ${
+                  isLight ? 'bg-[#f1f5f9] border-[#cbd5e1] text-[#475569]' : 'bg-[#1a1b24] border-[#313342] text-[#ffb59c]'
+                }`}>
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span>Plan: Platos 3D Gestionados</span>
+                </div>
               </div>
             </div>
 
             <div className="p-6 space-y-6">
-              {/* Card Explicativa de Onboarding: Se cocina y escanea 1 sola vez */}
+              {/* Card Explicativa de Plan SaaS: Platos 3D Gestionados por la Empresa Proveedora */}
               <div className={`p-4 rounded-xl border flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${
-                isLight ? 'bg-[#fff7ed] border-[#fed7aa]' : 'bg-[#1f1712] border-[#7c2d12]/40'
+                isLight ? 'bg-[#f0fdf4] border-[#bbf7d0]' : 'bg-[#0f1f17] border-[#166534]/40'
               }`}>
                 <div className="flex items-start gap-3">
-                  <span className="material-symbols-outlined text-[22px] text-[#ea580c] shrink-0 mt-0.5">info</span>
+                  <span className="material-symbols-outlined text-[22px] text-emerald-400 shrink-0 mt-0.5">verified</span>
                   <div>
-                    <h4 className="text-[13px] font-bold text-[#ea580c]">
-                      Configuración Inicial del Menú (Proceso Único por Plato)
+                    <h4 className="text-[13px] font-bold text-emerald-400">
+                      Platos 3D y Realidad Aumentada Gestionados por Plan
                     </h4>
-                    <p className={`text-[12px] leading-relaxed mt-0.5 ${isLight ? 'text-[#7c2d12]' : 'text-[#fed7aa]/80'}`}>
-                      El chef cocina cada plato muestra <strong>una sola vez</strong> durante el setup del restaurante. Se coloca en el centro de la mesa o base giratoria y se realiza el escaneo 360° con la cámara del dispositivo móvil. Una vez procesado y guardado en Supabase, el plato queda grabado en la carta con su modelo 3D y proyección en Realidad Aumentada (AR) para los comensales.
+                    <p className={`text-[12px] leading-relaxed mt-0.5 ${isLight ? 'text-[#166534]' : 'text-[#bbf7d0]/80'}`}>
+                      La digitalización fotogramétrica 360° y los modelos 3D son preparados y cargados directamente por nuestro equipo técnico según el plan contratado por tu restaurante (ej. paquete de 20 platos). Desde este panel puedes visualizar tus platos activos, ajustar precios en vivo y consultar el maridaje. Para solicitar la inclusión de nuevos platos 3D a tu carta, contacta a tu ejecutivo comercial.
                     </p>
                   </div>
                 </div>
 
                 <div className="shrink-0 flex items-center gap-2">
-                  <span className="px-2.5 py-1 rounded-full text-[11px] font-mono font-bold bg-[#ea580c]/15 text-[#ea580c] border border-[#ea580c]/30">
-                    Setup Único
+                  <span className="px-2.5 py-1 rounded-full text-[11px] font-mono font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                    Servicio Gestionado
                   </span>
                 </div>
               </div>
@@ -2333,10 +2331,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
         <DishCatalogAdmin
           dishes={dishes}
           onClose={() => setShowCatalogModal(false)}
-          onOpenScanner={() => {
-            setShowCatalogModal(false);
-            setShowScannerModal(true);
-          }}
+
           onRefreshDishes={async () => {
             const list = await fetchDishesFromDb();
             if (list) setDishes(list);

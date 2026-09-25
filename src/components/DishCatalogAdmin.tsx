@@ -7,7 +7,7 @@ import { updateDishPrice, deleteDishFromDb } from '@/services/menuService';
 interface DishCatalogAdminProps {
   dishes: MenuItem[];
   onClose: () => void;
-  onOpenScanner: () => void;
+  onOpenScanner?: () => void;
   onRefreshDishes: () => void;
   onShowToast: (msg: string, icon?: string) => void;
 }
@@ -80,15 +80,10 @@ export const DishCatalogAdmin: React.FC<DishCatalogAdminProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onOpenScanner}
-              className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-[#ff5708] to-[#ff7b39] hover:brightness-110 text-[#2b0b00] font-bold text-[12px] flex items-center gap-1.5 shadow-md shadow-[#ff5708]/25 cursor-pointer active:scale-95 transition-all"
-            >
-              <span className="material-symbols-outlined text-[17px]">3d_rotation</span>
-              <span className="hidden sm:inline">Escanear Plato 3D</span>
-              <span className="sm:hidden">Escanear 3D</span>
-            </button>
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#1e202a] border border-[#333544] text-[#a1a1aa] text-[11px] font-mono-code">
+              <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span>Modelado 3D por Plan</span>
+            </div>
 
             <button
               type="button"
@@ -145,13 +140,9 @@ export const DishCatalogAdmin: React.FC<DishCatalogAdminProps> = ({
             <div className="py-12 text-center text-[#71717a] text-[13px] space-y-2">
               <span className="material-symbols-outlined text-[36px] text-[#ff5708]/60">restaurant</span>
               <p>No se encontraron platos en esta categoría.</p>
-              <button
-                type="button"
-                onClick={onOpenScanner}
-                className="mt-2 px-4 py-2 rounded-xl bg-[#ff5708]/20 border border-[#ff5708]/40 text-[#ffb59c] text-[12px] font-bold"
-              >
-                Escanear el primer plato con la cámara
-              </button>
+              <div className="mt-2 text-[11px] font-mono-code text-gray-400 max-w-sm mx-auto">
+                Los platos y modelos 3D son digitalizados y cargados por tu proveedor según tu plan contratado. Para solicitar nuevos platos, contacta a tu ejecutivo de cuenta.
+              </div>
             </div>
           ) : (
             filtered.map((dish) => (
