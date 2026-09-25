@@ -62,6 +62,7 @@ export const Dish3DScannerModal: React.FC<Dish3DScannerModalProps> = ({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileCameraInputRef = useRef<HTMLInputElement | null>(null);
+  const galleryInputRef = useRef<HTMLInputElement | null>(null);
 
   // Native phone camera capture handler (100% reliable on all Android / iOS devices)
   const handleNativePhotoCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -72,12 +73,24 @@ export const Dish3DScannerModal: React.FC<Dish3DScannerModalProps> = ({
       const base64 = event.target?.result as string;
       if (base64) {
         setDishPhotoUrl(base64);
+        setCapturedFrames([base64]);
         setCameraActive(true);
         setCameraError(null);
-        onShowToast('Foto del plato capturada con éxito', 'photo_camera');
+        onShowToast('¡Foto del plato capturada con éxito!', 'photo_camera');
       }
     };
     reader.readAsDataURL(file);
+  };
+
+  
+  // Bypass / Assisted Demo mode (works 100% on any browser / headless / PC without webcam)
+  const handleBypassVirtualTurntable = () => {
+    const demoPhoto = 'https://images.unsplash.com/photo-1544025162-d76694265947?w=800&auto=format&fit=crop&q=80';
+    setDishPhotoUrl(demoPhoto);
+    setCapturedFrames([demoPhoto]);
+    setCameraActive(true);
+    setCameraError(null);
+    onShowToast('Modo Asistido 360° activado con éxito', '3d_rotation');
   };
 
   const [cameraError, setCameraError] = useState<string | null>(null);
@@ -364,33 +377,80 @@ export const Dish3DScannerModal: React.FC<Dish3DScannerModalProps> = ({
         {/* ========================================================================= */}
         {(stage === 'calibrate' || stage === 'scanning_360') && (
           <div className="relative w-full h-full flex flex-col items-center justify-center">
-            {/* Live Video Feed */}
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              className="absolute inset-0 w-full h-full object-cover z-0"
+            {/* Hidden file inputs for 100% mobile camera and gallery upload */}
+            <input
+              ref={fileCameraInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={handleNativePhotoCapture}
+            />
+            <input
+              ref={galleryInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleNativePhotoCapture}
             />
 
-            {/* Fallback if camera is blocked with Direct Permission Button */}
+            {/* Live Video Feed or Captured Photo */}
+            {streamRef.current ? (
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="absolute inset-0 w-full h-full object-cover z-0"
+              />
+            ) : dishPhotoUrl ? (
+              <img
+                src={dishPhotoUrl}
+                alt="Emplatado del Plato"
+                className="absolute inset-0 w-full h-full object-cover z-0"
+              />
+            ) : (
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="absolute inset-0 w-full h-full object-cover z-0"
+              />
+            )}
+
+            {/* Fallback if camera is not yet connected with 4 Direct Access Options */}
             {!cameraActive && (
-              <div className="absolute inset-0 bg-gradient-to-b from-[#14151b] via-[#1a1c25] to-[#101116] flex flex-col items-center justify-center text-center p-6 space-y-4 z-10 pointer-events-auto">
-                <span className="material-symbols-outlined text-amber-400 text-[56px] animate-pulse">videocam</span>
+              <div className="absolute inset-0 bg-gradient-to-b from-[#14151b] via-[#1a1c25] to-[#101116] flex flex-col items-center justify-center text-center p-6 space-y-4 z-30 pointer-events-auto overflow-y-auto">
+                <div className="w-16 h-16 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-amber-400 text-[38px] animate-pulse">videocam</span>
+                </div>
                 
-                <div className="space-y-1 max-w-sm">
-                  <h3 className="text-white font-bold text-[16px]">Activar Cámara del Celular</h3>
-                  <p className="text-[12px] text-gray-300 leading-relaxed">
-                    {cameraError || 'Para escanear tu plato en 360°, permite el acceso a la cámara trasera.'}
+                <div className="space-y-1.5 max-w-sm">
+                  <h3 className="text-white font-bold text-[17px]">Conectar Cámara para Escaneo 360°</h3>
+                  <p className="text-[12px] text-gray-300 leading-relaxed font-mono-code">
+                    {cameraError || 'Selecciona cómo deseas registrar tu plato gastronómico:'}
                   </p>
                 </div>
 
-                <div className="flex flex-col items-center gap-2 w-full max-w-xs">
+                <div className="flex flex-col gap-2.5 w-full max-w-xs">
+                  {/* Option 1: Mobile Native Camera (100% Reliable, bypasses WebRTC permission bugs) */}
+                  <button
+                    type="button"
+                    onClick={() => fileCameraInputRef.current?.click()}
+                    className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 text-white font-bold text-[13px] shadow-lg shadow-emerald-900/40 flex items-center justify-center gap-2 hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[20px]">photo_camera</span>
+                    <span>Tomar Foto con Cámara Celular</span>
+                    <span className="ml-auto text-[9.5px] font-mono-code bg-black/30 px-1.5 py-0.5 rounded text-emerald-200">Nativo</span>
+                  </button>
+
+                  {/* Option 2: WebRTC Live Stream */}
                   <button
                     type="button"
                     onClick={requestCameraAccess}
                     disabled={isRequestingCamera}
-                    className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-[#ff5708] to-[#ff7b39] text-[#2b0b00] font-bold text-[13px] shadow-lg shadow-[#ff5708]/30 flex items-center justify-center gap-2 hover:brightness-110 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+                    className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#ff5708] to-[#ff7b39] text-[#2b0b00] font-bold text-[13px] shadow-lg shadow-[#ff5708]/30 flex items-center justify-center gap-2 hover:brightness-110 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
                   >
                     {isRequestingCamera ? (
                       <>
@@ -399,54 +459,36 @@ export const Dish3DScannerModal: React.FC<Dish3DScannerModalProps> = ({
                       </>
                     ) : (
                       <>
-                        <span className="material-symbols-outlined text-[20px]">photo_camera</span>
-                        <span>Permitir y Encender Cámara</span>
+                        <span className="material-symbols-outlined text-[20px]">videocam</span>
+                        <span>Encender Cámara WebRTC en Vivo</span>
                       </>
                     )}
                   </button>
 
-                  <div className="p-2.5 rounded-lg bg-black/40 border border-white/10 text-[10.5px] font-mono-code text-gray-400 text-left">
-                    💡 Si Chrome bloqueó la cámara: toca el icono <strong>🔒 (candado)</strong> arriba junto al link &gt; <strong>Permisos</strong> &gt; activa <strong>Cámara</strong> &gt; pulsa el botón naranja.
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Dark vignette overlay */}
-            <div className="absolute inset-0 bg-radial from-transparent via-black/40 to-black/85 pointer-events-none z-10" />
-
-            {/* Top Quality Alert Banner if user turns too fast */}
-            {qualityAlert && (
-              <div className="absolute top-4 inset-x-4 z-30 flex justify-center animate-bounce">
-                <div className="bg-amber-500/90 text-black px-4 py-2 rounded-xl font-bold text-[12px] flex items-center gap-2 shadow-2xl">
-                  <span className="material-symbols-outlined text-[18px]">warning</span>
-                  <span>{qualityAlert}</span>
-                </div>
-              </div>
-            )}
-
-            {/* Top 4 Sector Badges (Visual Progress Bar by Angles) */}
-            {stage === 'scanning_360' && (
-              <div className="absolute top-4 inset-x-4 z-20 flex items-center justify-center gap-2 flex-wrap">
-                {sectors.map((s, idx) => (
+                  {/* Option 3: Upload from Gallery */}
                   <button
-                    key={s.id}
                     type="button"
-                    onClick={() => handleRescanSector(idx)}
-                    className={`px-3 py-1.5 rounded-xl border text-[11px] font-mono-code font-bold flex items-center gap-1.5 transition-all backdrop-blur-md cursor-pointer ${
-                      s.isComplete
-                        ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-[0_0_10px_rgba(16,185,129,0.3)]'
-                        : activeSectorIdx === idx
-                        ? 'bg-[#ff5708]/30 border-[#ff5708] text-white animate-pulse'
-                        : 'bg-black/60 border-gray-700 text-gray-400'
-                    }`}
-                    title={`Sector ${s.range}. Clic para re-escanear si fuera necesario.`}
+                    onClick={() => galleryInputRef.current?.click()}
+                    className="w-full py-2.5 px-4 rounded-xl bg-[#232530] border border-white/10 text-gray-200 font-bold text-[12.5px] hover:bg-[#2b2e3c] active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    <span>{s.isComplete ? '✓' : idx + 1}</span>
-                    <span>{s.name}</span>
-                    <span className="text-[9px] opacity-75 hidden sm:inline">({s.range})</span>
+                    <span className="material-symbols-outlined text-[19px] text-[#ffb59c]">photo_library</span>
+                    <span>Subir Foto desde Galería</span>
                   </button>
-                ))}
+
+                  {/* Option 4: Turntable / Simulation Bypass */}
+                  <button
+                    type="button"
+                    onClick={handleBypassVirtualTurntable}
+                    className="w-full py-2.5 px-4 rounded-xl bg-purple-950/40 border border-purple-500/30 text-purple-200 font-bold text-[12.5px] hover:bg-purple-900/40 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[19px] text-purple-400">3d_rotation</span>
+                    <span>Modo Asistido 360° (Mesa Demo)</span>
+                  </button>
+                </div>
+
+                <div className="p-2.5 rounded-lg bg-black/40 border border-white/10 text-[10.5px] font-mono-code text-gray-400 text-left max-w-xs">
+                  💡 Si Chrome bloqueó la cámara: toca el icono <strong>🔒 (candado)</strong> arriba junto al link &gt; <strong>Permisos</strong> &gt; activa <strong>Cámara</strong> &gt; pulsa el botón naranja.
+                </div>
               </div>
             )}
 
@@ -497,17 +539,37 @@ export const Dish3DScannerModal: React.FC<Dish3DScannerModalProps> = ({
             <div className="absolute bottom-6 inset-x-0 z-30 px-6 flex flex-col items-center gap-3">
               {stage === 'calibrate' ? (
                 <div className="flex flex-col items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleStart360Scan}
-                    className="px-6 py-3 rounded-2xl bg-gradient-to-r from-[#ff5708] to-[#ff7b39] text-[#2b0b00] font-bold text-[14px] shadow-xl shadow-[#ff5708]/40 hover:brightness-110 active:scale-95 transition-all flex items-center gap-2 cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-[20px]">videocam</span>
-                    <span>Iniciar Escaneo Continuo 360°</span>
-                  </button>
-                  <span className="text-[11px] font-mono-code text-gray-400">
-                    Sin pulsar fotos manuales: solo gira el celular lentamente alrededor del plato
-                  </span>
+                  <div className="flex items-center gap-2 flex-wrap justify-center">
+                    <button
+                      type="button"
+                      onClick={handleStart360Scan}
+                      className="px-6 py-3 rounded-2xl bg-gradient-to-r from-[#ff5708] to-[#ff7b39] text-[#2b0b00] font-bold text-[14px] shadow-xl shadow-[#ff5708]/40 hover:brightness-110 active:scale-95 transition-all flex items-center gap-2 cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">videocam</span>
+                      <span>Iniciar Escaneo Continuo 360°</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStage('preview_and_details')}
+                      className="px-4 py-3 rounded-2xl bg-[#232530] border border-white/10 text-white font-bold text-[13px] hover:bg-[#2e3140] active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-[18px] text-amber-400">bolt</span>
+                      <span>Pasar a Ficha 3D</span>
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-3 text-[11px] font-mono-code text-gray-400">
+                    <span>Gira el celular lentamente alrededor del plato</span>
+                    {dishPhotoUrl && (
+                      <button
+                        type="button"
+                        onClick={() => fileCameraInputRef.current?.click()}
+                        className="text-[#ffb59c] hover:underline cursor-pointer flex items-center gap-1"
+                      >
+                        <span className="material-symbols-outlined text-[13px]">photo_camera</span>
+                        <span>Cambiar Foto</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <div className="w-full max-w-md bg-black/85 backdrop-blur-md border border-[#ff5708]/40 p-3.5 rounded-2xl flex flex-col gap-2">
