@@ -160,8 +160,10 @@ export const RolePermissionsMatrix: React.FC<RolePermissionsMatrixProps> = ({ on
         </div>
       </div>
 
-      {/* Permissions Table */}
-      <div className="overflow-x-auto -mx-2 sm:mx-0">
+      {/* ============================================================= */}
+      {/* Vista de TABLA — sólo en pantallas medianas/grandes (sm y más) */}
+      {/* ============================================================= */}
+      <div className="hidden sm:block overflow-x-auto -mx-2 sm:mx-0">
         <table className="w-full text-left border-collapse min-w-[700px]">
           <thead>
             <tr className="border-b border-[#27272a] text-[#71717a] text-[10px] font-mono-code uppercase font-bold tracking-wider">
@@ -176,7 +178,6 @@ export const RolePermissionsMatrix: React.FC<RolePermissionsMatrixProps> = ({ on
           <tbody className="divide-y divide-[#27272a]/60">
             {permissions.map((row) => (
               <tr key={row.roleId} className="hover:bg-[#202024]/50 transition-colors">
-                {/* Role title and description */}
                 <td className="py-3 px-3">
                   <div className="flex flex-col">
                     <span className="text-[13.5px] font-bold text-white tracking-tight font-sans">
@@ -188,7 +189,6 @@ export const RolePermissionsMatrix: React.FC<RolePermissionsMatrixProps> = ({ on
                   </div>
                 </td>
 
-                {/* Columns */}
                 {(['panelAdmin', 'kdsCocina', 'edicionMenu', 'cobroPos', 'anulacionComandas'] as PermissionColumnKey[]).map(
                   (colKey) => {
                     const val = row[colKey];
@@ -228,10 +228,54 @@ export const RolePermissionsMatrix: React.FC<RolePermissionsMatrixProps> = ({ on
         </table>
       </div>
 
+      {/* ============================================================= */}
+      {/* Vista de TARJETAS — sólo en móvil (debajo de sm). Sin scroll   */}
+      {/* horizontal: cada rol es una tarjeta y cada permiso una fila   */}
+      {/* tocable que se apila verticalmente. Cero riesgo de "cortes".  */}
+      {/* ============================================================= */}
+      <div className="sm:hidden space-y-3">
+        {permissions.map((row) => (
+          <div key={row.roleId} className="rounded-xl border border-[#27272a] bg-[#141416] p-3.5 space-y-3">
+            <div>
+              <span className="text-[13.5px] font-bold text-white block leading-snug">{row.roleTitle}</span>
+              <span className="text-[11px] text-[#71717a] leading-snug block mt-0.5">{row.roleDescription}</span>
+            </div>
+
+            <div className="space-y-1.5">
+              {(['panelAdmin', 'kdsCocina', 'edicionMenu', 'cobroPos', 'anulacionComandas'] as PermissionColumnKey[]).map(
+                (colKey) => {
+                  const val = row[colKey];
+                  const styles =
+                    val === 'allow'
+                      ? { border: 'border-[#ff5708]/40', bg: 'bg-[#ff5708]/10', text: 'text-[#ff5708]', icon: 'check', label: 'Permitir' }
+                      : val === 'read'
+                      ? { border: 'border-[#eab308]/40', bg: 'bg-[#eab308]/10', text: 'text-[#eab308]', icon: 'visibility', label: 'Lectura' }
+                      : { border: 'border-[#3f3f46]', bg: 'bg-[#0e0e10]', text: 'text-[#71717a]', icon: 'close', label: 'Denegar' };
+                  return (
+                    <button
+                      key={colKey}
+                      type="button"
+                      onClick={() => handleTogglePermission(row.roleId, colKey)}
+                      className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-[#0e0e10] border border-[#27272a] active:scale-[0.98] transition-transform cursor-pointer"
+                    >
+                      <span className="text-[12px] text-[#c6c5cf] font-medium text-left">{COLUMN_NAMES[colKey]}</span>
+                      <span className={`shrink-0 flex items-center gap-1 px-2 py-1 rounded-md border text-[10px] font-mono font-bold uppercase ${styles.border} ${styles.bg} ${styles.text}`}>
+                        <span className="material-symbols-outlined text-[13px]">{styles.icon}</span>
+                        {styles.label}
+                      </span>
+                    </button>
+                  );
+                }
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
       {/* Global Policies Modal */}
       {showPoliciesModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="bg-[#18181b] border border-[#3f3f46] rounded-2xl shadow-2xl max-w-md w-full p-6 text-[#e5e1e4] space-y-5 animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
+          <div className="bg-[#18181b] border border-[#3f3f46] rounded-2xl shadow-2xl max-w-md w-full p-6 text-[#e5e1e4] space-y-5 animate-in fade-in zoom-in-95 duration-200 my-8 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-[#27272a]">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-[#ff5708] text-[22px]">tune</span>
@@ -320,9 +364,9 @@ export const RolePermissionsMatrix: React.FC<RolePermissionsMatrixProps> = ({ on
 
       {/* Audit Logs Modal */}
       {showAuditModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="bg-[#18181b] border border-[#3f3f46] rounded-2xl shadow-2xl max-w-2xl w-full p-6 text-[#e5e1e4] space-y-4 animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between pb-3 border-b border-[#27272a]">
+        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
+          <div className="bg-[#18181b] border border-[#3f3f46] rounded-2xl shadow-2xl max-w-2xl w-full p-6 text-[#e5e1e4] space-y-4 animate-in fade-in zoom-in-95 duration-200 my-8 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between pb-3 border-b border-[#27272a] shrink-0">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-[#ff5708] text-[22px]">history</span>
                 <div>
@@ -389,7 +433,7 @@ export const RolePermissionsMatrix: React.FC<RolePermissionsMatrixProps> = ({ on
               )}
             </div>
 
-            <div className="flex justify-between items-center pt-2 border-t border-[#27272a]">
+            <div className="flex justify-between items-center pt-2 border-t border-[#27272a] shrink-0">
               <button
                 type="button"
                 onClick={handleOpenAuditModal}

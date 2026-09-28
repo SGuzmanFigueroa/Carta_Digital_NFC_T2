@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { RolePermissionsMatrix } from './RolePermissionsMatrix';
 import { StaffMember } from '../types';
 
@@ -29,6 +29,31 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
   const [changingPinStaff, setChangingPinStaff] = useState<StaffMember | null>(null);
   const [viewingPermissionsStaff, setViewingPermissionsStaff] = useState<StaffMember | null>(null);
   const [editingPermissions, setEditingPermissions] = useState<Record<string, 'allow' | 'read' | 'deny'>>({});
+
+  // --- Scroll horizontal "profesional" de las pestañas de filtro (Todos / Administración / etc.) ---
+  const tabsScrollRef = useRef<HTMLDivElement>(null);
+  const [showTabsLeftFade, setShowTabsLeftFade] = useState(false);
+  const [showTabsRightFade, setShowTabsRightFade] = useState(false);
+
+  const updateTabsFade = useCallback(() => {
+    const el = tabsScrollRef.current;
+    if (!el) return;
+    setShowTabsLeftFade(el.scrollLeft > 4);
+    setShowTabsRightFade(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+  }, []);
+
+  useEffect(() => {
+    updateTabsFade();
+    const el = tabsScrollRef.current;
+    if (!el) return;
+    const onResize = () => updateTabsFade();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [updateTabsFade, staffList.length]);
+
+  const scrollTabsBy = (amount: number) => {
+    tabsScrollRef.current?.scrollBy({ left: amount, behavior: 'smooth' });
+  };
 
   const getDefaultPermissionsForRole = (role: string): Record<string, 'allow' | 'read' | 'deny'> => {
     if (role === 'admin') {
@@ -186,28 +211,62 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
         </div>
       </div>
 
-      {/* Tabs / Filter Pills */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 border-b border-[#2d2e38]">
-        {[
-          { id: 'all', label: `Todos (${staffList.length})` },
-          { id: 'admin', label: `Administración (${staffList.filter((s) => s.role === 'admin').length})` },
-          { id: 'kitchen', label: `Cocina KDS (${staffList.filter((s) => s.role === 'kitchen').length})` },
-          { id: 'floor', label: `Sala y TPV (${staffList.filter((s) => s.role === 'floor').length})` },
-          { id: 'bar', label: `Barra & Runner (${staffList.filter((s) => s.role === 'bar' || s.role === 'runner').length})` }
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => setActiveTab(tab.id as any)}
-            className={`px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors shrink-0 cursor-pointer ${
-              activeTab === tab.id
-                ? 'bg-[#ff5708] text-[#2b0b00] font-bold shadow-sm'
-                : 'text-[#c6c5cf] hover:text-white hover:bg-[#20212a]'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+      {/* Tabs / Filter Pills - versión con scroll horizontal profesional (flechas + fade) */}
+      <div className="relative border-b border-[#2d2e38]">
+        {showTabsLeftFade && (
+          <>
+            <div className="pointer-events-none absolute left-0 top-0 bottom-1 w-10 z-10 bg-gradient-to-r from-[#0e0e10] to-transparent" />
+            <button
+              type="button"
+              onClick={() => scrollTabsBy(-160)}
+              aria-label="Desplazar pestañas a la izquierda"
+              className="absolute left-0 top-1/2 -translate-y-1/2 -mt-0.5 z-20 w-6 h-6 rounded-full bg-[#1c1b1d] border border-[#353437] text-[#c6c5cf] hover:text-white hover:border-[#ff5708] flex items-center justify-center cursor-pointer shadow-md"
+            >
+              <span className="material-symbols-outlined text-[15px]">chevron_left</span>
+            </button>
+          </>
+        )}
+
+        <div
+          ref={tabsScrollRef}
+          onScroll={updateTabsFade}
+          className="flex items-center gap-2 overflow-x-auto pb-1 scroll-smooth [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] px-1"
+        >
+          {[
+            { id: 'all', label: `Todos (${staffList.length})` },
+            { id: 'admin', label: `Administración (${staffList.filter((s) => s.role === 'admin').length})` },
+            { id: 'kitchen', label: `Cocina KDS (${staffList.filter((s) => s.role === 'kitchen').length})` },
+            { id: 'floor', label: `Sala y TPV (${staffList.filter((s) => s.role === 'floor').length})` },
+            { id: 'bar', label: `Barra & Runner (${staffList.filter((s) => s.role === 'bar' || s.role === 'runner').length})` }
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors shrink-0 cursor-pointer whitespace-nowrap ${
+                activeTab === tab.id
+                  ? 'bg-[#ff5708] text-[#2b0b00] font-bold shadow-sm'
+                  : 'text-[#c6c5cf] hover:text-white hover:bg-[#20212a]'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {showTabsRightFade && (
+          <>
+            <div className="pointer-events-none absolute right-0 top-0 bottom-1 w-10 z-10 bg-gradient-to-l from-[#0e0e10] to-transparent" />
+            <button
+              type="button"
+              onClick={() => scrollTabsBy(160)}
+              aria-label="Desplazar pestañas a la derecha"
+              className="absolute right-0 top-1/2 -translate-y-1/2 -mt-0.5 z-20 w-6 h-6 rounded-full bg-[#1c1b1d] border border-[#353437] text-[#c6c5cf] hover:text-white hover:border-[#ff5708] flex items-center justify-center cursor-pointer shadow-md"
+            >
+              <span className="material-symbols-outlined text-[15px]">chevron_right</span>
+            </button>
+          </>
+        )}
       </div>
 
       {/* Staff Grid */}
@@ -390,9 +449,9 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
       {/* 🚀 MODAL: CREAR NUEVO COLABORADOR */}
       {/* ===================================================================== */}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#1c1b1d] max-w-md w-full rounded-2xl border border-[#ff5708]/40 p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between pb-3 border-b border-[#2d2e38]">
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-start sm:items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-[#1c1b1d] max-w-md w-full rounded-2xl border border-[#ff5708]/40 shadow-2xl my-8 flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between p-6 pb-3 border-b border-[#2d2e38] shrink-0">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-[#ff5708] text-[22px]">person_add</span>
                 <h3 className="text-[17px] font-bold text-white">Registrar Nuevo Colaborador</h3>
@@ -406,7 +465,7 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleCreateCollaborator} className="space-y-3.5 text-[13px]">
+            <form onSubmit={handleCreateCollaborator} className="space-y-3.5 text-[13px] p-6 pt-4 overflow-y-auto">
               <div>
                 <label className="block text-[11px] font-bold text-[#c6c5cf] uppercase mb-1">Nombre y Apellido *</label>
                 <input
@@ -521,9 +580,9 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
       {/* ✏️ MODAL: EDITAR COLABORADOR */}
       {/* ===================================================================== */}
       {editingStaff && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#1c1b1d] max-w-md w-full rounded-2xl border border-white/20 p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between pb-3 border-b border-[#2d2e38]">
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-start sm:items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-[#1c1b1d] max-w-md w-full rounded-2xl border border-white/20 shadow-2xl my-8 flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between p-6 pb-3 border-b border-[#2d2e38] shrink-0">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-[#00FF88] text-[22px]">edit</span>
                 <h3 className="text-[17px] font-bold text-white">Editar Datos del Colaborador</h3>
@@ -537,7 +596,7 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleSaveEditStaff} className="space-y-3.5 text-[13px]">
+            <form onSubmit={handleSaveEditStaff} className="space-y-3.5 text-[13px] p-6 pt-4 overflow-y-auto">
               <div>
                 <label className="block text-[11px] font-bold text-[#c6c5cf] uppercase mb-1">Nombre Completo</label>
                 <input
@@ -650,8 +709,8 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
       {/* 🔑 MODAL: CAMBIAR PIN TPV */}
       {/* ===================================================================== */}
       {changingPinStaff && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#1c1b1d] max-w-sm w-full rounded-2xl border border-[#ff5708]/40 p-6 space-y-4 shadow-2xl text-center">
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-start sm:items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-[#1c1b1d] max-w-sm w-full rounded-2xl border border-[#ff5708]/40 p-6 space-y-4 shadow-2xl text-center my-8 max-h-[90vh] overflow-y-auto">
             <div className="w-12 h-12 rounded-full bg-[#ff5708]/10 text-[#ff5708] flex items-center justify-center mx-auto border border-[#ff5708]/30">
               <span className="material-symbols-outlined text-[24px]">pin</span>
             </div>
@@ -713,11 +772,12 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
       {/* 🛡️ MODAL: VER / CONFIGURAR PERMISOS DE COLABORADOR (100% INTERACTIVO) */}
       {/* ===================================================================== */}
       {viewingPermissionsStaff && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#1c1b1d] max-w-xl w-full rounded-2xl border border-[#38bdf8]/40 p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between pb-3 border-b border-[#2d2e38]">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-start sm:items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-[#1c1b1d] max-w-xl w-full rounded-2xl border border-[#38bdf8]/40 shadow-2xl my-8 flex flex-col max-h-[90vh]">
+            {/* Header fijo */}
+            <div className="flex items-center justify-between p-6 pb-3 border-b border-[#2d2e38] shrink-0">
               <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-xl bg-[#38bdf8]/10 text-[#38bdf8] flex items-center justify-center border border-[#38bdf8]/30">
+                <div className="w-10 h-10 rounded-xl bg-[#38bdf8]/10 text-[#38bdf8] flex items-center justify-center border border-[#38bdf8]/30 shrink-0">
                   <span className="material-symbols-outlined text-[22px]">verified_user</span>
                 </div>
                 <div>
@@ -728,14 +788,15 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
               <button
                 type="button"
                 onClick={() => setViewingPermissionsStaff(null)}
-                className="p-1 rounded-lg text-[#a1a1aa] hover:text-white hover:bg-[#24252e] cursor-pointer"
+                className="p-1 rounded-lg text-[#a1a1aa] hover:text-white hover:bg-[#24252e] cursor-pointer shrink-0"
               >
                 <span className="material-symbols-outlined text-[18px]">close</span>
               </button>
             </div>
 
-            <div className="space-y-2 text-[12.5px]">
-              <div className="flex items-center justify-between">
+            {/* Cuerpo scrolleable */}
+            <div className="space-y-2 text-[12.5px] px-6 py-4 overflow-y-auto">
+              <div className="flex items-center justify-between gap-3">
                 <p className="text-[#c6c5cf] text-[12px]">
                   Haz clic en cualquier nivel para personalizar los accesos de este colaborador:
                 </p>
@@ -758,14 +819,14 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
                 ].map((cap) => {
                   const currentVal = (editingPermissions as any)[cap.id] || 'deny';
                   return (
-                    <div key={cap.id} className="p-3 flex items-center justify-between gap-3">
+                    <div key={cap.id} className="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                       <div className="min-w-0 flex-1">
                         <span className="font-bold text-white block text-[13px]">{cap.title}</span>
                         <span className="text-[11px] text-[#a1a1aa] leading-tight block">{cap.desc}</span>
                       </div>
 
                       {/* 3 Botones Interactivos: Permitir | Lectura | Denegar */}
-                      <div className="flex items-center gap-1 shrink-0 bg-[#0e0e10] p-1 rounded-lg border border-[#2d2e38]">
+                      <div className="flex items-center gap-1 shrink-0 bg-[#0e0e10] p-1 rounded-lg border border-[#2d2e38] self-start sm:self-center">
                         <button
                           type="button"
                           onClick={() => setEditingPermissions((prev) => ({ ...prev, [cap.id]: 'allow' }))}
@@ -808,7 +869,8 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
               </div>
             </div>
 
-            <div className="pt-3 border-t border-[#2d2e38] flex items-center justify-between gap-3">
+            {/* Footer fijo */}
+            <div className="p-6 pt-3 border-t border-[#2d2e38] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shrink-0">
               <button
                 type="button"
                 onClick={() => {
@@ -823,7 +885,7 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
                 <span className="material-symbols-outlined text-[15px]">arrow_downward</span>
               </button>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 justify-end">
                 <button
                   type="button"
                   onClick={() => setViewingPermissionsStaff(null)}
@@ -860,8 +922,8 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
       {/* 🗑️ MODAL: CONFIRMAR ELIMINACIÓN */}
       {/* ===================================================================== */}
       {deletingStaff && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#1c1b1d] max-w-sm w-full rounded-2xl border border-rose-500/40 p-6 space-y-4 shadow-2xl text-center">
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-start sm:items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-[#1c1b1d] max-w-sm w-full rounded-2xl border border-rose-500/40 p-6 space-y-4 shadow-2xl text-center my-8 max-h-[90vh] overflow-y-auto">
             <div className="w-12 h-12 rounded-full bg-rose-500/10 text-rose-400 flex items-center justify-center mx-auto border border-rose-500/30">
               <span className="material-symbols-outlined text-[24px]">person_remove</span>
             </div>

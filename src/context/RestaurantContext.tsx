@@ -24,7 +24,9 @@ import {
   verifyAndSanitizeDishPrice,
   AuditLogger,
   AuditLogEntry,
-  clearAuthSessionCookie
+  clearAuthSessionCookie,
+  readAuthSession,
+  AUTH_SESSION_CHANGE_EVENT
 } from '../utils/security';
 
 interface RestaurantContextType {
@@ -268,11 +270,38 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
       const savedDiner = localStorage.getItem(STORAGE_KEY_DINER);
       if (savedDiner) setDinerActiveTicket(JSON.parse(savedDiner));
 
-      const savedAuth = localStorage.getItem(STORAGE_KEY_AUTH);
-      if (savedAuth) setCurrentUser(JSON.parse(savedAuth));
+      // Restaura la sesión activa desde localStorage (rememberMe habilitado) o, en su
+      // defecto, desde la cookie de sesión que ya validó el middleware de rutas.
+      setCurrentUser(readAuthSession());
     } catch (err) {
       console.warn('Error loading GastroPulse state from storage:', err);
     }
+  }, []);
+
+  // Sincronización reactiva de la sesión: login, logout, cambio de usuario o
+  // modificaciones desde otro tab del mismo terminal actualizan el rol en vivo.
+  useEffect(() => {
+    const handleSessionChange = (event: Event) => {
+      const session = (event as CustomEvent<AuthUser | null>).detail ?? null;
+      setCurrentUser(session);
+      if (!session) {
+        setIsTerminalLocked(false);
+      }
+    };
+
+    const handleStorageSync = (event: StorageEvent) => {
+      // Sólo reacciona a cambios de la clave de sesión (o a un clear global)
+      if (event.key !== null && event.key !== STORAGE_KEY_AUTH) return;
+      setCurrentUser(readAuthSession());
+    };
+
+    window.addEventListener(AUTH_SESSION_CHANGE_EVENT, handleSessionChange);
+    window.addEventListener('storage', handleStorageSync);
+
+    return () => {
+      window.removeEventListener(AUTH_SESSION_CHANGE_EVENT, handleSessionChange);
+      window.removeEventListener('storage', handleStorageSync);
+    };
   }, []);
 
   // Inactivity auto-lock monitor (5 minutes of idle on management terminals)
