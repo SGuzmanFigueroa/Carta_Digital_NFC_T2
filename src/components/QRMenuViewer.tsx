@@ -1,6 +1,24 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MenuItem, OrderTicket, TableStatus } from '../types';
-import { ThreeDView } from './ThreeDView';
+//import { ThreeDView } from './ThreeDView';
+import dynamic from 'next/dynamic';
+
+// Importación dinámica: Obliga a Next.js a no incluir Three.js en la carga inicial.
+// Como tu componente usa "export const ThreeDView" (exportación nombrada), usamos .then()
+const ThreeDView = dynamic(
+  () => import('./ThreeDView').then((mod) => mod.ThreeDView),
+  {
+    ssr: false, // Fundamental: Three.js necesita el objeto 'window', no puede renderizarse en el servidor
+    loading: () => (
+      <div className="flex items-center justify-center w-full h-64 bg-[#131418] rounded-xl border border-[#24252e]">
+        <div className="flex flex-col items-center gap-2">
+          <span className="w-6 h-6 border-2 border-[#ff5708] border-t-transparent rounded-full animate-spin"></span>
+          <span className="text-[#ff5708] font-mono-code text-[11px] animate-pulse">Cargando motor 3D...</span>
+        </div>
+      </div>
+    )
+  }
+);
 import { ARTableViewer } from './ARTableViewer';
 
 interface QRMenuViewerProps {
@@ -235,7 +253,8 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   };
 
   const heroItem = menuItems[0]; // Arroz Chaufa Wok de Autor
-
+  // Extrae el ID del modelo desde la URL de la imagen (ej: /images/smoked-old-fashioned.jpg -> smoked-old-fashioned)
+  const getModelId = (dish: MenuItem) => dish.image?.split('/').pop()?.replace('.jpg', '') || dish.id;
   return (
     <div className="w-full min-h-screen bg-[#0b0c0e] text-[#e5e1e4] pb-36 selection:bg-[#ff5708] selection:text-white">
       {/* ========================================================================= */}
@@ -473,7 +492,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
               </div>
             ) : (
               <ThreeDView
-                dishId={heroItem.id}
+                dishId={getModelId(heroItem)}
                 heightClass="h-64 sm:h-80"
                 onInteract={() => onShowToast('Rotando Arroz Chaufa Wok 3D', '3d_rotation')}
               />
@@ -894,7 +913,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
 
             {/* Custom 3D canvas tailored to this specific dish! */}
             <ThreeDView
-              dishId={selectedDishForModal.id}
+              dishId={getModelId(selectedDishForModal)}
               heightClass="h-64 sm:h-72"
               onInteract={() => onShowToast(`Inspeccionando ${selectedDishForModal.name}`, '3d_rotation')}
             />
@@ -998,7 +1017,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
 
             <div style={{ transform: `scale(${arScale})` }} className="w-full transition-transform duration-200">
               <ThreeDView
-                dishId={arDish.id}
+                dishId={getModelId(arDish)}
                 enableCameraBg={true}
                 heightClass="h-72 sm:h-96"
                 onInteract={() => onShowToast('Moviendo plato en tu mesa', 'view_in_ar')}

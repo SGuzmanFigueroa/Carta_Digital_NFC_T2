@@ -38,6 +38,7 @@ export const ThreeDView: React.FC<ThreeDViewProps> = ({
     const camera = new THREE.PerspectiveCamera(42, width / height, 0.1, 100);
     const isMobile = width < 480;
     camera.position.set(0, isMobile ? 3.6 : 3.2, isMobile ? 4.8 : 4.2);
+    camera.lookAt(0, 0, 0);
 
     const renderer = new THREE.WebGLRenderer({
       alpha: true,
@@ -794,6 +795,7 @@ export const ThreeDView: React.FC<ThreeDViewProps> = ({
       camera.aspect = newW / newH;
       const mobile = newW < 480;
       camera.position.set(0, mobile ? 3.6 : 3.2, mobile ? 4.8 : 4.2);
+      camera.lookAt(0, 0, 0);
       camera.updateProjectionMatrix();
       renderer.setSize(newW, newH);
     };
