@@ -66,6 +66,22 @@ export default function RootLayout({
             })()`,
           }}
         />
+      
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){
+              if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
+                window.addEventListener('load', function() {
+                  navigator.serviceWorker.register('/sw.js').then(function(reg) {
+                    console.log('ServiceWorker registered:', reg.scope);
+                  }).catch(function(err) {
+                    console.warn('ServiceWorker registration failed:', err);
+                  });
+                });
+              }
+            })()`,
+          }}
+        />
       </head>
       <body className="min-h-screen flex flex-col bg-[#0b0c0e] text-[#e5e1e4] selection:bg-[#ff5708] selection:text-white">
         <RestaurantProvider>

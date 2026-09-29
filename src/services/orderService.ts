@@ -1,3 +1,4 @@
+import { queuePendingOrder } from './offlineSyncService';
 ﻿import { supabase } from '@/lib/supabase';
 import { OrderTicket, OrderItem, MenuItem } from '@/types';
 import { updateTableStateInDb } from './tableService';
@@ -67,7 +68,8 @@ export async function createOrderInDb(
   tableNumber: string,
   cartItems: { item: MenuItem; quantity: number; notes?: string }[],
   pax: number = 2,
-  customOrderId?: string
+  customOrderId?: string,
+  skipQueue: boolean = false
 ): Promise<OrderTicket | null> {
   try {
     const orderId = customOrderId || `cmd-${Math.floor(100 + Math.random() * 899)}`;
@@ -88,8 +90,32 @@ export async function createOrderInDb(
       });
 
     if (orderError) {
-      console.error('Error inserting order to Supabase:', orderError);
-      return null;
+      console.warn('[OfflineSync] No se pudo guardar en Supabase (offline o red). Encolando localmente:', orderError.message);
+      if (!skipQueue) {
+        queuePendingOrder(tableNumber, cartItems, pax, orderId);
+      }
+      // Retornar ticket local para que la UI no se quede bloqueada
+      return {
+        id: orderId,
+        table: tableNumber,
+        pax: pax,
+        timeAgo: 'En cola offline',
+        createdTime: new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }),
+        origin: 'QR COMENSAL',
+        status: 'por-validar',
+        isCritical: false,
+        preparationPercent: 0,
+        items: cartItems.map((c, idx) => ({
+          id: `it-off-${Date.now()}-${idx}`,
+          name: c.item.name,
+          quantity: c.quantity,
+          price: c.item.price,
+          notes: c.notes,
+          station: 'wok_saute'
+        })),
+        subtotal: subtotal,
+        total: total
+      };
     }
 
     // 2. Insert order items

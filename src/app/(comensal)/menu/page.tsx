@@ -6,6 +6,12 @@ import { INITIAL_MENU_ITEMS } from '@/data/mockData';
 import { useRestaurant } from '@/context/RestaurantContext';
 import { OrderTicket, MenuItem } from '@/types';
 import { fetchDishesFromDb } from '@/services/menuService';
+import {
+  cacheMenuItems,
+  getCachedMenuItems,
+  setupOfflineSync,
+  isDeviceOnline
+} from '@/services/offlineSyncService';
 
 export default function MenuPage() {
   const {
@@ -18,26 +24,74 @@ export default function MenuPage() {
     callWaiter
   } = useRestaurant();
 
-  const [menuItems, setMenuItems] = useState<MenuItem[]>(INITIAL_MENU_ITEMS);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>(() => {
+    const cached = getCachedMenuItems();
+    return cached && cached.length > 0 ? cached : INITIAL_MENU_ITEMS;
+  });
+  const [isOnline, setIsOnline] = useState<boolean>(true);
 
   useEffect(() => {
+    setIsOnline(isDeviceOnline());
+
+    // Setup background offline synchronization
+    const cleanupSync = setupOfflineSync(
+      // 1. On online/offline status change
+      (online) => {
+        setIsOnline(online);
+        if (online) {
+          showToast('Conectado a la red del restaurante.', 'wifi');
+          // Re-fetch fresh menu
+          fetchDishesFromDb().then((dishes) => {
+            if (dishes && dishes.length > 0) {
+              setMenuItems(dishes);
+              cacheMenuItems(dishes);
+            }
+          }).catch(console.warn);
+        } else {
+          showToast('Modo Offline: Puedes seguir pidiendo normalmente.', 'wifi_off');
+        }
+      },
+      // 2. On orders synced
+      (count) => {
+        showToast(`¡Conexión restablecida! ${count} pedido(s) sincronizados con cocina.`, 'cloud_done');
+      }
+    );
+
+    // Initial fetch and cache
     fetchDishesFromDb()
       .then((dishes) => {
         if (dishes && dishes.length > 0) {
           setMenuItems(dishes);
+          cacheMenuItems(dishes);
         }
       })
       .catch((err) => {
-        console.warn('Fallback to INITIAL_MENU_ITEMS:', err);
+        console.warn('Network issue fetching dishes, using cached menu:', err);
+        const cached = getCachedMenuItems();
+        if (cached && cached.length > 0) {
+          setMenuItems(cached);
+        }
       });
-  }, []);
+
+    return () => {
+      cleanupSync();
+    };
+  }, [showToast]);
 
   const handleAddNewOrder = (newTicket: OrderTicket) => {
     // Handled via sendOrderFromMenu inside QRMenuViewer
   };
 
   return (
-    <div className="min-h-screen bg-[#0e0e10] text-[#e5e1e4]">
+    <div className="min-h-screen bg-[#0e0e10] text-[#e5e1e4] relative">
+      {/* Offline Status Banner */}
+      {!isOnline && (
+        <div className="sticky top-0 z-50 bg-amber-500/90 backdrop-blur-md text-black px-4 py-2 text-center text-xs font-bold flex items-center justify-center gap-2 shadow-lg transition-all animate-in slide-in-from-top duration-300">
+          <span className="material-symbols-outlined text-[18px]">wifi_off</span>
+          <span>Modo Sin Conexión activo — Puedes seguir ordenando. Tus pedidos se enviarán solos al volver la red.</span>
+        </div>
+      )}
+
       <QRMenuViewer
         menuItems={menuItems}
         onAddNewOrder={handleAddNewOrder}
@@ -47,11 +101,26 @@ export default function MenuPage() {
         onSendOrderFromMenu={sendOrderFromMenu}
         onRequestTableAccount={requestTableAccount}
         onCallWaiter={callWaiter}
-        onDishCreated={(newDish) => setMenuItems((prev) => [newDish, ...prev])}
+        onDishCreated={(newDish) => {
+          setMenuItems((prev) => {
+            const updated = [newDish, ...prev];
+            cacheMenuItems(updated);
+            return updated;
+          });
+        }}
         onRefreshDishes={() => {
-          fetchDishesFromDb().then((dishes) => {
-            if (dishes && dishes.length > 0) setMenuItems(dishes);
-          }).catch(console.warn);
+          fetchDishesFromDb()
+            .then((dishes) => {
+              if (dishes && dishes.length > 0) {
+                setMenuItems(dishes);
+                cacheMenuItems(dishes);
+              }
+            })
+            .catch((err) => {
+              console.warn('Error refreshing dishes:', err);
+              const cached = getCachedMenuItems();
+              if (cached && cached.length > 0) setMenuItems(cached);
+            });
         }}
       />
 
