@@ -59,6 +59,28 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'Efectivo' | 'Tarjeta POS (Visa/MC)' | 'Yape / Plin'>('Tarjeta POS (Visa/MC)');
   const [waiterCalled, setWaiterCalled] = useState(false);
+
+  // Flechas de desplazamiento para la barra de categorías
+  const catScrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const updateCatArrows = () => {
+    const el = catScrollRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 4);
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+  };
+
+  const scrollCategories = (dir: 'left' | 'right') => {
+    catScrollRef.current?.scrollBy({ left: dir === 'right' ? 160 : -160, behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    updateCatArrows();
+    window.addEventListener('resize', updateCatArrows);
+    return () => window.removeEventListener('resize', updateCatArrows);
+  }, []);
     
   // 3D Inspector Modal
   const [selectedDishForModal, setSelectedDishForModal] = useState<MenuItem | null>(null);
@@ -396,26 +418,58 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
           </div>
 
           {/* Categories Pill Bar */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar -mx-3.5 px-3.5 sm:mx-0 sm:px-0">
-            {[
-              { id: 'todos', label: 'Todos' },
-              { id: 'fondos', label: 'Fondos & Wok' },
-              { id: 'entradas', label: 'Entradas Nikkei' },
-              { id: 'postres', label: 'Postres de Autor' },
-              { id: 'bebidas', label: 'Bebidas Signature' }
-            ].map((cat) => (
+          <div className="relative">
+            {canScrollLeft && (
               <button
-                key={cat.id}
-                onClick={() => setSelectedCategory(cat.id)}
-                className={`px-3.5 py-1.5 rounded-full text-[12px] font-medium whitespace-nowrap transition-all cursor-pointer ${
-                  selectedCategory === cat.id
-                    ? 'bg-[#ff5708] text-[#2b0b00] font-bold shadow-[0_0_12px_rgba(255,87,8,0.35)]'
-                    : 'bg-[#181920] text-[#a1a1aa] hover:text-white border border-[#2a2b35]'
-                }`}
+                type="button"
+                onClick={() => scrollCategories('left')}
+                aria-label="Ver categorías anteriores"
+                className="absolute left-0 top-0 bottom-1 z-10 w-11 flex items-center justify-start bg-gradient-to-r from-[#0b0c0e] via-[#0b0c0e]/90 to-transparent cursor-pointer"
               >
-                {cat.label}
+                <span className="w-7 h-7 rounded-full bg-[#1e1f28] border border-[#353642] flex items-center justify-center text-[#ffb59c]">
+                  <span className="material-symbols-outlined text-[18px]">chevron_left</span>
+                </span>
               </button>
-            ))}
+            )}
+
+            <div
+              ref={catScrollRef}
+              onScroll={updateCatArrows}
+              className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar -mx-3.5 px-3.5 sm:mx-0 sm:px-0"
+            >
+              {[
+                { id: 'todos', label: 'Todos' },
+                { id: 'fondos', label: 'Fondos & Wok' },
+                { id: 'entradas', label: 'Entradas Nikkei' },
+                { id: 'postres', label: 'Postres de Autor' },
+                { id: 'bebidas', label: 'Bebidas Signature' }
+              ].map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => setSelectedCategory(cat.id)}
+                  className={`px-3.5 py-1.5 rounded-full text-[12px] font-medium whitespace-nowrap transition-all cursor-pointer ${
+                    selectedCategory === cat.id
+                      ? 'bg-[#ff5708] text-[#2b0b00] font-bold shadow-[0_0_12px_rgba(255,87,8,0.35)]'
+                      : 'bg-[#181920] text-[#a1a1aa] hover:text-white border border-[#2a2b35]'
+                  }`}
+                >
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+
+            {canScrollRight && (
+              <button
+                type="button"
+                onClick={() => scrollCategories('right')}
+                aria-label="Ver más categorías"
+                className="absolute right-0 top-0 bottom-1 z-10 w-11 flex items-center justify-end bg-gradient-to-l from-[#0b0c0e] via-[#0b0c0e]/90 to-transparent cursor-pointer"
+              >
+                <span className="w-7 h-7 rounded-full bg-[#1e1f28] border border-[#353642] flex items-center justify-center text-[#ffb59c]">
+                  <span className="material-symbols-outlined text-[18px]">chevron_right</span>
+                </span>
+              </button>
+            )}
           </div>
         </div>
 

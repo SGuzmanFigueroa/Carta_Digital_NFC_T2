@@ -113,6 +113,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         try {
           if (rememberMe) {
             localStorage.setItem('gastropulse_auth_user', JSON.stringify(authUser));
+          } else {
+            // Sin "Recordarme" la sesión persistida debe quedar limpia, para no restaurar
+            // el usuario/rol anterior del terminal al recargar la aplicación.
+            localStorage.removeItem('gastropulse_auth_user');
           }
           setAuthSessionCookie(authUser);
         } catch (err) {}

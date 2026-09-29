@@ -19,7 +19,7 @@ export async function loginStaffWithPin(pin: string): Promise<AuthUser | null> {
       name: data.name,
       username: data.username,
       email: `${data.username}@aureabistro.pe`,
-      role: (data.role as AuthUser['role']) || 'kitchen',
+      role: (data.role?.toLowerCase().trim() as AuthUser['role']) || 'kitchen',
       roleTitle: data.role_title || 'Personal GastroPulse',
       pin: data.pin,
       assignment: data.station || 'General',
@@ -79,7 +79,6 @@ export async function createStaffMemberInDb(staff: StaffMember): Promise<boolean
       avatar_url: staff.avatarUrl || null
     };
 
-    // Intentar primero con email, custom_permissions y password
     let { error } = await supabase
       .from('staff')
       .insert({
@@ -100,7 +99,6 @@ export async function createStaffMemberInDb(staff: StaffMember): Promise<boolean
       error = retryNoPass.error;
     }
 
-    // Si las columnas aún no existen en Postgres (PGRST204), hacer fallback a columnas base
     if (error && (error as any).code === 'PGRST204') {
       const fallbackRes = await supabase
         .from('staff')
@@ -156,7 +154,6 @@ export async function updateStaffMemberInDb(staff: StaffMember): Promise<boolean
       } as any)
       .eq('id', staff.id);
 
-    // Si la columna password aún no existe en Postgres, reintentar sin password
     if (error && (error as any).code === 'PGRST204') {
       const retryRes = await supabase
         .from('staff')
@@ -168,7 +165,6 @@ export async function updateStaffMemberInDb(staff: StaffMember): Promise<boolean
         .eq('id', staff.id);
       error = retryRes.error;
 
-      // Si email/custom_permissions tampoco existieran, fallback a columnas base
       if (error && (error as any).code === 'PGRST204') {
         const fallbackRes = await supabase
           .from('staff')
@@ -203,7 +199,6 @@ const STORAGE_KEY_STAFF = 'gastropulse_staff_list_v1';
 
 export async function getPersistedStaffList(): Promise<StaffMember[]> {
   try {
-    // 1. Cargar caché local primero para preservar correos y permisos en F5
     let localSaved: StaffMember[] = [];
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem(STORAGE_KEY_STAFF);
@@ -217,10 +212,8 @@ export async function getPersistedStaffList(): Promise<StaffMember[]> {
       }
     }
 
-    // 2. Cargar desde Supabase
     const dbStaff = await fetchStaffFromDb();
     if (dbStaff && dbStaff.length > 0) {
-      // Combinar datos de Supabase con los correos y permisos guardados en local
       const mergedStaff: StaffMember[] = dbStaff.map((dbMember): StaffMember => {
         const localMatch = localSaved.find(
           (loc) => loc.id === dbMember.id || loc.username === dbMember.username
@@ -242,7 +235,6 @@ export async function getPersistedStaffList(): Promise<StaffMember[]> {
         return res;
       });
 
-      // Incluir también colaboradores creados localmente que aún no sincronicen con la nube
       localSaved.forEach((loc) => {
         if (!mergedStaff.some((m) => m.id === loc.id || m.username === loc.username)) {
           mergedStaff.push(loc);
@@ -255,7 +247,6 @@ export async function getPersistedStaffList(): Promise<StaffMember[]> {
       return mergedStaff;
     }
 
-    // Si Supabase no tiene datos o está offline, usar localStorage
     if (localSaved.length > 0) {
       return localSaved;
     }
@@ -263,7 +254,6 @@ export async function getPersistedStaffList(): Promise<StaffMember[]> {
     console.warn('Error loading staff list:', err);
   }
 
-  // 3. Fallback a datos iniciales
   if (typeof window !== 'undefined') {
     const { INITIAL_STAFF } = await import('@/data/mockData');
     localStorage.setItem(STORAGE_KEY_STAFF, JSON.stringify(INITIAL_STAFF));
@@ -352,7 +342,6 @@ export async function fetchRolePermissionsFromDb(): Promise<RolePermissionItem[]
       return DEFAULT_ROLE_PERMISSIONS;
     }
 
-    // Map into ordered array prioritizing admin -> sous_chef -> waiter -> bartender -> runner
     const order = ['admin', 'sous_chef', 'waiter', 'bartender', 'runner'];
     const items: RolePermissionItem[] = data.map((d: any) => ({
       id: d.id,

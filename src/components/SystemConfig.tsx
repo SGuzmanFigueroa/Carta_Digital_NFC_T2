@@ -43,6 +43,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
   const [dishSearchFilter, setDishSearchFilter] = useState('');
   const [editingDishPriceId, setEditingDishPriceId] = useState<string | null>(null);
   const [tempDishPrice, setTempDishPrice] = useState<string>('');
+  const [showMobileNav, setShowMobileNav] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -648,6 +649,15 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
   }, [allTablesList, modalZoneFilter]);
 
   const t = getTranslations(formData.language);
+  const activeLabel = ({
+    perfil: t.nav_profile,
+    notificaciones: t.nav_notifications,
+    tema: t.nav_theme,
+    idioma: t.nav_region,
+    impresion: t.nav_hardware,
+    'qr-mesas': t.nav_qr_tables,
+    'carta-platos': 'Carta & Platos 3D',
+  } as Record<string, string>)[activeSection];
   const isLight = formData.themeMode === 'light';
   const isHighContrast = formData.themeMode === 'kds-high-contrast';
 
@@ -774,7 +784,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
   };
 
   return (
-    <div className="w-full flex flex-col px-4 lg:px-8 py-6 max-w-[1400px] mx-auto gap-8 selection:bg-[#FF5A1F] selection:text-[#0F0F0F] transition-colors duration-200">
+    <div className="w-full flex flex-col px-4 lg:px-8 py-6 max-w-[1400px] mx-auto gap-6 lg:gap-8 selection:bg-[#FF5A1F] selection:text-[#0F0F0F] transition-colors duration-200 overflow-x-clip">
       
       {/* Header */}
       <div className={`mb-2 border-b pb-6 ${sectionHeaderBorder}`}>
@@ -787,14 +797,14 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
               {t.sys_subtitle} {formData.branchName || 'AUREA Bistro'}. {t.sys_subtitle_end}
             </p>
           </div>
-          <div className="flex gap-4">
+          <div className="flex gap-2 sm:gap-4 w-full sm:w-auto">
             <button 
               onClick={() => {
                 setFormData({ ...config });
                 applyTheme(config.themeMode, config.colorAccent, config.density);
                 onShowToast('Valores restablecidos', 'restart_alt');
               }}
-              className={`px-5 py-2.5 rounded border transition text-sm font-medium flex items-center gap-2 cursor-pointer ${
+              className={`flex-1 sm:flex-none justify-center px-3 sm:px-5 py-2.5 rounded border transition text-sm font-medium flex items-center gap-2 cursor-pointer ${
                 isLight 
                   ? 'bg-white text-[#334155] border-[#cbd5e1] hover:bg-[#f8fafc] shadow-sm' 
                   : isHighContrast 
@@ -802,14 +812,14 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                   : 'bg-[#1C1C1C] text-gray-300 border-[#2A2A2A] hover:bg-[#252525]'
               }`}
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+              <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
               {t.reset_values}
             </button>
             <button 
               onClick={handleSave}
-              className="px-5 py-2.5 bg-[#FF5A1F] text-white rounded hover:bg-[#FF703D] transition font-bold text-sm flex items-center gap-2 cursor-pointer shadow-[0_0_15px_rgba(255,90,31,0.25)] active:scale-95"
+              className="flex-1 sm:flex-none justify-center px-3 sm:px-5 py-2.5 bg-[#FF5A1F] text-white rounded hover:bg-[#FF703D] transition font-bold text-sm flex items-center gap-2 cursor-pointer shadow-[0_0_15px_rgba(255,90,31,0.25)] active:scale-95"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
+              <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
               {t.save_changes}
             </button>
           </div>
@@ -817,10 +827,45 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
       </div>
 
       {/* Grid Principal */}
-      <div className="flex gap-8 items-start">
+      <div className="flex flex-col lg:flex-row gap-4 lg:gap-8 items-start w-full">
         
-        {/* Menú Lateral Sticky */}
-        <aside className="w-[260px] shrink-0 flex flex-col gap-2 sticky top-24">
+        {/* Botón para abrir el panel lateral (solo móvil) */}
+        <button
+          type="button"
+          onClick={() => setShowMobileNav(true)}
+          className={`lg:hidden sticky top-[72px] z-40 w-full flex items-center justify-between gap-3 px-4 py-3 rounded-lg border text-sm font-semibold cursor-pointer shadow-lg ${
+            isLight ? 'bg-white border-[#cbd5e1] text-[#0f172a]' : isHighContrast ? 'bg-black border-2 border-white text-white' : 'bg-[#1A1A1A] border-[#2A2A2A] text-white'
+          }`}
+        >
+          <span className="flex items-center gap-2.5 min-w-0">
+            <span className="material-symbols-outlined text-[#FF5A1F] text-[20px]">menu_open</span>
+            <span className="truncate">{activeLabel}</span>
+          </span>
+          <span className={`text-[10px] font-mono uppercase tracking-widest ${descColor}`}>Secciones</span>
+        </button>
+
+        {/* Fondo oscuro al abrir el panel (solo móvil) */}
+        {showMobileNav && (
+          <div
+            className="lg:hidden fixed inset-0 z-[55] bg-black/70 backdrop-blur-sm animate-in fade-in duration-200"
+            onClick={() => setShowMobileNav(false)}
+          />
+        )}
+
+        {/* Menú Lateral: panel deslizable en móvil, sticky en escritorio */}
+        <aside className={`fixed inset-y-0 left-0 z-[60] w-[280px] max-w-[85vw] p-4 overflow-y-auto flex flex-col gap-2 transition-transform duration-300 ease-out border-r ${
+          isLight ? 'bg-white border-[#e2e8f0]' : isHighContrast ? 'bg-black border-white' : 'bg-[#0e0e10] border-[#2A2A2A]'
+        } ${showMobileNav ? 'translate-x-0' : '-translate-x-full'} lg:static lg:translate-x-0 lg:z-auto lg:w-[260px] lg:max-w-none lg:shrink-0 lg:p-0 lg:overflow-visible lg:bg-transparent lg:border-0 lg:sticky lg:top-24 min-w-0`}>
+          <div className="lg:hidden flex items-center justify-between pb-3 mb-1 border-b border-gray-500/20">
+            <span className={`text-[11px] font-mono uppercase tracking-widest font-bold ${labelColor}`}>Secciones</span>
+            <button
+              type="button"
+              onClick={() => setShowMobileNav(false)}
+              className={`p-1 rounded-lg cursor-pointer ${isLight ? 'text-[#64748b] hover:bg-[#f1f5f9]' : 'text-[#a1a1aa] hover:text-white hover:bg-[#27272a]'}`}
+            >
+              <span className="material-symbols-outlined text-[20px]">close</span>
+            </button>
+          </div>
           <nav className="flex flex-col gap-1.5">
             {[
               {
@@ -871,8 +916,8 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                 <a
                   key={item.id}
                   href={`#${item.id}`}
-                  onClick={() => setActiveSection(item.id as any)}
-                  className={`flex justify-between items-center px-4 py-3 rounded text-sm transition-all cursor-pointer ${
+                  onClick={() => { setActiveSection(item.id as any); setShowMobileNav(false); }}
+                  className={`gap-3 flex justify-between items-center px-4 py-3 rounded text-sm transition-all cursor-pointer ${
                     isActive
                       ? isLight
                         ? 'bg-white text-[#ff5708] border-l-2 border-[#FF5A1F] shadow-sm font-semibold'
@@ -901,7 +946,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
             })}
           </nav>
 
-          <div className={`mt-8 p-5 rounded text-[11px] font-mono tracking-wide border ${sidebarBg}`}>
+          <div className={`block mt-4 lg:mt-8 p-5 rounded text-[11px] font-mono tracking-wide border ${sidebarBg}`}>
             <div className={`flex justify-between mb-4 uppercase font-bold ${isLight ? 'text-[#64748b]' : 'text-gray-500'}`}>
               <span>{t.terminal_status}</span>
               <span className="text-[#00FF88] flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-[#00FF88]"></span> OK</span>
@@ -924,11 +969,11 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
         </aside>
 
         {/* Contenido Central Scrollable */}
-        <div className="flex-1 flex flex-col gap-8 max-w-4xl pb-24">
+        <div className="flex-1 w-full min-w-0 flex flex-col gap-6 lg:gap-8 max-w-4xl pb-24">
           
           {/* SEC_01: PERFIL */}
           <section id="perfil" className={`border rounded-xl scroll-mt-24 ${sectionBg}`}>
-            <div className={`flex justify-between items-start p-6 border-b ${sectionHeaderBorder}`}>
+            <div className={`flex justify-between items-start p-4 sm:p-6 border-b ${sectionHeaderBorder}`}>
               <div className="flex items-center gap-3">
                 <svg className="w-6 h-6 text-[#FF5A1F] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M13.5 21v-7.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349m-16.5 11.65V9.35m0 0a3.001 3.001 0 003.75-.615A2.993 2.993 0 009.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 002.25 1.016c.896 0 1.7-.393 2.25-1.016a3.001 3.001 0 003.75.614m-16.5 0a3.004 3.004 0 01-.621-4.72L4.318 3.44A1.5 1.5 0 015.378 3h13.243a1.5 1.5 0 011.06.44l1.19 1.189a3 3 0 01-.621 4.72m-13.5 8.65h3.75a.75.75 0 00.75-.75V13.5a.75.75 0 00-.75-.75H6.75a.75.75 0 00-.75.75v3.75c0 .415.336.75.75.75z" />
@@ -940,7 +985,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
               </div>
             </div>
 
-            <div className="flex flex-col md:flex-row p-6 gap-6">
+            <div className="flex flex-col md:flex-row p-4 sm:p-6 gap-6">
               {/* Panel Izquierdo (Logo) */}
               <div className={`w-full md:w-[240px] shrink-0 flex flex-col items-center justify-center p-5 rounded-lg border ${
                 isLight ? 'bg-[#f8fafc] border-[#e2e8f0]' : isHighContrast ? 'bg-black border-2 border-white' : 'bg-[#0F0F0F] border-[#2A2A2A]'
@@ -979,7 +1024,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
               </div>
 
               {/* Panel Derecho */}
-              <div className="flex-1 flex flex-col justify-between">
+              <div className="flex-1 min-w-0 flex flex-col justify-between">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
                   <div className="flex flex-col gap-1.5">
                     <label className={`text-[10px] uppercase tracking-[0.1em] font-bold ${labelColor}`}>{t.branch_name}</label>
@@ -1035,7 +1080,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
 
           {/* SEC_02: NOTIFICACIONES */}
           <section id="notificaciones" className={`border rounded-xl scroll-mt-24 ${sectionBg}`}>
-            <div className={`flex justify-between items-start p-6 border-b ${sectionHeaderBorder}`}>
+            <div className={`flex justify-between items-start p-4 sm:p-6 border-b ${sectionHeaderBorder}`}>
               <div className="flex items-center gap-3">
                 <svg className="w-6 h-6 text-[#FF5A1F] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0M3.124 7.5A8.969 8.969 0 015.292 3m13.416 0a8.969 8.969 0 012.168 4.5" />
@@ -1047,7 +1092,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
               </div>
             </div>
             
-            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-4 sm:p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Card 1: Alertas sonoras */}
               <div className={`p-4 rounded-xl flex justify-between items-start transition-all ${cardBg}`}>
                 <div className="flex gap-3 pr-4">
@@ -1116,7 +1161,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
 
           {/* SEC_03: TEMA & ERGONOMÍA */}
           <section id="tema" className={`border rounded-xl scroll-mt-24 ${sectionBg}`}>
-            <div className={`flex justify-between items-start p-6 border-b ${sectionHeaderBorder}`}>
+            <div className={`flex justify-between items-start p-4 sm:p-6 border-b ${sectionHeaderBorder}`}>
               <div className="flex items-center gap-3">
                 <svg className="w-6 h-6 text-[#FF5A1F] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9.53 16.122a3 3 0 00-5.78 1.128 2.25 2.25 0 01-2.4 2.245 4.5 4.5 0 008.4-2.245c0-.399-.078-.78-.22-1.128zm0 0a15.998 15.998 0 003.388-1.62m-5.043-.025a15.994 15.994 0 011.622-3.395m3.42 3.42a15.995 15.995 0 004.764-4.648l3.876-5.814a1.151 1.151 0 00-1.597-1.597L14.146 6.32a15.996 15.996 0 00-4.649 4.763m3.42 3.42a6.776 6.776 0 00-3.42-3.42" />
@@ -1128,7 +1173,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
               </div>
             </div>
 
-            <div className="p-6 flex flex-col gap-6">
+            <div className="p-4 sm:p-6 flex flex-col gap-6">
               {/* MODO DE PANTALLA */}
               <div>
                 <label className={`text-[10px] uppercase tracking-[0.1em] font-bold mb-3 block ${labelColor}`}>{t.screen_mode}</label>
@@ -1250,7 +1295,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                 {/* Acento Cromático */}
                 <div className="flex flex-col gap-3">
                   <label className={`text-[10px] uppercase tracking-[0.1em] font-bold ${labelColor}`}>{t.chromatic_accent}</label>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <button
                       type="button"
                       onClick={() => {
@@ -1388,7 +1433,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
 
           {/* SEC_04: IDIOMA */}
           <section id="idioma" className={`border rounded-xl scroll-mt-24 ${sectionBg}`}>
-            <div className={`flex justify-between items-start p-6 border-b ${sectionHeaderBorder}`}>
+            <div className={`flex justify-between items-start p-4 sm:p-6 border-b ${sectionHeaderBorder}`}>
               <div className="flex items-center gap-3">
                 <svg className="w-6 h-6 text-[#FF5A1F] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" /></svg>
                 <div>
@@ -1397,7 +1442,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                 </div>
               </div>
             </div>
-            <div className="p-6 grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="p-4 sm:p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
               <div className="flex flex-col gap-1.5">
                 <label className={`text-[10px] uppercase tracking-[0.1em] font-bold ${labelColor}`}>{t.system_language}</label>
                 <select 
@@ -1488,7 +1533,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
 
           {/* SEC_05: IMPRESIÓN */}
           <section id="impresion" className={`border rounded-xl scroll-mt-24 ${sectionBg}`}>
-            <div className={`flex justify-between items-start p-6 border-b ${sectionHeaderBorder}`}>
+            <div className={`flex justify-between items-start p-4 sm:p-6 border-b ${sectionHeaderBorder}`}>
               <div className="flex items-center gap-3">
                 <svg className="w-6 h-6 text-[#FF5A1F] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
                 <div>
@@ -1497,8 +1542,8 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                 </div>
               </div>
             </div>
-            <div className="p-6 flex flex-col md:flex-row gap-8">
-              <div className="flex-1 space-y-6">
+            <div className="p-4 sm:p-6 flex flex-col md:flex-row gap-8">
+              <div className="flex-1 min-w-0 space-y-6">
                 <div className="flex items-center justify-between">
                   <p className={`text-[13px] font-semibold flex items-center gap-2 ${isLight ? 'text-[#334155]' : 'text-gray-300'}`}>
                     <span className="w-2 h-2 rounded-full bg-[#00FF88]"></span> {t.thermal_printer}
@@ -1509,7 +1554,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                     <span className="text-[#FF5A1F] text-[10px] font-mono tracking-widest font-bold">OFFLINE // NO IP</span>
                   )}
                 </div>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="flex flex-col gap-1.5 col-span-1">
                     <label className={`text-[10px] uppercase tracking-[0.1em] font-bold ${labelColor}`}>{t.ip_address}</label>
                     <input type="text" value={formData.printerIp} onChange={(e) => setFormData({...formData, printerIp: e.target.value})} className={`w-full rounded p-2.5 text-[13px] font-mono focus:border-[#FF5A1F] focus:outline-none transition ${selectBg}`} />
@@ -1535,7 +1580,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                     </select>
                   </div>
                 </div>
-                <div className="flex items-center gap-6 pt-4 flex-wrap">
+                <div className="flex items-center gap-4 sm:gap-6 pt-4 flex-wrap">
                   <label className={`flex items-center gap-2 text-[12.5px] cursor-pointer ${isLight ? 'text-[#334155]' : 'text-gray-300'}`}>
                     <input type="checkbox" checked={formData.autoCut} onChange={() => handleToggle('autoCut')} className="w-4 h-4 accent-[#FF5A1F]" />
                     {t.auto_cut}
@@ -1544,7 +1589,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                     <input type="checkbox" checked={formData.acousticBuzzer} onChange={() => handleToggle('acousticBuzzer')} className="w-4 h-4 accent-[#FF5A1F]" />
                     {t.acoustic_buzzer}
                   </label>
-                  <button onClick={handleTestPrint} className={`ml-auto px-4 py-2 border rounded-lg transition text-[12px] font-medium flex items-center gap-2 cursor-pointer ${
+                  <button onClick={handleTestPrint} className={`sm:ml-auto w-full sm:w-auto justify-center px-4 py-2 border rounded-lg transition text-[12px] font-medium flex items-center gap-2 cursor-pointer ${
                     isLight 
                       ? 'bg-white hover:bg-[#f8fafc] border-[#cbd5e1] text-[#334155] shadow-sm' 
                       : 'bg-[#252525] hover:bg-[#333] border-[#3A3A3A] text-gray-300'
@@ -1567,7 +1612,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                   <span className="text-[10px] text-[#FF5A1F] tracking-[0.1em] font-bold font-mono">{t.simulator}</span>
                 </div>
 
-                <div className={`mx-auto bg-white p-4 font-mono text-black leading-relaxed shadow-lg border border-[#e2e8f0] rounded transition-all duration-300 ${
+                <div className={`mx-auto max-w-full bg-white p-4 font-mono text-black leading-relaxed shadow-lg border border-[#e2e8f0] rounded transition-all duration-300 ${
                   formData.paperWidth === '58mm' ? 'w-[220px] text-[9px]' : 'w-full text-[10px]'
                 } ${testPrintActive ? 'ring-4 ring-[#00FF88]/40 scale-[1.02] shadow-[#00FF88]/20' : ''}`}>
                   
@@ -1619,7 +1664,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
           </section>
           {/* SEC_06: CÓDIGOS QR PARA MESAS & NFC */}
           <section id="qr-mesas" className={`border rounded-xl scroll-mt-24 ${sectionBg}`}>
-            <div className={`flex justify-between items-start p-6 border-b ${sectionHeaderBorder}`}>
+            <div className={`flex justify-between items-start p-4 sm:p-6 border-b ${sectionHeaderBorder}`}>
               <div className="flex items-center gap-3">
                 <svg className="w-6 h-6 text-[#FF5A1F] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
@@ -1631,9 +1676,9 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
               </div>
             </div>
 
-            <div className="p-6 flex flex-col lg:flex-row gap-8">
+            <div className="p-4 sm:p-6 flex flex-col lg:flex-row gap-8">
               {/* Columna Izquierda: Parámetros y Generador */}
-              <div className="flex-1 space-y-6">
+              <div className="flex-1 min-w-0 space-y-6">
                 
                 {/* Capacidad y Selector Dinámico de Mesas del Restaurante (10, 20, 50 mesas) */}
                 <div className={`p-4 rounded-xl border flex flex-col gap-3.5 ${cardBg}`}>
@@ -1698,7 +1743,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                         placeholder="Filtrar mesa (ej: 05, T1, VIP)..."
                         value={tableSearchFilter}
                         onChange={(e) => setTableSearchFilter(e.target.value)}
-                        className={`text-[11px] px-2.5 py-1 rounded border focus:border-[#FF5A1F] focus:outline-none w-48 ${
+                        className={`text-[11px] px-2.5 py-1 rounded border focus:border-[#FF5A1F] focus:outline-none w-full sm:w-48 ${
                           isLight ? 'bg-white border-[#cbd5e1] text-[#0f172a]' : 'bg-[#141414] border-[#333] text-gray-200'
                         }`}
                       />
@@ -1779,12 +1824,12 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                   <label className={`text-[10px] uppercase tracking-[0.1em] font-bold ${labelColor}`}>
                     {t.table_url}
                   </label>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap sm:flex-nowrap">
                     <input
                       type="text"
                       readOnly
                       value={`${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/menu?mesa=${encodeURIComponent(customTableName.trim() || ('MESA ' + selectedTableNumber))}&zona=${encodeURIComponent(selectedZone)}`}
-                      className={`flex-1 rounded p-2.5 text-[12px] font-mono tracking-tight cursor-default ${
+                      className={`flex-1 min-w-0 w-full sm:w-auto rounded p-2.5 text-[12px] font-mono tracking-tight cursor-default ${
                         isLight ? 'bg-[#f1f5f9] border border-[#cbd5e1] text-[#334155]' : 'bg-[#141414] border border-[#2A2A2A] text-gray-300'
                       }`}
                     />
@@ -1795,10 +1840,11 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                         navigator.clipboard.writeText(url);
                         onShowToast('Enlace de la mesa copiado al portapapeles', 'content_copy');
                       }}
-                      className="px-3.5 py-2 rounded border bg-[#FF5A1F] text-white hover:bg-[#FF703D] font-bold text-[12px] flex items-center gap-1.5 cursor-pointer shrink-0 transition-all"
+                      className="flex-1 sm:flex-none justify-center px-3.5 py-2 rounded border bg-[#FF5A1F] text-white hover:bg-[#FF703D] font-bold text-[12px] flex items-center gap-1.5 cursor-pointer shrink-0 transition-all"
                     >
                       <span className="material-symbols-outlined text-[16px]">content_copy</span>
-                      <span className="hidden sm:inline">{t.copy_link}</span>
+                      <span className="sm:hidden lg:inline">{t.copy_link}</span>
+                      <span className="hidden sm:inline lg:hidden">{t.copy_link}</span>
                     </button>
                     <button
                       type="button"
@@ -1806,12 +1852,12 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                         const url = `${window.location.origin}/menu?mesa=${encodeURIComponent(customTableName.trim() || ('MESA ' + selectedTableNumber))}&zona=${encodeURIComponent(selectedZone)}`;
                         window.open(url, '_blank');
                       }}
-                      className={`px-3 py-2 rounded border text-[12px] font-semibold flex items-center gap-1 cursor-pointer shrink-0 transition-colors ${
+                      className={`flex-1 sm:flex-none justify-center px-3 py-2 rounded border text-[12px] font-semibold flex items-center gap-1 cursor-pointer shrink-0 transition-colors ${
                         isLight ? 'bg-white border-[#cbd5e1] text-[#334155] hover:bg-[#f8fafc]' : 'bg-[#252525] border-[#333] text-gray-200 hover:bg-[#2e2e2e]'
                       }`}
                     >
                       <span className="material-symbols-outlined text-[16px]">open_in_new</span>
-                      <span className="hidden sm:inline">{t.open_menu}</span>
+                      <span>{t.open_menu}</span>
                     </button>
                   </div>
                 </div>
@@ -1820,7 +1866,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                 <div className={`p-4 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${cardBg}`}>
                   <div className="flex flex-col gap-2">
                     <span className={`text-[11px] font-bold uppercase tracking-wider ${labelColor}`}>Opciones del QR</span>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-4 flex-wrap">
                       <label className="flex items-center gap-2 text-[12px] cursor-pointer">
                         <input
                           type="checkbox"
@@ -1990,7 +2036,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
 
           {/* SEC_07: CARTA DIGITAL & ESCANEO 3D DE PLATOS (SETUP ONBOARDING) */}
           <section id="carta-platos" className={`border rounded-xl scroll-mt-24 ${sectionBg}`}>
-            <div className={`flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-6 border-b ${sectionHeaderBorder}`}>
+            <div className={`flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4 sm:p-6 border-b ${sectionHeaderBorder}`}>
               <div className="flex items-center gap-3">
                 <span className="material-symbols-outlined text-[28px] text-[#ff5708] shrink-0">view_in_ar</span>
                 <div>
@@ -2023,7 +2069,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
               </div>
             </div>
 
-            <div className="p-6 space-y-6">
+            <div className="p-4 sm:p-6 space-y-6">
               {/* Card Explicativa de Plan SaaS: Platos 3D Gestionados por la Empresa Proveedora */}
               <div className={`p-4 rounded-xl border flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${
                 isLight ? 'bg-[#f0fdf4] border-[#bbf7d0]' : 'bg-[#0f1f17] border-[#166534]/40'
@@ -2083,7 +2129,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
 
               {/* Buscador y Filtro Rápido */}
               <div className="flex items-center justify-between gap-3 flex-wrap">
-                <div className="relative flex-1 min-w-[240px]">
+                <div className="relative flex-1 min-w-[200px]">
                   <span className="material-symbols-outlined absolute left-3 top-2.5 text-[18px] text-gray-400">search</span>
                   <input
                     type="text"
@@ -2117,7 +2163,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                           isLight ? 'bg-white border-[#e2e8f0]' : 'bg-[#181921] border-[#292a35]'
                         }`}
                       >
-                        <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
                           <div className="w-14 h-14 rounded-lg bg-[#252632] overflow-hidden shrink-0 relative flex items-center justify-center border border-[#373948]">
                             {dish.image ? (
                               <img src={dish.image} alt={dish.name} className="w-full h-full object-cover" />
@@ -2221,10 +2267,10 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
       {/* Modal de Cuadrícula de Todas las Mesas */}
       {showAllQRsModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-          <div className={`border rounded-2xl shadow-2xl max-w-4xl w-full p-6 space-y-5 max-h-[90vh] flex flex-col ${
+          <div className={`border rounded-2xl shadow-2xl max-w-4xl w-full p-4 sm:p-6 space-y-5 max-h-[90vh] flex flex-col ${
             isLight ? 'bg-white border-[#cbd5e1] text-[#0f172a]' : 'bg-[#18181b] border-[#3f3f46] text-[#e5e1e4]'
           }`}>
-            <div className={`flex items-center justify-between pb-3 border-b shrink-0 ${isLight ? 'border-[#e2e8f0]' : 'border-[#27272a]'}`}>
+            <div className={`flex items-center justify-between flex-wrap gap-2 pb-3 border-b shrink-0 ${isLight ? 'border-[#e2e8f0]' : 'border-[#27272a]'}`}>
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-[#FF5A1F] text-[22px]">grid_view</span>
                 <h3 className={`font-bold text-[16px] ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>
@@ -2254,7 +2300,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
             </div>
 
             {/* Filtro por Zona en el Modal de Lote */}
-            <div className="flex items-center justify-between gap-3 pb-2 border-b border-gray-500/20 shrink-0">
+            <div className="flex items-center justify-between gap-3 pb-2 border-b border-gray-500/20 shrink-0 flex-wrap">
               <div className="flex items-center gap-1.5 flex-wrap">
                 {[
                   { id: 'all', label: `Todas (${allTablesList.length})` },
@@ -2388,7 +2434,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                     placeholder="https://ejemplo.com/logo.png"
                     value={customLogoInput}
                     onChange={(e) => setCustomLogoInput(e.target.value)}
-                    className={`flex-1 rounded-lg px-3 py-2 text-[12.5px] border focus:border-[#FF5A1F] focus:outline-none ${
+                    className={`flex-1 min-w-0 rounded-lg px-3 py-2 text-[12.5px] border focus:border-[#FF5A1F] focus:outline-none ${
                       isLight ? 'bg-white border-[#cbd5e1] text-[#0f172a]' : 'bg-[#121215] border-[#27272a] text-white'
                     }`}
                   />
