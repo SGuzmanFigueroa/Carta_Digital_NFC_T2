@@ -1,8 +1,11 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿'use client';
+
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { setAuthSessionCookie, AuditLogger, sanitizeText } from '../utils/security';
 import { kitchenAudio } from '../utils/audio';
 import { AuthUser, StaffMember } from '../types';
-import { getPersistedStaffList } from '../services/authService';
+import { getPersistedStaffList, sendPasswordResetEmail } from '../services/authService';
 import { INITIAL_STAFF } from '../data/mockData';
 
 interface LoginScreenProps {
@@ -10,6 +13,7 @@ interface LoginScreenProps {
   onLoginSuccess: (user: AuthUser) => void;
   onExploreAsGuest: () => void;
   onShowToast: (msg: string, icon?: string) => void;
+  redirectTo?: string;
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({
@@ -17,14 +21,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   onLoginSuccess,
   onExploreAsGuest,
   onShowToast,
+  redirectTo,
 }) => {
+  const router = useRouter();
   const [activeStaff, setActiveStaff] = useState<StaffMember[]>(staffList);
-
-  useEffect(() => {
-    if (staffList && staffList.length > 0) {
-      setActiveStaff(staffList);
-    }
-  }, [staffList]);
 
   useEffect(() => {
     getPersistedStaffList().then((list) => {
@@ -47,11 +47,19 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   const [errorMessage, setErrorMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // PIN keypad state
+  // CD-14 (Punto 1): Estados para validación en tiempo real
+  const [emailError, setEmailError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+
+  // CD-14 (Punto 2): Estados para Modal de Recuperación
+  const [showRecoverModal, setShowRecoverModal] = useState(false);
+  const [recoverEmail, setRecoverEmail] = useState('');
+  const [recoverStatus, setRecoverStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [recoverError, setRecoverError] = useState('');
+
+  // PIN keypad state & Security
   const [pinDigits, setPinDigits] = useState<string>('');
   const [selectedStaffForPin, setSelectedStaffForPin] = useState<StaffMember | null>(null);
-
-  // Security: Brute-force & Lockout state
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [lockoutSeconds, setLockoutSeconds] = useState(0);
 
@@ -71,9 +79,43 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     return () => clearInterval(timer);
   }, [lockoutSeconds]);
 
+  // CD-14 (Punto 1): Funciones de Validación en Tiempo Real
+  const handleEmailChange = (val: string) => {
+    setUsernameOrEmail(val);
+    const isEmail = val.includes('@');
+    if (isEmail) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      setEmailError(!emailRegex.test(val) ? 'Formato de correo institucional inválido.' : '');
+    } else {
+      setEmailError('');
+    }
+  };
+
+  const handlePasswordChange = (val: string) => {
+    setPassword(val);
+    const regex = /^(?=.*\d)(?=.*[@$!%*#?&]).{8,}$/;
+    if (!regex.test(val) && val.length > 0) {
+      setPasswordError('Mínimo 8 caracteres, incluir números y caracteres seguros (@$!%*#?&).');
+    } else {
+      setPasswordError('');
+    }
+  };
+
+  const executeRoleRedirection = (user: AuthUser) => {
+    const role = `${user.role} ${user.roleTitle}`.toLowerCase();
+    const destination = redirectTo || (
+      role.includes('admin') ? '/dashboard' :
+      role.includes('kitchen') || role.includes('chef') || role.includes('cocina') ? '/kds' :
+      role.includes('floor') || role.includes('waiter') || role.includes('mozo') || role.includes('mesero') || role.includes('sala') ? '/pedidos' :
+      '/dashboard'
+    );
+
+    router.replace(destination);
+  };
+
   const handleCredentialsLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (lockoutSeconds > 0) return;
+    if (lockoutSeconds > 0 || passwordError || emailError) return;
     setErrorMessage('');
 
     const sanitizedUser = sanitizeText(usernameOrEmail, 80);
@@ -90,12 +132,18 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         const emailMatches = st.email && st.email.toLowerCase() === trimmedInput;
         const userMatches = st.username && st.username.toLowerCase() === trimmedInput;
         const nameMatches = st.name.toLowerCase() === trimmedInput;
-        // Permite autenticación con la contraseña definida o con su PIN de 4 dígitos
         const passMatches = (st.password && st.password === password) || st.pin === password;
         return (emailMatches || userMatches || nameMatches) && passMatches;
       });
 
       if (matched) {
+        // CD-14 (Punto 3): Validación de cuenta inactiva
+        if (['inactivo', 'inactive', 'disabled', 'desactivado', 'suspended'].includes(matched.status?.trim().toLowerCase() || '')) {
+          setErrorMessage('Cuenta inactiva. Por favor, contacta a Recursos Humanos.');
+          setIsLoading(false);
+          return;
+        }
+
         setFailedAttempts(0);
         const authUser: AuthUser = {
           id: matched.id,
@@ -114,8 +162,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           if (rememberMe) {
             localStorage.setItem('gastropulse_auth_user', JSON.stringify(authUser));
           } else {
-            // Sin "Recordarme" la sesión persistida debe quedar limpia, para no restaurar
-            // el usuario/rol anterior del terminal al recargar la aplicación.
             localStorage.removeItem('gastropulse_auth_user');
           }
           setAuthSessionCookie(authUser);
@@ -132,6 +178,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         setIsLoading(false);
         onShowToast(`¡Bienvenido/a, ${matched.name}! Sesión iniciada.`, 'verified_user');
         onLoginSuccess(authUser);
+
+        // CD-14 (Punto 4): Ejecutar ruteo estricto
+        executeRoleRedirection(authUser);
       } else {
         const nextAttempts = failedAttempts + 1;
         setFailedAttempts(nextAttempts);
@@ -153,10 +202,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           });
           setErrorMessage('⚠️ Terminal bloqueada temporalmente (30s) por exceso de intentos.');
         } else {
-          setErrorMessage(`Credenciales inválidas. Intento ${nextAttempts}/4 antes del bloqueo.`);
+          // CD-14 (Punto 3): Feedback visual accesible descriptivo
+          setErrorMessage(`Credenciales inválidas. Verifica tu correo y contraseña. (Intento ${nextAttempts}/4)`);
         }
       }
-        }, 60);
+    }, 60);
   };
 
   const handlePinInput = (digit: string) => {
@@ -166,7 +216,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     setErrorMessage('');
 
     if (newPin.length === 4) {
-      // Validate PIN
       validatePin(newPin);
     }
   };
@@ -196,6 +245,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       }
 
       if (matched) {
+        if (['inactivo', 'inactive', 'disabled', 'desactivado', 'suspended'].includes(matched.status?.trim().toLowerCase() || '')) {
+          setErrorMessage('Cuenta inactiva. Por favor, contacta a Recursos Humanos.');
+          setIsLoading(false);
+          setPinDigits('');
+          return;
+        }
+
         setFailedAttempts(0);
         const authUser: AuthUser = {
           id: matched.id,
@@ -226,6 +282,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         setIsLoading(false);
         onShowToast(`Acceso concedido vía PIN: ${matched.name}`, 'key');
         onLoginSuccess(authUser);
+        executeRoleRedirection(authUser);
       } else {
         const nextAttempts = failedAttempts + 1;
         setFailedAttempts(nextAttempts);
@@ -251,7 +308,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           setErrorMessage(`PIN incorrecto. Intento ${nextAttempts}/4 antes del bloqueo temporal.`);
         }
       }
-        }, 50);
+    }, 50);
   };
 
   const fillQuickDemoUser = (targetRole: 'admin' | 'kitchen' | 'floor' | 'bar') => {
@@ -271,13 +328,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       user = INITIAL_STAFF[0];
     }
 
-    // Populate input visual states
     setUsernameOrEmail(user.email || user.username || 'admin');
     setPassword(user.password || user.pin || 'admin123');
     setPinDigits(user.pin || '9021');
     setErrorMessage('');
 
-    // Instant seamless login for test
     const authUser: AuthUser = {
       id: user.id,
       name: user.name,
@@ -306,6 +361,20 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
     onShowToast(`Acceso concedido: ${user.name} (${user.roleTitle})`, 'verified');
     onLoginSuccess(authUser);
+    executeRoleRedirection(authUser);
+  };
+
+  const handleRecoverySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setRecoverStatus('loading');
+    setRecoverError('');
+    const { success, error } = await sendPasswordResetEmail(recoverEmail);
+    if (success) {
+      setRecoverStatus('success');
+    } else {
+      setRecoverStatus('error');
+      setRecoverError(error || 'No se pudo enviar el correo. Inténtalo de nuevo.');
+    }
   };
 
   return (
@@ -406,41 +475,53 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
           {/* Form Content */}
           <div className="p-6 sm:p-7">
-            {/* Error Message Alert */}
+            {/* CD-14 (Punto 3): Feedback visual accesible de error */}
             {errorMessage && (
-              <div className="mb-4 p-3 rounded-xl bg-red-950/40 border border-red-500/40 text-red-200 text-[13px] flex items-center gap-2.5 animate-fadeIn">
-                <span className="material-symbols-outlined text-red-400 text-[18px]">error</span>
-                <span>{errorMessage}</span>
+              <div className="mb-4 p-3 rounded-xl bg-red-950/40 border border-red-500/80 text-red-300 text-[13px] flex items-center gap-2.5 animate-fadeIn" role="alert" aria-live="assertive">
+                <span className="material-symbols-outlined text-red-500 text-[20px]">warning</span>
+                <span className="font-medium">{errorMessage}</span>
               </div>
             )}
 
             {authMode === 'credentials' ? (
               <form onSubmit={handleCredentialsLogin} className="space-y-4">
                 <div>
-                  <label className="block text-[12px] font-medium text-[#c6c5cf] mb-1.5">
-                    Usuario o Correo Electrónico
+                  <label htmlFor="login-username" className="block text-[12px] font-medium text-[#c6c5cf] mb-1.5">
+                    Usuario o Correo Institucional
                   </label>
                   <div className="relative">
                     <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#c6c5cf] material-symbols-outlined text-[18px]">
                       person
                     </span>
                     <input
+                      id="login-username"
                       type="text"
                       required
                       placeholder="ej. admin@aureabistro.pe o admin"
                       value={usernameOrEmail}
-                      onChange={(e) => setUsernameOrEmail(e.target.value)}
-                      className="w-full bg-[#0e0e10] text-[#e5e1e4] pl-10 pr-3.5 py-2.5 rounded-xl border border-[#353437] focus:outline-none focus:border-[#ff5708] focus:ring-1 focus:ring-[#ff5708] text-[13px] transition-all"
+                      onChange={(e) => handleEmailChange(e.target.value)}
+                      aria-invalid={Boolean(emailError)}
+                      aria-describedby={emailError ? 'login-email-error' : undefined}
+                      className={`w-full bg-[#0e0e10] text-[#e5e1e4] pl-10 pr-3.5 py-2.5 rounded-xl border focus:outline-none focus:ring-1 transition-all text-[13px] ${
+                        emailError ? 'border-red-500/50 focus:border-red-500 focus:ring-red-500' : 'border-[#353437] focus:border-[#ff5708] focus:ring-[#ff5708]'
+                      }`}
                     />
                   </div>
+                  {/* Validación de correo en tiempo real */}
+                  {emailError && <p id="login-email-error" className="mt-1 text-[11px] text-red-400">{emailError}</p>}
                 </div>
 
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-[12px] font-medium text-[#c6c5cf]">Contraseña</label>
+                    <label htmlFor="login-password" className="text-[12px] font-medium text-[#c6c5cf]">Contraseña</label>
                     <button
                       type="button"
-                      onClick={() => onShowToast('Contacta al Administrador General para restablecer tu contraseña', 'info')}
+                      onClick={() => {
+                        setRecoverEmail(usernameOrEmail.includes('@') ? usernameOrEmail : '');
+                        setRecoverError('');
+                        setRecoverStatus('idle');
+                        setShowRecoverModal(true);
+                      }}
                       className="text-[11px] text-[#ff8c42] hover:underline cursor-pointer"
                     >
                       ¿Olvidaste tu clave?
@@ -451,12 +532,17 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                       lock
                     </span>
                     <input
+                      id="login-password"
                       type={showPassword ? 'text' : 'password'}
                       required
                       placeholder="••••••••"
                       value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="w-full bg-[#0e0e10] text-[#e5e1e4] pl-10 pr-10 py-2.5 rounded-xl border border-[#353437] focus:outline-none focus:border-[#ff5708] focus:ring-1 focus:ring-[#ff5708] text-[13px] transition-all"
+                      onChange={(e) => handlePasswordChange(e.target.value)}
+                      aria-invalid={Boolean(passwordError)}
+                      aria-describedby={passwordError ? 'login-password-error' : undefined}
+                      className={`w-full bg-[#0e0e10] text-[#e5e1e4] pl-10 pr-10 py-2.5 rounded-xl border focus:outline-none focus:ring-1 transition-all text-[13px] ${
+                        passwordError ? 'border-red-500/50 focus:border-red-500 focus:ring-red-500' : 'border-[#353437] focus:border-[#ff5708] focus:ring-[#ff5708]'
+                      }`}
                     />
                     <button
                       type="button"
@@ -468,6 +554,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                       </span>
                     </button>
                   </div>
+                  {/* Validación de contraseña en tiempo real */}
+                  {passwordError && <p id="login-password-error" className="mt-1 text-[11px] text-red-400">{passwordError}</p>}
                 </div>
 
                 <div className="flex items-center justify-between pt-1">
@@ -484,7 +572,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
                 <button
                   type="submit"
-                  disabled={isLoading}
+                  disabled={isLoading || !!passwordError || !!emailError}
                   className="w-full py-3 px-4 rounded-xl bg-[#ff5708] hover:bg-[#ff6922] text-[#511500] font-bold text-[14px] transition-all shadow-[0_0_20px_rgba(255,87,8,0.3)] active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
                 >
                   {isLoading ? (
@@ -503,7 +591,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             ) : (
               /* PIN Keypad Mode */
               <div className="space-y-4">
-                {/* Selected Staff Pill or General Mode */}
                 {selectedStaffForPin && (
                   <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#201f22] border border-[#ff5708]/30 text-[12px]">
                     <div className="flex items-center gap-2">
@@ -528,7 +615,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   </div>
                 )}
 
-                {/* PIN Display Bullets */}
                 <div className="flex justify-center items-center gap-3 py-2">
                   {[0, 1, 2, 3].map((index) => {
                     const isFilled = pinDigits.length > index;
@@ -545,7 +631,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   })}
                 </div>
 
-                {/* Touch Keypad */}
                 <div className="grid grid-cols-3 gap-2 max-w-[280px] mx-auto">
                   {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
                     <button
@@ -664,6 +749,48 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           </div>
         </div>
       </div>
+
+      {/* CD-14 (Punto 2): Modal de Recuperación con Supabase Auth */}
+      {showRecoverModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div role="dialog" aria-modal="true" aria-labelledby="recover-title" className="bg-[#161619] p-6 rounded-2xl w-full max-w-sm border border-[#353437] shadow-2xl animate-fadeIn">
+            <h3 id="recover-title" className="text-xl font-bold text-[#e5e1e4] mb-2">Restablecer Accesos</h3>
+
+            {recoverStatus === 'success' ? (
+              <div className="text-center py-4">
+                <span className="material-symbols-outlined text-emerald-500 text-[40px] mb-2">check_circle</span>
+                <p className="text-[#c6c5cf] text-sm mb-4">Se ha enviado un enlace seguro de restablecimiento a tu bandeja de correo.</p>
+                <button onClick={() => { setShowRecoverModal(false); setRecoverStatus('idle'); }} className="w-full bg-[#2a2a2c] text-white py-2.5 rounded-xl hover:bg-[#353437]">Entendido</button>
+              </div>
+            ) : (
+              <form onSubmit={handleRecoverySubmit}>
+                <p className="text-sm text-[#c6c5cf] mb-4">Ingresa tu correo institucional registrado en Supabase.</p>
+                <input
+                  type="email"
+                  required
+                  value={recoverEmail}
+                  onChange={(e) => setRecoverEmail(e.target.value)}
+                  aria-label="Correo institucional para recuperación"
+                  aria-invalid={recoverStatus === 'error'}
+                  aria-describedby={recoverStatus === 'error' ? 'recover-error' : undefined}
+                  placeholder="usuario@aureabistro.pe"
+                  className="w-full bg-[#0e0e10] border border-[#353437] rounded-xl px-4 py-2.5 text-[#e5e1e4] mb-4 focus:border-[#ff5708] outline-none text-[13px]"
+                />
+                {recoverStatus === 'error' && <p id="recover-error" className="text-red-400 text-[11px] mb-3" role="alert">{recoverError}</p>}
+
+                <div className="flex gap-3">
+                  <button type="button" onClick={() => setShowRecoverModal(false)} className="flex-1 bg-[#2a2a2c] text-[#c6c5cf] py-2.5 rounded-xl hover:bg-[#353437] transition-colors text-[13px]">
+                    Cancelar
+                  </button>
+                  <button type="submit" disabled={recoverStatus === 'loading'} className="flex-1 bg-[#ff5708] text-[#511500] font-bold py-2.5 rounded-xl hover:bg-[#ff6922] transition-colors disabled:opacity-50 text-[13px]">
+                    {recoverStatus === 'loading' ? 'Enviando...' : 'Enviar Enlace'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Footer Info & Disclaimers */}
       <footer className="w-full py-3.5 px-6 border-t border-[#353437]/30 bg-[#131315]/80 text-[11px] font-label-code text-[#c6c5cf] flex flex-col sm:flex-row items-center justify-between gap-2 z-10">

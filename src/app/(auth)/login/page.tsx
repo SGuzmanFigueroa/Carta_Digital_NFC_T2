@@ -37,20 +37,12 @@ function LoginContent() {
 
   const handleLoginSuccess = (user: AuthUser) => {
     showToast(`Bienvenido/a, ${user.name}. Acceso a ${user.roleTitle}`, 'verified');
-    const redirectParam = searchParams.get('redirect');
-
-    setTimeout(() => {
-      if (redirectParam && redirectParam.startsWith('/')) {
-        router.push(redirectParam);
-      } else if (user.role === 'kitchen') {
-        router.push('/kds');
-      } else if (user.role === 'admin') {
-        router.push('/dashboard');
-      } else {
-        router.push('/kds');
-      }
-    }, 600);
   };
+
+  const redirectParam = searchParams.get('redirect');
+  const redirectTo = redirectParam?.startsWith('/') && !redirectParam.startsWith('//')
+    ? redirectParam
+    : undefined;
 
   const handleExploreAsGuest = () => {
     router.push('/menu');
@@ -63,6 +55,7 @@ function LoginContent() {
         onLoginSuccess={handleLoginSuccess}
         onExploreAsGuest={handleExploreAsGuest}
         onShowToast={showToast}
+        redirectTo={redirectTo}
       />
 
       {/* Floating Toast Feedback */}
