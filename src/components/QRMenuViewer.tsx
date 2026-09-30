@@ -311,6 +311,31 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   };
 
 
+  // ── CD-1 / CD-13 · Animación fluida de scroll reveal & IntersectionObserver 60fps
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('IntersectionObserver' in window)) return;
+
+    const cards = document.querySelectorAll('.scroll-reveal-card');
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('is-visible');
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      {
+        rootMargin: '0px 0px -20px 0px',
+        threshold: 0.08,
+      }
+    );
+
+    cards.forEach((card) => observer.observe(card));
+
+    return () => observer.disconnect();
+  }, [filteredItems, selectedCategory]);
+
   const heroItem = menuItems[0]; // Arroz Chaufa Wok de Autor
   // Extrae el ID del modelo desde la URL de la imagen (ej: /images/smoked-old-fashioned.jpg -> smoked-old-fashioned)
   const getModelId = (dish: MenuItem) => dish.image?.split('/').pop()?.replace('.jpg', '') || dish.id;
@@ -706,17 +731,22 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
             </div>
           ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            {filteredItems.map((dish) => (
+            {filteredItems.map((dish, index) => (
               <article
                 key={dish.id}
-                className="bg-white dark:bg-[#15161c] rounded-2xl overflow-hidden border border-[#e2e8f0] dark:border-[#24252e] hover:border-[#ff5708]/50 transition-colors flex flex-col justify-between group shadow-sm dark:shadow-none"
+                className="scroll-reveal-card bg-white dark:bg-[#15161c] rounded-2xl overflow-hidden border border-[#e2e8f0] dark:border-[#24252e] hover:border-[#ff5708]/50 transition-all duration-300 flex flex-col justify-between group shadow-sm dark:shadow-none hover:shadow-lg dark:hover:shadow-[0_4px_25px_rgba(255,87,8,0.12)] hover:-translate-y-0.5"
+                style={{
+                  transitionDelay: `${Math.min(index * 30, 240)}ms`
+                }}
               >
                 {/* Image & Badges */}
                 <div className="relative h-44 sm:h-48 overflow-hidden bg-[#e2e8f0] dark:bg-[#0e0e10]">
                   <img
                     src={dish.image}
                     alt={dish.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    loading="lazy"
+                    decoding="async"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 will-change-transform"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-white dark:from-[#15161c] via-transparent to-black/30" />
 
