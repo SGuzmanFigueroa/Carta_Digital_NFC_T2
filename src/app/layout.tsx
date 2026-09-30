@@ -67,6 +67,42 @@ export default function RootLayout({
           }}
         />
       
+        {/* CD-13 · Bootstrap anti-FOUC del tema Claro/Oscuro del comensal.
+            Se ejecuta antes del primer paint y SOLO en la vista pública del
+            cliente (/menu y /). El resto del sistema conserva el tema del
+            panel de administración, por lo que no se altera su diseño. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){
+              try {
+                var path = window.location.pathname;
+                var isDinerView = path === '/' || path === '/menu' || path.indexOf('/menu/') === 0;
+                if (!isDinerView) return;
+
+                var KEY = 'gastropulse_menu_theme';
+                var stored = null;
+                try { stored = localStorage.getItem(KEY); } catch(e) {}
+                var theme = (stored === 'light' || stored === 'dark') ? stored : null;
+                if (!theme) {
+                  theme = (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches)
+                    ? 'light'
+                    : 'dark';
+                }
+
+                var root = document.documentElement;
+                root.setAttribute('data-menu-theme', theme);
+                if (theme === 'light') {
+                  root.classList.remove('dark');
+                  root.classList.add('light');
+                } else {
+                  root.classList.remove('light');
+                  root.classList.add('dark');
+                }
+              } catch(e) {}
+            })()`,
+          }}
+        />
+
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(){

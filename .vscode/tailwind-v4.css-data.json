@@ -1,0 +1,115 @@
+{
+  "version": 1.1,
+  "atDirectives": [
+    {
+      "name": "@theme",
+      "description": "Tailwind CSS v4: define tokens de diseño (colores, fuentes, breakpoints, espaciado) que se convierten en utilidades y variables CSS.",
+      "references": [
+        {
+          "name": "Tailwind CSS v4 — Theme variables",
+          "url": "https://tailwindcss.com/docs/theme"
+        }
+      ]
+    },
+    {
+      "name": "@custom-variant",
+      "description": "Tailwind CSS v4: registra una variante personalizada, p. ej. `@custom-variant dark (&:where(.dark, .dark *));` para que `dark:` dependa de una clase en lugar de `prefers-color-scheme`.",
+      "references": [
+        {
+          "name": "Tailwind CSS v4 — Adding custom variants",
+          "url": "https://tailwindcss.com/docs/adding-custom-styles#adding-custom-variants"
+        }
+      ]
+    },
+    {
+      "name": "@variant",
+      "description": "Tailwind CSS v4: aplica una variante de Tailwind a un bloque de CSS propio (alternativa en CSS a las clases utilitarias).",
+      "references": [
+        {
+          "name": "Tailwind CSS v4 — Functions and directives",
+          "url": "https://tailwindcss.com/docs/functions-and-directives"
+        }
+      ]
+    },
+    {
+      "name": "@utility",
+      "description": "Tailwind CSS v4: define una utilidad personalizada que luego puede usarse como clase y con sus variantes.",
+      "references": [
+        {
+          "name": "Tailwind CSS v4 — Adding custom utilities",
+          "url": "https://tailwindcss.com/docs/adding-custom-styles#adding-custom-utilities"
+        }
+      ]
+    },
+    {
+      "name": "@apply",
+      "description": "Tailwind CSS v4: inlinea utilidades de Tailwind dentro de una regla CSS propia.",
+      "references": [
+        {
+          "name": "Tailwind CSS v4 — Functions and directives",
+          "url": "https://tailwindcss.com/docs/functions-and-directives"
+        }
+      ]
+    },
+    {
+      "name": "@source",
+      "description": "Tailwind CSS v4: registra rutas o patrones adicionales donde Tailwind debe buscar clases (equivalente al `content` de v3).",
+      "references": [
+        {
+          "name": "Tailwind CSS v4 — Detecting classes in source files",
+          "url": "https://tailwindcss.com/docs/detecting-classes-in-source-files"
+        }
+      ]
+    },
+    {
+      "name": "@reference",
+      "description": "Tailwind CSS v4: importa el stylesheet principal solo como referencia (para `@apply`) sin duplicar CSS en la salida.",
+      "references": [
+        {
+          "name": "Tailwind CSS v4 — Functions and directives",
+          "url": "https://tailwindcss.com/docs/functions-and-directives"
+        }
+      ]
+    },
+    {
+      "name": "@plugin",
+      "description": "Tailwind CSS v4: carga un plugin (paquete npm o ruta local) en formato JavaScript (compatibilidad v3).",
+      "references": [
+        {
+          "name": "Tailwind CSS v4 — Functions and directives",
+          "url": "https://tailwindcss.com/docs/functions-and-directives"
+        }
+      ]
+    },
+    {
+      "name": "@config",
+      "description": "Tailwind CSS v4: carga un `tailwind.config.js` heredado de v3 (compatibilidad).",
+      "references": [
+        {
+          "name": "Tailwind CSS v4 — Functions and directives",
+          "url": "https://tailwindcss.com/docs/functions-and-directives"
+        }
+      ]
+    },
+    {
+      "name": "@tailwind",
+      "description": "Tailwind CSS v3: inyecta una capa de Tailwind (base, components, utilities). En v4 usar `@import \"tailwindcss\"`.",
+      "references": [
+        {
+          "name": "Tailwind CSS v4 — Upgrade guide",
+          "url": "https://tailwindcss.com/docs/upgrade-guide"
+        }
+      ]
+    },
+    {
+      "name": "@screen",
+      "description": "Tailwind CSS v3: genera media queries a partir de los breakpoints del tema (equivalente v4: `@variant`).",
+      "references": [
+        {
+          "name": "Tailwind CSS v4 — Upgrade guide",
+          "url": "https://tailwindcss.com/docs/upgrade-guide"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  // Recomendación (opcional, se puede borrar este archivo sin afectar nada):
+  // Tailwind CSS IntelliSense da autocompletado/hover de las utilidades dentro de
+  // `className` y entiende las at-rules de Tailwind v4 (@theme, @custom-variant, ...).
+  // La corrección de las advertencias css(unknownAtRules) NO depende de esto:
+  // se resuelve con `.vscode/tailwind-v4.css-data.json` + `css.customData`.
+  "recommendations": ["bradlc.vscode-tailwindcss"]
+}

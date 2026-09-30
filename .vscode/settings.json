@@ -1,0 +1,8 @@
+{
+  // Tailwind CSS v4 es "CSS-first": usa at-rules propias (@theme, @custom-variant,
+  // @utility, ...) que el validador CSS integrado de VS Code no conoce y reporta
+  // como `Unknown at rule @theme / @custom-variant` (css(unknownAtRules)).
+  // Este custom data le enseña esas directivas, así el aviso desaparece SIN apagar
+  // el lint (los at-rules realmente inexistentes siguen marcándose como error).
+  "css.customData": [".vscode/tailwind-v4.css-data.json"]
+}

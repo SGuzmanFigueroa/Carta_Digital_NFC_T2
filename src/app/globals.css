@@ -1,6 +1,15 @@
 @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap');
 @import "tailwindcss";
 
+/* ==========================================================================
+   CD-13 · TEMA CLARO/OSCURO DEL COMENSAL
+   Sobrescribe la variante `dark:` de Tailwind v4 para que dependa de la clase
+   `.dark` en un ancestro (aquí, <html>) y no de `prefers-color-scheme`.
+   Esto permite alternar Light/Obsidian con una clase, sin `!important` y sin
+   afectar al sistema interno: ninguna otra vista usa utilidades `dark:`.
+   ========================================================================== */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @font-face {
   font-family: 'Material Symbols Outlined';
   font-style: normal;
@@ -254,6 +263,24 @@ html[data-theme="kds-high-contrast"] header {
 [data-accent="cyan"] .border-\[\#FF5A1F\],
 [data-accent="cyan"] .border-\[\#ff5708\] {
   border-color: #00b4d8 !important;
+}
+
+/* ==========================================================
+   CD-13 · TEMA DEL COMENSAL (ruta pública /menu)
+   Acotado mediante `data-menu-theme`, atributo que SOLO inyecta la vista del
+   cliente. Se usa un atributo propio en lugar de `data-theme` para no activar
+   los overrides globales del panel de administración.
+   ========================================================== */
+html[data-menu-theme="light"] body {
+  background-color: #f4f5f7 !important;
+  color: #0f172a !important;
+  color-scheme: light;
+}
+
+html[data-menu-theme="dark"] body {
+  background-color: #0b0c0e !important;
+  color: #e5e1e4 !important;
+  color-scheme: dark;
 }
 
 /* --- DENSITY --- */
