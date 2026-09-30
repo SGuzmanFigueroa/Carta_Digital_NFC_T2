@@ -293,3 +293,54 @@ html[data-menu-theme="dark"] body {
   padding-bottom: 0.75rem;
   font-size: 14.5px;
 }
+
+
+/* ==========================================================
+   CD-13 · ANIMACIÓN FLUIDA DE CAMBIO DE TEMA
+   ========================================================== */
+
+/* 1. Transición nativa View Transitions API */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.38s;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+::view-transition-old(root) {
+  animation-name: menuThemeFadeOut;
+}
+
+::view-transition-new(root) {
+  animation-name: menuThemeFadeIn;
+}
+
+@keyframes menuThemeFadeOut {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.995); }
+}
+
+@keyframes menuThemeFadeIn {
+  from { opacity: 0; transform: scale(1.005); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* 2. Fallback de transición CSS suave en todos los elementos del comensal */
+html.theme-transitioning,
+html.theme-transitioning body,
+html.theme-transitioning div,
+html.theme-transitioning header,
+html.theme-transitioning nav,
+html.theme-transitioning button,
+html.theme-transitioning span,
+html.theme-transitioning p,
+html.theme-transitioning h1,
+html.theme-transitioning h2,
+html.theme-transitioning h3,
+html.theme-transitioning section,
+html.theme-transitioning article {
+  transition: background-color 0.38s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.38s cubic-bezier(0.4, 0, 0.2, 1),
+              color 0.38s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.38s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  transition-delay: 0s !important;
+}

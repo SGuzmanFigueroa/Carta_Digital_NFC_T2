@@ -77,6 +77,30 @@ function resetMenuTheme(): void {
   root.classList.remove('light');
 }
 
+/** Dispara la transición visual fluida entre temas (soporta View Transitions nativo y fallback CSS) */
+function triggerThemeTransition(callback: () => void): void {
+  if (typeof document === 'undefined') {
+    callback();
+    return;
+  }
+
+  // 1. Soporte nativo de View Transitions API (Chrome 111+, Edge, Safari 18+)
+  if ('startViewTransition' in document && typeof (document as any).startViewTransition === 'function') {
+    (document as any).startViewTransition(() => {
+      callback();
+    });
+    return;
+  }
+
+  // 2. Fallback universal con clase de transición CSS suave
+  const root = document.documentElement;
+  root.classList.add('theme-transitioning');
+  callback();
+  window.setTimeout(() => {
+    root.classList.remove('theme-transitioning');
+  }, 450);
+}
+
 function persistMenuTheme(theme: MenuTheme): void {
   if (typeof window === 'undefined') return;
   try {
@@ -142,12 +166,21 @@ export function MenuThemeProvider({ children }: { children: React.ReactNode }) {
 
   const setTheme = useCallback((next: MenuTheme) => {
     hasExplicitChoiceRef.current = true;
-    setThemeState(next);
+    triggerThemeTransition(() => {
+      applyMenuTheme(next);
+      setThemeState(next);
+    });
   }, []);
 
   const toggleTheme = useCallback(() => {
     hasExplicitChoiceRef.current = true;
-    setThemeState((previous) => (previous === 'dark' ? 'light' : 'dark'));
+    setThemeState((previous) => {
+      const next = previous === 'dark' ? 'light' : 'dark';
+      triggerThemeTransition(() => {
+        applyMenuTheme(next);
+      });
+      return next;
+    });
   }, []);
 
   const value = useMemo<MenuThemeContextValue>(
