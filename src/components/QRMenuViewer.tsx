@@ -105,21 +105,27 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     }
   ]);
 
-  // Sincronizar automáticamente la mesa desde el QR escaneado (?mesa=Mesa 02&zona=Salón)
+  // Sincronizar automáticamente la mesa desde el QR escaneado (?mesa=4, ?table=04, ?m=2)
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
-      const mesaParam = params.get('mesa');
-      if (mesaParam && mesaParam.trim()) {
-        const decoded = decodeURIComponent(mesaParam.trim());
-        setSelectedTable(decoded);
+      const rawMesa = params.get('mesa') || params.get('table') || params.get('m');
+      if (rawMesa && rawMesa.trim()) {
+        let formatted = decodeURIComponent(rawMesa.trim()).toUpperCase();
+        if (/^\d+$/.test(formatted)) {
+          formatted = `MESA ${formatted.padStart(2, '0')}`;
+        } else if (!formatted.startsWith('MESA') && !formatted.startsWith('BARRA')) {
+          formatted = `MESA ${formatted}`;
+        }
+        setSelectedTable(formatted);
         try {
-          sessionStorage.setItem('gastropulse_active_table', decoded);
+          sessionStorage.setItem('gastropulse_active_table', formatted);
+          localStorage.setItem('gastropulse_active_table', formatted);
         } catch {}
-        onShowToast(`Mesa vinculada por QR: ${decoded}`, 'qr_code_scanner');
+        onShowToast(`Mesa vinculada automáticamente por QR: ${formatted}`, 'qr_code_scanner');
       } else {
         try {
-          const saved = sessionStorage.getItem('gastropulse_active_table');
+          const saved = sessionStorage.getItem('gastropulse_active_table') || localStorage.getItem('gastropulse_active_table');
           if (saved) setSelectedTable(saved);
         } catch {}
       }
@@ -180,12 +186,26 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     };
   }, [isArModalOpen]);
 
+  const normalizeStr = (str: string) =>
+    str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+
   const filteredItems = menuItems.filter((item) => {
-    const matchesCat = selectedCategory === 'todos' || item.category === selectedCategory;
+    const itemCat = normalizeStr(item.category || '');
+    const selCat = normalizeStr(selectedCategory);
+    const matchesCat =
+      selectedCategory === 'todos' ||
+      itemCat === selCat ||
+      itemCat.startsWith(selCat) ||
+      selCat.startsWith(itemCat);
+
+    const query = normalizeStr(searchQuery);
     const matchesSearch =
-      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (item.tag && item.tag.toLowerCase().includes(searchQuery.toLowerCase()));
+      !query ||
+      normalizeStr(item.name).includes(query) ||
+      normalizeStr(item.description).includes(query) ||
+      (item.tag && normalizeStr(item.tag).includes(query)) ||
+      (item.category && normalizeStr(item.category).includes(query));
+
     return matchesCat && matchesSearch;
   });
 
@@ -639,6 +659,27 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
             </span>
           </div>
 
+          {filteredItems.length === 0 ? (
+            <div className="bg-[#15161c] rounded-2xl border border-[#24252e] p-8 text-center space-y-3 my-4">
+              <div className="w-12 h-12 rounded-full bg-[#1e1f28] border border-[#ff5708]/30 text-[#ff5708] flex items-center justify-center mx-auto">
+                <span className="material-symbols-outlined text-[24px]">search_off</span>
+              </div>
+              <h4 className="text-white font-bold text-[16px]">No se encontraron platos</h4>
+              <p className="text-[#a1a1aa] text-[13px] max-w-sm mx-auto">
+                No encontramos ningún resultado para "{searchQuery}". Prueba con otro ingrediente o limpia los filtros.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery('');
+                  setSelectedCategory('todos');
+                }}
+                className="px-4 py-2 rounded-xl bg-[#ff5708] text-[#2b0b00] font-bold text-[12px] transition-all hover:bg-[#e04800]"
+              >
+                Ver toda la carta
+              </button>
+            </div>
+          ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             {filteredItems.map((dish) => (
               <article
@@ -731,6 +772,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
               </article>
             ))}
           </div>
+          )}
         </section>
       </main>
 
