@@ -156,7 +156,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           setErrorMessage(`Credenciales inválidas. Intento ${nextAttempts}/4 antes del bloqueo.`);
         }
       }
-    }, 450);
+        }, 60);
   };
 
   const handlePinInput = (digit: string) => {
@@ -251,7 +251,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           setErrorMessage(`PIN incorrecto. Intento ${nextAttempts}/4 antes del bloqueo temporal.`);
         }
       }
-    }, 380);
+        }, 50);
   };
 
   const fillQuickDemoUser = (targetRole: 'admin' | 'kitchen' | 'floor' | 'bar') => {
@@ -316,7 +316,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] bg-[#ff5708]/5 rounded-full blur-[140px] pointer-events-none" />
 
       {/* Top Bar Status Info */}
-      <div className="w-full px-6 py-4 flex items-center justify-between border-b border-[#353437]/40 bg-[#131315]/80 backdrop-blur-md z-10">
+      <div className="w-full px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between border-b border-[#353437]/40 bg-[#131315]/80 backdrop-blur-md z-10">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-[#ff5708] flex items-center justify-center text-[#511500] font-bold shadow-[0_0_16px_rgba(255,87,8,0.4)]">
             <span className="material-symbols-outlined text-[20px]">restaurant_menu</span>

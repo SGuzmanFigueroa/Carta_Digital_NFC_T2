@@ -387,12 +387,15 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
   // Central timer tick every 1000ms for elapsed time
   useEffect(() => {
     const timer = setInterval(() => {
-      setTickets((prev) =>
-        prev.map((t) => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      setTickets((prev) => {
+        const hasActive = prev.some((t) => t.status !== 'lista_despachada' && t.status !== 'archivada');
+        if (!hasActive) return prev;
+        return prev.map((t) => {
           if (t.status === 'lista_despachada' || t.status === 'archivada') return t;
           return { ...t, elapsedSeconds: (t.elapsedSeconds || 0) + 1 };
-        })
-      );
+        });
+      });
     }, 1000);
     return () => clearInterval(timer);
   }, []);
