@@ -50,6 +50,48 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const [customTip, setCustomTip] = useState<string>('');
   const [comments, setComments] = useState('');
 
+  // Métodos de pago dinámicamente habilitados según la configuración del restaurante
+  const availableMethods = React.useMemo(() => {
+    return [
+      paymentConfig.acceptYape ? {
+        id: 'yape' as PaymentMethod,
+        label: 'Yape QR',
+        icon: 'qr_code',
+        activeColor: 'bg-[#742284] text-white shadow-md'
+      } : null,
+      paymentConfig.acceptPlin ? {
+        id: 'plin' as PaymentMethod,
+        label: 'Plin QR',
+        icon: 'qr_code',
+        activeColor: 'bg-[#0077b6] text-white shadow-md'
+      } : null,
+      paymentConfig.acceptPos ? {
+        id: 'tarjeta' as PaymentMethod,
+        label: 'Tarjeta',
+        icon: 'credit_card',
+        activeColor: 'bg-[#ff5708] text-[#2b0b00] shadow-md'
+      } : null,
+      paymentConfig.acceptCash ? {
+        id: 'efectivo' as PaymentMethod,
+        label: 'Efectivo',
+        icon: 'payments',
+        activeColor: 'bg-[#10b981] text-[#064e3b] shadow-md'
+      } : null,
+    ].filter(Boolean) as Array<{
+      id: PaymentMethod;
+      label: string;
+      icon: string;
+      activeColor: string;
+    }>;
+  }, [paymentConfig]);
+
+  // Si el método seleccionado actualmente fue deshabilitado en configuración, cambiar automáticamente al primero activo
+  useEffect(() => {
+    if (availableMethods.length > 0 && !availableMethods.some(m => m.id === selectedMethod)) {
+      setSelectedMethod(availableMethods[0].id);
+    }
+  }, [availableMethods, selectedMethod]);
+
   if (!isOpen) return null;
 
   const phoneAccount = paymentConfig.phoneNumber || '987 654 321';
@@ -177,60 +219,38 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               </button>
             </div>
 
-            {/* Pestañas de Métodos de Pago */}
-            <div className="grid grid-cols-4 gap-1.5 p-1 bg-[#f1f5f9] dark:bg-[#1e1f28] rounded-xl border border-[#cbd5e1] dark:border-[#353642]">
-              <button
-                type="button"
-                onClick={() => setSelectedMethod('yape')}
-                className={`py-2 min-h-[44px] rounded-lg text-[11px] font-bold transition-all flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
-                  selectedMethod === 'yape'
-                    ? 'bg-[#742284] text-white shadow-md'
-                    : 'text-[#475569] dark:text-[#a1a1aa] hover:text-[#0f172a] dark:hover:text-white'
-                }`}
-              >
-                <span className="material-symbols-outlined text-[16px]">qr_code</span>
-                <span>Yape QR</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setSelectedMethod('plin')}
-                className={`py-2 min-h-[44px] rounded-lg text-[11px] font-bold transition-all flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
-                  selectedMethod === 'plin'
-                    ? 'bg-[#0077b6] text-white shadow-md'
-                    : 'text-[#475569] dark:text-[#a1a1aa] hover:text-[#0f172a] dark:hover:text-white'
-                }`}
-              >
-                <span className="material-symbols-outlined text-[16px]">qr_code</span>
-                <span>Plin QR</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setSelectedMethod('tarjeta')}
-                className={`py-2 min-h-[44px] rounded-lg text-[11px] font-bold transition-all flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
-                  selectedMethod === 'tarjeta'
-                    ? 'bg-[#ff5708] text-[#2b0b00] shadow-md'
-                    : 'text-[#475569] dark:text-[#a1a1aa] hover:text-[#0f172a] dark:hover:text-white'
-                }`}
-              >
-                <span className="material-symbols-outlined text-[16px]">credit_card</span>
-                <span>Tarjeta</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setSelectedMethod('efectivo')}
-                className={`py-2 min-h-[44px] rounded-lg text-[11px] font-bold transition-all flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
-                  selectedMethod === 'efectivo'
-                    ? 'bg-[#10b981] text-[#064e3b] shadow-md'
-                    : 'text-[#475569] dark:text-[#a1a1aa] hover:text-[#0f172a] dark:hover:text-white'
-                }`}
-              >
-                <span className="material-symbols-outlined text-[16px]">payments</span>
-                <span>Efectivo</span>
-              </button>
-            </div>
+            {/* Pestañas de Métodos de Pago Habilitados Dinámicamente */}
+            {availableMethods.length > 0 ? (
+              <div className={`grid gap-1.5 p-1 bg-[#f1f5f9] dark:bg-[#1e1f28] rounded-xl border border-[#cbd5e1] dark:border-[#353642] ${
+                availableMethods.length === 4
+                  ? 'grid-cols-4'
+                  : availableMethods.length === 3
+                  ? 'grid-cols-3'
+                  : availableMethods.length === 2
+                  ? 'grid-cols-2'
+                  : 'grid-cols-1'
+              }`}>
+                {availableMethods.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => setSelectedMethod(m.id)}
+                    className={`py-2 min-h-[44px] rounded-lg text-[11px] font-bold transition-all flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
+                      selectedMethod === m.id
+                        ? m.activeColor
+                        : 'text-[#475569] dark:text-[#a1a1aa] hover:text-[#0f172a] dark:hover:text-white'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[16px]">{m.icon}</span>
+                    <span>{m.label}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-[12px] text-center font-medium">
+                Los cobros digitales están temporalmente pausados. El garzón se acercará a tu mesa para coordinar el cobro.
+              </div>
+            )}
 
             {/* Panel de Yape / Plin con Códigos QR Dinámicos */}
             {(selectedMethod === 'yape' || selectedMethod === 'plin') && (

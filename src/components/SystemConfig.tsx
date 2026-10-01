@@ -2524,6 +2524,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                           const next = { ...paymentGatewayConfig, [m.key]: !isChecked };
                           setPaymentGatewayConfig(next);
                           savePaymentConfig(next);
+                          onShowToast(`${m.label} ${!isChecked ? 'habilitado' : 'desactivado'} para la Carta Digital`, 'info');
                         }}
                         className={`p-3 rounded-xl border flex flex-col items-center justify-center text-center gap-1.5 cursor-pointer transition-all ${
                           isChecked
