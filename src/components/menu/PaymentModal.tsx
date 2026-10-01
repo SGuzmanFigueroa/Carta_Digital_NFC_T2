@@ -135,7 +135,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
-      <div className="bg-white dark:bg-[#15161c] w-full max-w-lg rounded-t-3xl sm:rounded-2xl border border-[#e2e8f0] dark:border-[#ff5708]/30 shadow-2xl p-4 sm:p-6 space-y-4 max-h-[92vh] overflow-y-auto">
+      <div className="bg-white dark:bg-[#15161c] w-full max-w-lg rounded-t-3xl sm:rounded-2xl border border-[#e2e8f0] dark:border-[#ff5708]/30 shadow-2xl p-4 sm:p-6 pb-8 sm:pb-6 space-y-4 max-h-[92vh] overflow-y-auto overscroll-contain">
         
         {/* ========================================================================= */}
         {/* PASO 1: PASARELA DE PAGO DIGITAL QR                                       */}
@@ -158,6 +158,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 </div>
               </div>
               <button
+                id="btn-close-payment-modal"
                 type="button"
                 onClick={onClose}
                 className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-[#64748b] hover:text-[#0f172a] dark:text-[#a1a1aa] dark:hover:text-white cursor-pointer"
@@ -336,14 +337,21 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     </label>
 
                     {voucherFile && (
-                      <button
-                        type="button"
-                        onClick={() => setVoucherFile(null)}
-                        className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl bg-red-500/10 text-red-500 border border-red-500/20 cursor-pointer"
-                        title="Quitar comprobante"
-                      >
-                        <span className="material-symbols-outlined text-[18px]">delete</span>
-                      </button>
+                      <div className="flex items-center gap-2">
+                        {voucherFile.startsWith('data:image') && (
+                          <div className="w-10 h-10 rounded-lg overflow-hidden border border-[#ff5708] flex-shrink-0">
+                            <img src={voucherFile} alt="Preview" className="w-full h-full object-cover" />
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setVoucherFile(null)}
+                          className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl bg-red-500/10 text-red-500 border border-red-500/20 cursor-pointer"
+                          title="Quitar comprobante"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">delete</span>
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -394,6 +402,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
             {/* Botón de Confirmación Principal */}
             <button
+              id="btn-confirm-payment"
               type="button"
               onClick={handleConfirmPayment}
               disabled={isSubmitting}
@@ -519,6 +528,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
             {/* Botón Enviar Reseña */}
             <button
+              id="btn-submit-customer-review"
               type="button"
               onClick={handleSubmitReview}
               disabled={isSubmitting}
@@ -549,6 +559,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             </div>
 
             <button
+              id="btn-completed-close-modal"
               type="button"
               onClick={onClose}
               className="px-6 py-2.5 min-h-[44px] rounded-xl bg-[#ff5708] text-[#2b0b00] font-bold text-[13px] shadow hover:bg-[#ff6924] transition-all cursor-pointer"
