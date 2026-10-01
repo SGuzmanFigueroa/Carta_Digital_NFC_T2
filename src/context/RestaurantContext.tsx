@@ -594,12 +594,35 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
       const updatedTickets = [newKdsTicket, ...tickets];
       const updatedOrders = [newDinerOrder, ...orders];
 
+      // Consolidar comanda activa para el comensal si ya tiene pedidos previos en esta mesa (Ronda 2, 3...)
+      let consolidatedDinerOrder = newDinerOrder;
+      const cleanNumSafe = safeTable.replace(/\D/g, '');
+      const prevDiner = dinerActiveTicket;
+      const isSameTable = prevDiner && (
+        prevDiner.table.replace(/\D/g, '') === cleanNumSafe ||
+        prevDiner.table.toLowerCase() === safeTable.toLowerCase() ||
+        safeTable.toLowerCase().includes(prevDiner.table.toLowerCase())
+      );
+
+      if (isSameTable) {
+        const combinedItems = [...prevDiner.items, ...newDinerOrder.items];
+        const combinedSubtotal = prevDiner.subtotal + newDinerOrder.subtotal;
+        const combinedTotal = prevDiner.total + newDinerOrder.total;
+        consolidatedDinerOrder = {
+          ...newDinerOrder,
+          id: prevDiner.id,
+          items: combinedItems,
+          subtotal: combinedSubtotal,
+          total: combinedTotal
+        };
+      }
+
       setTickets(updatedTickets);
       setOrders(updatedOrders);
       setTables(updatedTables);
-      setDinerActiveTicket(newDinerOrder);
+      setDinerActiveTicket(consolidatedDinerOrder);
 
-      persistState(updatedTickets, updatedOrders, updatedTables, undefined, newDinerOrder);
+      persistState(updatedTickets, updatedOrders, updatedTables, undefined, consolidatedDinerOrder);
 
       // Persist order to Supabase in background
       createOrderInDb(safeTable, cartItems, safePax, cmdId).catch((err) => {
@@ -1182,7 +1205,10 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
         broadcastSync('DINER_STATUS_UPDATE', { ticket: updatedDiner });
       }
 
-      await requestTableAccountInDb(activeTable, paymentMethod);
+      // Optimistic background sync: no bloquear interfaz del comensal
+      requestTableAccountInDb(activeTable, paymentMethod).catch((err) => {
+        console.warn('Background sync error requesting account in DB:', err);
+      });
       showToast(`Cuenta solicitada (${paymentMethod}). Garzón en camino.`, 'receipt');
       return true;
     },

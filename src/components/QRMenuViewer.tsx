@@ -1269,15 +1269,27 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       {/* ========================================================================= */}
       {/* 💳 CD-10 · MODAL PASARELA DE PAGO DIGITAL QR Y RESEÑAS POST-PAGO          */}
       {/* ========================================================================= */}
-      <PaymentModal
-        isOpen={isPaymentModalOpen}
-        onClose={() => setIsPaymentModalOpen(false)}
-        tableNumber={activeTicket?.table || selectedTable}
-        totalAmount={activeTicket?.total || (cartTotal > 0 ? cartTotal : 86.00)}
-        orderId={activeTicket?.id}
-        onRequestTableAccount={onRequestTableAccount}
-        onShowToast={onShowToast}
-      />
+      {(() => {
+        const cleanTblNum = selectedTable.replace(/\D/g, '');
+        const currentTbl = (tables || []).find((t) => t.number === cleanTblNum || selectedTable.includes(t.number));
+        const tblAmount = Number(currentTbl?.amount || 0);
+        const consolidatedTotalAmount: number =
+          tblAmount > 0
+            ? tblAmount
+            : Number(activeTicket?.total || (cartTotal > 0 ? cartTotal : 86.00));
+
+        return (
+          <PaymentModal
+            isOpen={isPaymentModalOpen}
+            onClose={() => setIsPaymentModalOpen(false)}
+            tableNumber={activeTicket?.table || selectedTable}
+            totalAmount={consolidatedTotalAmount}
+            orderId={activeTicket?.id}
+            onRequestTableAccount={onRequestTableAccount}
+            onShowToast={onShowToast}
+          />
+        );
+      })()}
 
     </div>
   );

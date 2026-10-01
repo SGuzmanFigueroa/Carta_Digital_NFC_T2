@@ -29,19 +29,67 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const [step, setStep] = useState<ModalStep>('payment');
   const [paymentConfig, setPaymentConfig] = useState<PaymentGatewayConfig>(() => getPaymentConfig());
 
+  // Sincronización en vivo entre pestañas (evento 'storage' nativo) y dentro de la misma pestaña
   useEffect(() => {
-    setPaymentConfig(getPaymentConfig());
-    const handleConfigUpdate = (e: any) => {
-      if (e.detail) setPaymentConfig(e.detail);
+    const syncConfig = () => {
+      setPaymentConfig(getPaymentConfig());
     };
-    window.addEventListener('gastropulse_payment_config_updated', handleConfigUpdate);
-    return () => window.removeEventListener('gastropulse_payment_config_updated', handleConfigUpdate);
+    syncConfig();
+
+    const handleCustomEvent = (e: any) => {
+      if (e.detail) setPaymentConfig(e.detail);
+      else syncConfig();
+    };
+
+    const handleStorageEvent = (e: StorageEvent) => {
+      if (!e.key || e.key === 'gastropulse_payment_config_v1') {
+        syncConfig();
+      }
+    };
+
+    window.addEventListener('gastropulse_payment_config_updated', handleCustomEvent);
+    window.addEventListener('storage', handleStorageEvent);
+
+    return () => {
+      window.removeEventListener('gastropulse_payment_config_updated', handleCustomEvent);
+      window.removeEventListener('storage', handleStorageEvent);
+    };
   }, []);
+
+  // Cada vez que el comensal abre el modal, refrescar la configuración de pagos más reciente
+  useEffect(() => {
+    if (isOpen) {
+      setPaymentConfig(getPaymentConfig());
+    }
+  }, [isOpen]);
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('yape');
   const [opCode, setOpCode] = useState('');
   const [voucherFile, setVoucherFile] = useState<string | null>(null);
-  const [cashAmount, setCashAmount] = useState('Monto Exacto');
+  const [cashType, setCashType] = useState<'exact' | '50' | '100' | '200' | 'custom'>('exact');
+  const [customCash, setCustomCash] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Cálculo automático del vuelto en efectivo
+  const numericCashGiven = React.useMemo(() => {
+    if (cashType === 'exact') return totalAmount;
+    if (cashType === '50') return 50;
+    if (cashType === '100') return 100;
+    if (cashType === '200') return 200;
+    if (cashType === 'custom') return parseFloat(customCash) || 0;
+    return totalAmount;
+  }, [cashType, customCash, totalAmount]);
+
+  const cashChange = Math.max(0, numericCashGiven - totalAmount);
+  const isCashInsufficient = selectedMethod === 'efectivo' && cashType !== 'exact' && (numericCashGiven < totalAmount);
+
+  // Validación estricta de Código de Operación Yape/Plin (6 a 8 dígitos) o subida de captura de voucher
+  const cleanOpDigits = opCode.replace(/\D/g, '');
+  const isOpCodeValid = cleanOpDigits.length >= 6 && cleanOpDigits.length <= 8;
+  const isVoucherUploaded = Boolean(voucherFile);
+  const isDigitalPaymentValid =
+    selectedMethod !== 'yape' && selectedMethod !== 'plin'
+      ? true
+      : (isOpCodeValid || isVoucherUploaded);
 
   // Estados de la pantalla Post-Pago (Reseñas & Feedback)
   const [rating, setRating] = useState<number>(5);
@@ -118,14 +166,24 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
   const handleSimulateVoucher = () => {
     setVoucherFile('voucher_simulado.png');
-    setOpCode(`OP-${Math.floor(100000 + Math.random() * 900000)}`);
-    onShowToast('Voucher de prueba simulado con código bancario', 'verified');
+    const randomOp = String(Math.floor(100000 + Math.random() * 900000));
+    setOpCode(randomOp);
+    onShowToast(`Voucher simulado con código bancario OP-${randomOp}`, 'verified');
   };
 
-  const handleConfirmPayment = async () => {
+  const handleConfirmPayment = () => {
+    if ((selectedMethod === 'yape' || selectedMethod === 'plin') && !isDigitalPaymentValid) {
+      onShowToast('Ingresa los 6 u 8 dígitos del código de operación o adjunta el voucher', 'warning');
+      return;
+    }
+    if (selectedMethod === 'efectivo' && isCashInsufficient) {
+      onShowToast('El importe con el que pagarás debe cubrir el total de la cuenta', 'warning');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      const opSuffix = opCode ? ` (OP: ${opCode})` : '';
+      const opSuffix = cleanOpDigits ? ` (OP: ${cleanOpDigits})` : '';
       const methodLabel =
         selectedMethod === 'yape'
           ? `Yape QR${opSuffix}`
@@ -133,10 +191,22 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           ? `Plin QR${opSuffix}`
           : selectedMethod === 'tarjeta'
           ? 'Tarjeta POS'
-          : `Efectivo (${cashAmount})`;
+          : cashType === 'exact'
+          ? `Efectivo (Monto Exacto: S/ ${totalAmount.toFixed(2)})`
+          : `Efectivo (Paga con: S/ ${numericCashGiven.toFixed(2)} • Vuelto: S/ ${cashChange.toFixed(2)})`;
 
+      // Optimistic UI: disparar en segundo plano sin congelar la interfaz del comensal
       if (onRequestTableAccount) {
-        await onRequestTableAccount(methodLabel);
+        try {
+          const res = onRequestTableAccount(methodLabel);
+          if (res && typeof (res as Promise<boolean>).catch === 'function') {
+            (res as Promise<boolean>).catch((err: unknown) => {
+              console.warn('Error en sincronización en segundo plano de cuenta:', err);
+            });
+          }
+        } catch (err: unknown) {
+          console.warn('Error llamando onRequestTableAccount:', err);
+        }
       }
 
       onShowToast(`Pago con ${methodLabel} registrado. ¡Gracias!`, 'check_circle');
@@ -374,13 +444,47 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     </button>
                   </label>
 
-                  <input
-                    type="text"
-                    value={opCode}
-                    onChange={(e) => setOpCode(e.target.value)}
-                    placeholder="Ej. OP-481920 (6 u 8 dígitos)"
-                    className="w-full bg-white dark:bg-[#121318] text-[#0f172a] dark:text-white px-3 py-2 min-h-[44px] rounded-xl text-[13px] border border-[#cbd5e1] dark:border-[#353642] focus:outline-none focus:border-[#ff5708]"
-                  />
+                  <div className="space-y-1.5">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={8}
+                      value={opCode}
+                      onChange={(e) => setOpCode(e.target.value.replace(/[^0-9]/g, '').slice(0, 8))}
+                      placeholder="Ej. 481920 (6 u 8 dígitos numéricos)"
+                      className={`w-full bg-white dark:bg-[#121318] text-[#0f172a] dark:text-white px-3 py-2 min-h-[44px] rounded-xl text-[13px] border focus:outline-none transition-colors ${
+                        cleanOpDigits.length > 0 && !isOpCodeValid && !isVoucherUploaded
+                          ? 'border-amber-500 focus:border-amber-500'
+                          : isOpCodeValid || isVoucherUploaded
+                          ? 'border-emerald-500 focus:border-emerald-500'
+                          : 'border-[#cbd5e1] dark:border-[#353642] focus:border-[#ff5708]'
+                      }`}
+                    />
+
+                    {/* Validación en tiempo real con feedback visual */}
+                    <div className="text-[11px] min-h-[18px]">
+                      {isOpCodeValid ? (
+                        <span className="text-emerald-500 font-semibold flex items-center gap-1">
+                          <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                          Código de operación válido (${cleanOpDigits.length} dígitos)
+                        </span>
+                      ) : isVoucherUploaded ? (
+                        <span className="text-emerald-500 font-semibold flex items-center gap-1">
+                          <span className="material-symbols-outlined text-[14px]">verified</span>
+                          Captura de comprobante adjuntada correctamente
+                        </span>
+                      ) : cleanOpDigits.length > 0 ? (
+                        <span className="text-amber-500 font-semibold flex items-center gap-1">
+                          <span className="material-symbols-outlined text-[14px]">info</span>
+                          Faltan dígitos: se requieren entre 6 y 8 números (llevas ${cleanOpDigits.length})
+                        </span>
+                      ) : (
+                        <span className="text-[#64748b] dark:text-[#94a3b8]">
+                          Digita los 6 u 8 números del comprobante o adjunta la foto del voucher.
+                        </span>
+                      )}
+                    </div>
+                  </div>
 
                   {/* Subir archivo voucher */}
                   <div className="flex items-center gap-2">
@@ -427,45 +531,142 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               </div>
             )}
 
-            {/* Panel de Efectivo */}
+            {/* Panel de Efectivo con Cálculo Automático de Vuelto */}
             {selectedMethod === 'efectivo' && (
-              <div className="p-4 rounded-2xl bg-[#f8fafc] dark:bg-[#1a1b22] border border-[#e2e8f0] dark:border-[#2a2b36] space-y-3 text-left">
+              <div className="p-4 rounded-2xl bg-[#f8fafc] dark:bg-[#1a1b22] border border-[#e2e8f0] dark:border-[#2a2b36] space-y-3.5 text-left">
                 <div className="text-[13px] font-bold text-[#0f172a] dark:text-white flex items-center gap-1.5">
                   <span className="material-symbols-outlined text-emerald-500">payments</span>
-                  <span>¿Con cuánto pagarás? (Para llevarte el vuelto exacto)</span>
+                  <span>¿Con qué billete o importe vas a pagar?</span>
                 </div>
 
-                <div className="grid grid-cols-4 gap-1.5">
-                  {['Monto Exacto', 'S/ 50', 'S/ 100', 'S/ 200'].map((opt) => (
-                    <button
-                      key={opt}
-                      type="button"
-                      onClick={() => setCashAmount(opt)}
-                      className={`py-2 min-h-[44px] rounded-xl text-[11px] font-bold border transition-colors cursor-pointer ${
-                        cashAmount === opt
-                          ? 'bg-emerald-500 text-[#064e3b] border-emerald-400 font-bold'
-                          : 'bg-white dark:bg-[#121318] text-[#475569] dark:text-[#a1a1aa] border-[#cbd5e1] dark:border-[#353642]'
-                      }`}
-                    >
-                      {opt}
-                    </button>
-                  ))}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setCashType('exact'); setCustomCash(''); }}
+                    className={`py-2 px-2 min-h-[44px] rounded-xl text-[11px] font-bold border transition-all cursor-pointer ${
+                      cashType === 'exact'
+                        ? 'bg-emerald-500 text-white border-emerald-400 shadow-sm'
+                        : 'bg-white dark:bg-[#121318] text-[#475569] dark:text-[#a1a1aa] border-[#cbd5e1] dark:border-[#353642]'
+                    }`}
+                  >
+                    Monto Exacto
+                    <span className="block text-[10px] font-normal opacity-90">S/ {totalAmount.toFixed(2)}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => { setCashType('50'); setCustomCash(''); }}
+                    className={`py-2 px-2 min-h-[44px] rounded-xl text-[11px] font-bold border transition-all cursor-pointer ${
+                      cashType === '50'
+                        ? 'bg-emerald-500 text-white border-emerald-400 shadow-sm'
+                        : 'bg-white dark:bg-[#121318] text-[#475569] dark:text-[#a1a1aa] border-[#cbd5e1] dark:border-[#353642]'
+                    }`}
+                  >
+                    Billete S/ 50
+                    <span className="block text-[10px] font-normal opacity-90">
+                      {totalAmount <= 50 ? `Vuelto: S/ ${(50 - totalAmount).toFixed(2)}` : 'Insuficiente'}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => { setCashType('100'); setCustomCash(''); }}
+                    className={`py-2 px-2 min-h-[44px] rounded-xl text-[11px] font-bold border transition-all cursor-pointer ${
+                      cashType === '100'
+                        ? 'bg-emerald-500 text-white border-emerald-400 shadow-sm'
+                        : 'bg-white dark:bg-[#121318] text-[#475569] dark:text-[#a1a1aa] border-[#cbd5e1] dark:border-[#353642]'
+                    }`}
+                  >
+                    Billete S/ 100
+                    <span className="block text-[10px] font-normal opacity-90">
+                      {totalAmount <= 100 ? `Vuelto: S/ ${(100 - totalAmount).toFixed(2)}` : 'Insuficiente'}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => { setCashType('200'); setCustomCash(''); }}
+                    className={`py-2 px-2 min-h-[44px] rounded-xl text-[11px] font-bold border transition-all cursor-pointer ${
+                      cashType === '200'
+                        ? 'bg-emerald-500 text-white border-emerald-400 shadow-sm'
+                        : 'bg-white dark:bg-[#121318] text-[#475569] dark:text-[#a1a1aa] border-[#cbd5e1] dark:border-[#353642]'
+                    }`}
+                  >
+                    Billete S/ 200
+                    <span className="block text-[10px] font-normal opacity-90">
+                      {totalAmount <= 200 ? `Vuelto: S/ ${(200 - totalAmount).toFixed(2)}` : 'Insuficiente'}
+                    </span>
+                  </button>
                 </div>
+
+                {/* Opción de Importe Personalizado */}
+                <div className="pt-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] text-[#475569] dark:text-[#a1a1aa] whitespace-nowrap">Otro billete/monto:</span>
+                    <div className="relative flex-1">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[12px] font-bold text-[#64748b]">S/</span>
+                      <input
+                        type="number"
+                        step="0.10"
+                        min="1"
+                        placeholder="Ej. 150.00"
+                        value={customCash}
+                        onChange={(e) => {
+                          setCustomCash(e.target.value);
+                          setCashType('custom');
+                        }}
+                        className="w-full bg-white dark:bg-[#121318] text-[#0f172a] dark:text-white pl-8 pr-3 py-1.5 min-h-[38px] rounded-xl text-[12px] border border-[#cbd5e1] dark:border-[#353642] focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* TARJETA DINÁMICA DE DESGLOSE DE VUELTO */}
+                {!isCashInsufficient ? (
+                  <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-800 dark:text-emerald-300 space-y-1 animate-fadeIn">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[12px] font-bold flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-[18px] text-emerald-500">point_of_sale</span>
+                        Vuelto que te traerá el garzón:
+                      </span>
+                      <span className="text-[18px] font-mono-code font-black text-emerald-600 dark:text-emerald-400">
+                        S/ {cashChange.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-[#475569] dark:text-[#a1a1aa] flex justify-between border-t border-emerald-500/20 pt-1">
+                      <span>Total: S/ {totalAmount.toFixed(2)}</span>
+                      <span>Pagas con: S/ {numericCashGiven.toFixed(2)}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 text-[12px] font-semibold flex items-center gap-2 animate-fadeIn">
+                    <span className="material-symbols-outlined text-amber-500 text-[20px]">warning</span>
+                    <span>El billete indicado (S/ {numericCashGiven.toFixed(2)}) no cubre el total de la comanda (S/ {totalAmount.toFixed(2)}). Te faltan S/ {(totalAmount - numericCashGiven).toFixed(2)}.</span>
+                  </div>
+                )}
               </div>
             )}
 
-            {/* Botón de Confirmación Principal */}
+            {/* Botón de Confirmación Principal con Validación */}
             <button
               id="btn-confirm-payment"
               type="button"
               onClick={handleConfirmPayment}
-              disabled={isSubmitting}
-              className="w-full py-3 min-h-[44px] rounded-xl bg-[#ff5708] hover:bg-[#ff6924] text-[#2b0b00] font-bold text-[14px] flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(255,87,8,0.35)] transition-all cursor-pointer active:scale-98 disabled:opacity-50"
+              disabled={
+                isSubmitting ||
+                ((selectedMethod === 'yape' || selectedMethod === 'plin') && !isDigitalPaymentValid) ||
+                (selectedMethod === 'efectivo' && isCashInsufficient)
+              }
+              className="w-full py-3 min-h-[44px] rounded-xl bg-[#ff5708] hover:bg-[#ff6924] text-[#2b0b00] font-bold text-[14px] flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(255,87,8,0.35)] transition-all cursor-pointer active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span className="material-symbols-outlined text-[20px]">check_circle</span>
               <span>
                 {isSubmitting
                   ? 'Confirmando Pago...'
+                  : ((selectedMethod === 'yape' || selectedMethod === 'plin') && !isDigitalPaymentValid)
+                  ? 'Ingresa código OP o adjunta voucher'
+                  : (selectedMethod === 'efectivo' && isCashInsufficient)
+                  ? 'Selecciona billete suficiente'
                   : `Confirmar Pago Realizado • S/ ${totalAmount.toFixed(2)}`}
               </span>
             </button>
