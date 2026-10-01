@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Space_Mono } from "next/font/google";
 import "./globals.css";
 import { RestaurantProvider } from "@/context/RestaurantContext";
@@ -18,6 +18,19 @@ const spaceMono = Space_Mono({
   variable: "--font-space-mono",
   subsets: ["latin"],
 });
+
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: "cover", // Vital para soporte de Notch, Dynamic Island y barra inferior en iPhone
+  interactiveWidget: "resizes-content", // Previene que el teclado virtual tape modales en iOS y Android
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#0b0c0e" },
+    { media: "(prefers-color-scheme: light)", color: "#f4f5f7" }
+  ]
+};
 
 export const metadata: Metadata = {
   title: "GastroPulse OS - Plataforma Gastronómica Integral",

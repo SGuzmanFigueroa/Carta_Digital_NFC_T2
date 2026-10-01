@@ -835,7 +835,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       {/* 🛒 PERSISTENT FLOATING BOTTOM ORDER BAR */}
       {/* ========================================================================= */}
       {cart.length > 0 && (
-        <div className="fixed bottom-[4.75rem] sm:bottom-3 left-3 right-3 max-w-md mx-auto z-40">
+        <div className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] sm:bottom-3 left-3 right-3 max-w-md mx-auto z-40">
           <div className="bg-white/95 dark:bg-[#15161c]/95 backdrop-blur-xl border border-[#ff5708]/50 p-2.5 sm:p-3 rounded-2xl shadow-[0_4px_25px_rgba(15,23,42,0.18)] dark:shadow-[0_4px_25px_rgba(0,0,0,0.8)] flex items-center justify-between gap-2.5">
             <div
               className="flex items-center gap-2.5 cursor-pointer min-w-0"

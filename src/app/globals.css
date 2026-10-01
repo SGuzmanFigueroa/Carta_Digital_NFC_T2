@@ -406,3 +406,75 @@ html {
     transition: none !important;
   }
 }
+
+
+/* ==========================================================
+   BLINDAJE MÓVIL TOTAL (iPHONE iOS / SAFARI & ANDROID CHROME)
+   ========================================================== */
+
+/* 1. Viewport dinámico (100dvh) para evitar saltos por barras del navegador */
+html, body {
+  min-height: 100vh;
+  min-height: 100dvh;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  overscroll-behavior-y: contain; /* Evita recarga involuntaria por pull-to-refresh */
+}
+
+/* 2. Prevenir auto-zoom molesto en inputs en iPhone Safari (< 16px causa zoom forzado) */
+@media screen and (max-width: 768px) {
+  input[type="text"],
+  input[type="search"],
+  input[type="email"],
+  input[type="number"],
+  input[type="tel"],
+  input[type="password"],
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
+/* 3. Soporte de Safe Areas para iPhone con Notch, Dynamic Island y Home Indicator */
+.pb-safe {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 0.75rem);
+}
+.pt-safe {
+  padding-top: max(env(safe-area-inset-top, 0px), 0.5rem);
+}
+.pl-safe {
+  padding-left: max(env(safe-area-inset-left, 0px), 0.5rem);
+}
+.pr-safe {
+  padding-right: max(env(safe-area-inset-right, 0px), 0.5rem);
+}
+
+/* 4. Soporte universal de Glassmorphism (-webkit-backdrop-filter) para WebKit/Safari */
+.backdrop-blur-sm,
+.backdrop-blur-md,
+.backdrop-blur-lg,
+.backdrop-blur-xl,
+.backdrop-blur-2xl {
+  -webkit-backdrop-filter: blur(16px);
+}
+
+/* 5. Eliminación de retardos táctiles de 300ms y destellos tap en iOS/Android */
+button,
+a,
+[role="button"],
+.cursor-pointer {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* 6. Desplazamiento táctil fluido (momentum scrolling) en contenedores horizontales */
+.overflow-x-auto,
+.overflow-y-auto {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 7. Prevenir desbordamientos horizontales accidentales */
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
