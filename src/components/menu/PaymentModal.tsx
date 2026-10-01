@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { submitCustomerReview } from '@/services/reviewService';
+import { getPaymentConfig, PaymentGatewayConfig } from '@/services/paymentConfigService';
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -26,6 +27,16 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   onShowToast
 }) => {
   const [step, setStep] = useState<ModalStep>('payment');
+  const [paymentConfig, setPaymentConfig] = useState<PaymentGatewayConfig>(() => getPaymentConfig());
+
+  useEffect(() => {
+    setPaymentConfig(getPaymentConfig());
+    const handleConfigUpdate = (e: any) => {
+      if (e.detail) setPaymentConfig(e.detail);
+    };
+    window.addEventListener('gastropulse_payment_config_updated', handleConfigUpdate);
+    return () => window.removeEventListener('gastropulse_payment_config_updated', handleConfigUpdate);
+  }, []);
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('yape');
   const [opCode, setOpCode] = useState('');
   const [voucherFile, setVoucherFile] = useState<string | null>(null);
@@ -41,8 +52,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
   if (!isOpen) return null;
 
-  const phoneAccount = '987 654 321';
-  const titular = 'ÁUREA BISTRO S.A.C.';
+  const phoneAccount = paymentConfig.phoneNumber || '987 654 321';
+  const titular = paymentConfig.titularName || 'ÁUREA BISTRO S.A.C.';
 
   const handleCopyPhone = () => {
     if (navigator.clipboard) {
@@ -72,11 +83,12 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const handleConfirmPayment = async () => {
     setIsSubmitting(true);
     try {
+      const opSuffix = opCode ? ` (OP: ${opCode})` : '';
       const methodLabel =
         selectedMethod === 'yape'
-          ? 'Yape QR'
+          ? `Yape QR${opSuffix}`
           : selectedMethod === 'plin'
-          ? 'Plin QR'
+          ? `Plin QR${opSuffix}`
           : selectedMethod === 'tarjeta'
           ? 'Tarjeta POS'
           : `Efectivo (${cashAmount})`;
@@ -230,9 +242,32 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   </span>
                 </div>
 
-                {/* Código QR Dinámico SVG */}
+                {/* Código QR Personalizado o Dinámico */}
                 <div className="relative inline-block p-3 rounded-2xl bg-white border-2 border-dashed shadow-inner border-[#cbd5e1] dark:border-white/20">
-                  <svg className="w-40 h-40 mx-auto" viewBox="0 0 160 160" fill="none">
+                  {selectedMethod === 'yape' && paymentConfig.yapeQrImage ? (
+                    <div className="flex flex-col items-center">
+                      <img
+                        src={paymentConfig.yapeQrImage}
+                        alt="QR Oficial Yape"
+                        className="w-40 h-40 object-contain rounded-xl shadow-sm"
+                      />
+                      <span className="mt-1 text-[10px] font-bold text-[#742284] bg-[#742284]/10 px-2 py-0.5 rounded-full">
+                        QR Oficial del Restaurante
+                      </span>
+                    </div>
+                  ) : selectedMethod === 'plin' && paymentConfig.plinQrImage ? (
+                    <div className="flex flex-col items-center">
+                      <img
+                        src={paymentConfig.plinQrImage}
+                        alt="QR Oficial Plin"
+                        className="w-40 h-40 object-contain rounded-xl shadow-sm"
+                      />
+                      <span className="mt-1 text-[10px] font-bold text-[#0077b6] bg-[#0077b6]/10 px-2 py-0.5 rounded-full">
+                        QR Oficial del Restaurante
+                      </span>
+                    </div>
+                  ) : (
+                    <svg className="w-40 h-40 mx-auto" viewBox="0 0 160 160" fill="none">
                     {/* Finder Patterns */}
                     <rect x="10" y="10" width="40" height="40" rx="6" fill="#0f172a" />
                     <rect x="18" y="18" width="24" height="24" rx="4" fill="#ffffff" />
@@ -279,6 +314,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                       {selectedMethod === 'yape' ? 'YAPE' : 'PLIN'}
                     </text>
                   </svg>
+                  )}
 
                   <div className="mt-1 text-[11px] font-mono-code font-bold text-[#0f172a]">
                     Total a pagar: S/ {totalAmount.toFixed(2)}
