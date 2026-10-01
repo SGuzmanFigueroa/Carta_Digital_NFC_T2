@@ -986,19 +986,23 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-2 bg-white dark:bg-[#15161c] px-2 py-1 rounded-lg border border-[#e2e8f0] dark:border-[#2d2e38]">
+                    <div className="inline-flex items-center rounded-xl bg-[#f1f5f9] dark:bg-[#15161c] border border-[#cbd5e1] dark:border-[#2d2e38] p-0.5 shadow-sm">
                       <button
                         type="button"
                         onClick={() => handleRemoveFromCart(c.item.id)}
-                        className="w-11 h-11 min-h-[44px] min-w-[44px] rounded bg-[#e2e8f0] dark:bg-[#24252e] flex items-center justify-center text-[#0f172a] dark:text-white hover:bg-[#ff5708] hover:text-[#2b0b00] font-bold text-[14px] cursor-pointer"
+                        className="w-7 h-7 rounded-lg flex items-center justify-center text-[#475569] dark:text-[#a1a1aa] hover:bg-[#ff5708] hover:text-white active:scale-90 transition-all font-bold text-[15px] cursor-pointer select-none"
+                        title="Disminuir cantidad"
                       >
                         -
                       </button>
-                      <span className="font-mono-code text-[12px] px-1 font-bold">{c.quantity}</span>
+                      <span className="min-w-[24px] text-center font-mono-code text-[12px] font-bold text-[#0f172a] dark:text-white select-none">
+                        {c.quantity}
+                      </span>
                       <button
                         type="button"
                         onClick={() => handleAddToCart(c.item)}
-                        className="w-11 h-11 min-h-[44px] min-w-[44px] rounded bg-[#e2e8f0] dark:bg-[#24252e] flex items-center justify-center text-[#0f172a] dark:text-white hover:bg-[#ff5708] hover:text-[#2b0b00] font-bold text-[14px] cursor-pointer"
+                        className="w-7 h-7 rounded-lg flex items-center justify-center text-[#475569] dark:text-[#a1a1aa] hover:bg-[#ff5708] hover:text-white active:scale-90 transition-all font-bold text-[15px] cursor-pointer select-none"
+                        title="Aumentar cantidad"
                       >
                         +
                       </button>

@@ -145,9 +145,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             {/* Header */}
             <div className="flex items-center justify-between pb-3 border-b border-[#e2e8f0] dark:border-[#24252e]">
               <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-xl bg-[#ff5708]/15 border border-[#ff5708]/40 flex items-center justify-center text-[#ff5708]">
-                  <span className="material-symbols-outlined text-[24px]">qr_code_2</span>
-                </div>
+                <span className="material-symbols-outlined text-[28px] text-[#ff5708] shrink-0">qr_code_2</span>
                 <div>
                   <h3 className="text-[17px] font-bold text-[#0f172a] dark:text-white leading-tight">
                     Pedir la Cuenta y Pagar
@@ -361,8 +359,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             {/* Panel de Tarjeta POS */}
             {selectedMethod === 'tarjeta' && (
               <div className="p-4 rounded-2xl bg-[#f8fafc] dark:bg-[#1a1b22] border border-[#e2e8f0] dark:border-[#2a2b36] space-y-3 text-center">
-                <div className="w-12 h-12 rounded-full bg-[#ff5708]/15 border border-[#ff5708]/40 flex items-center justify-center text-[#ff5708] mx-auto">
-                  <span className="material-symbols-outlined text-[26px]">point_of_sale</span>
+                <div className="flex items-center justify-center mx-auto text-[#ff5708]">
+                  <span className="material-symbols-outlined text-[36px]">point_of_sale</span>
                 </div>
                 <h4 className="text-[14px] font-bold text-[#0f172a] dark:text-white">
                   Cobro con POS Inalámbrico en Mesa
@@ -423,9 +421,9 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         {/* ========================================================================= */}
         {step === 'feedback' && (
           <div className="space-y-4 text-center animate-fadeIn">
-            {/* Animación de Éxito */}
-            <div className="w-14 h-14 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 flex items-center justify-center text-emerald-500 mx-auto shadow-lg">
-              <span className="material-symbols-outlined text-[34px] animate-pulse">check_circle</span>
+            {/* Ícono de Éxito Flotante Limpio */}
+            <div className="flex items-center justify-center mx-auto text-emerald-500">
+              <span className="material-symbols-outlined text-[46px] animate-pulse drop-shadow-[0_0_14px_rgba(16,185,129,0.35)]">check_circle</span>
             </div>
 
             <div>
@@ -545,8 +543,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         {/* ========================================================================= */}
         {step === 'completed' && (
           <div className="space-y-4 text-center py-4 animate-fadeIn">
-            <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-[#ff5708] to-[#ff8c42] text-white flex items-center justify-center mx-auto shadow-xl">
-              <span className="material-symbols-outlined text-[36px]">sentiment_very_satisfied</span>
+            <div className="flex items-center justify-center mx-auto text-[#ff5708]">
+              <span className="material-symbols-outlined text-[52px] drop-shadow-[0_0_16px_rgba(255,87,8,0.45)]">sentiment_very_satisfied</span>
             </div>
 
             <div className="space-y-1">
