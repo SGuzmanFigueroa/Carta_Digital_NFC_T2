@@ -95,9 +95,23 @@ const ALLOWED_BROADCAST_ACTIONS = [
   'UPDATE_ORDERS'
 ];
 
+// Lista blanca estricta: ÚNICAMENTE las rutas de gestión operativa del personal
+// admiten bloqueo por inactividad. La carta digital del comensal (/ y /menu) está 100% blindada.
+function isStaffManagementRoute(path?: string | null): boolean {
+  if (!path) return false;
+  return (
+    path.startsWith('/kds') ||
+    path.startsWith('/pedidos') ||
+    path.startsWith('/dashboard') ||
+    path.startsWith('/personal') ||
+    path.startsWith('/configuracion')
+  );
+}
+
 export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const pathname = usePathname();
-  const isPublicDinerRoute = pathname?.startsWith('/menu');
+  const currentPath = pathname || (typeof window !== 'undefined' ? window.location.pathname : '');
+  const isStaffTerminal = isStaffManagementRoute(currentPath);
   const [tickets, setTickets] = useState<Ticket[]>(INITIAL_TICKETS);
   const [orders, setOrders] = useState<OrderTicket[]>(INITIAL_ORDERS);
   const [tables, setTables] = useState<TableStatus[]>(INITIAL_TABLES);
@@ -307,9 +321,21 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
     };
   }, []);
 
-  // Inactivity auto-lock monitor (solo para terminales de gestión del personal, NUNCA en /menu)
+  // Blindaje absoluto: Si el usuario está en la carta (/ o /menu), desbloquear inmediatamente
   useEffect(() => {
-    if (!currentUser || isTerminalLocked || isPublicDinerRoute) return;
+    const activeRoute = pathname || (typeof window !== 'undefined' ? window.location.pathname : '');
+    if (!isStaffManagementRoute(activeRoute)) {
+      setIsTerminalLocked(false);
+      setQuickUnlockPin('');
+      setQuickUnlockError('');
+    }
+  }, [pathname]);
+
+  // Inactivity auto-lock monitor (EXCLUSIVO para terminales operativas del staff: /kds, /pedidos, etc.)
+  useEffect(() => {
+    const activeRoute = pathname || (typeof window !== 'undefined' ? window.location.pathname : '');
+    if (!isStaffManagementRoute(activeRoute)) return;
+    if (!currentUser || isTerminalLocked) return;
 
     let timeoutId: NodeJS.Timeout;
     const INACTIVITY_LIMIT_MS = 5 * 60 * 1000; // 5 minutes
@@ -1234,8 +1260,8 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
     >
       {children}
 
-      {/* Terminal Inactivity Quick Lock Screen Overlay (solo en terminales staff, NUNCA en /menu del comensal) */}
-      {isTerminalLocked && currentUser && !isPublicDinerRoute && (
+      {/* Terminal Inactivity Quick Lock Screen Overlay (EXCLUSIVO para terminales del staff: /kds, /pedidos, etc.) */}
+      {isTerminalLocked && currentUser && isStaffManagementRoute(pathname || (typeof window !== 'undefined' ? window.location.pathname : '')) && (
         <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-xl flex items-center justify-center p-4 animate-fadeIn">
           <div className="bg-[#161619] max-w-sm w-full rounded-2xl border border-[#ff5708]/50 p-6 space-y-5 text-center shadow-[0_0_50px_rgba(255,87,8,0.25)]">
             <div className="w-14 h-14 mx-auto rounded-2xl bg-[#ff5708]/20 border border-[#ff5708]/40 flex items-center justify-center text-[#ff5708]">
