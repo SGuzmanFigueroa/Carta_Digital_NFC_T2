@@ -23,6 +23,7 @@ import { ARTableViewer } from './ARTableViewer';
 // CD-13 · Componentes del tema Claro/Oscuro y navegación inferior del comensal.
 import { ThemeToggle } from './menu/ThemeToggle';
 import { MenuBottomNav } from './menu/MenuBottomNav';
+import { PaymentModal } from './menu/PaymentModal';
 
 interface QRMenuViewerProps {
   menuItems: MenuItem[];
@@ -448,9 +449,20 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
               />
             </div>
 
-            <div className="flex items-center justify-between text-[11px] text-[#475569] dark:text-[#a1a1aa] font-mono-code">
+            <div className="flex items-center justify-between text-[11px] text-[#475569] dark:text-[#a1a1aa] font-mono-code pt-1 border-t border-[#e2e8f0] dark:border-[#24252e]">
               <span>{activeTicket.items.length} platos en marcha</span>
-              <span className="text-[#0f172a] dark:text-white font-bold">Total: S/ {activeTicket.total.toFixed(2)}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-[#0f172a] dark:text-white font-bold">Total: S/ {activeTicket.total.toFixed(2)}</span>
+                <button
+                  type="button"
+                  onClick={() => setIsPaymentModalOpen(true)}
+                  className="px-2.5 py-1 min-h-[36px] rounded-lg bg-[#ff5708] hover:bg-[#ff6924] text-[#2b0b00] font-bold text-[11px] flex items-center gap-1 shadow cursor-pointer transition-all active:scale-95"
+                  title="Pedir la cuenta y pagar con Yape o Plin QR"
+                >
+                  <span className="material-symbols-outlined text-[15px]">qr_code_2</span>
+                  <span>Pedir Cuenta / Pagar QR</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1019,21 +1031,36 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
               </div>
             </div>
 
-            <div className="pt-1 flex items-center gap-2">
+            <div className="space-y-2 pt-1">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsCartOpen(false)}
+                  className="flex-1 py-2.5 min-h-[44px] rounded-xl bg-[#f1f5f9] text-[#0f172a] border border-[#cbd5e1] dark:border-transparent dark:bg-[#24252e] dark:text-[#e5e1e4] font-medium text-[13px] hover:bg-[#e2e8f0] dark:hover:bg-[#2d2e3a] cursor-pointer"
+                >
+                  Seguir Pidiendo
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSendOrder}
+                  className="flex-1 py-2.5 min-h-[44px] rounded-xl bg-[#ff5708] text-[#2b0b00] font-bold text-[13px] flex items-center justify-center gap-1.5 hover:bg-[#ff6924] shadow-lg cursor-pointer"
+                >
+                  <span>Confirmar y Enviar</span>
+                  <span className="material-symbols-outlined text-[16px]">send</span>
+                </button>
+              </div>
+
+              {/* CD-10 · Botón directo para pedir la cuenta y pagar con QR */}
               <button
                 type="button"
-                onClick={() => setIsCartOpen(false)}
-                className="flex-1 py-2.5 min-h-[44px] rounded-xl bg-[#f1f5f9] text-[#0f172a] border border-[#cbd5e1] dark:border-transparent dark:bg-[#24252e] dark:text-[#e5e1e4] font-medium text-[13px] hover:bg-[#e2e8f0] dark:hover:bg-[#2d2e3a] cursor-pointer"
+                onClick={() => {
+                  setIsCartOpen(false);
+                  setIsPaymentModalOpen(true);
+                }}
+                className="w-full py-2.5 min-h-[44px] rounded-xl border border-[#ff5708]/40 bg-[#ff5708]/10 text-[#c2410c] dark:text-[#ffb59c] hover:bg-[#ff5708]/20 font-bold text-[12px] flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
               >
-                Seguir Pidiendo
-              </button>
-              <button
-                type="button"
-                onClick={handleSendOrder}
-                className="flex-1 py-2.5 min-h-[44px] rounded-xl bg-[#ff5708] text-[#2b0b00] font-bold text-[13px] flex items-center justify-center gap-1.5 hover:bg-[#ff6924] shadow-lg cursor-pointer"
-              >
-                <span>Confirmar y Enviar</span>
-                <span className="material-symbols-outlined text-[16px]">send</span>
+                <span className="material-symbols-outlined text-[17px]">qr_code_2</span>
+                <span>Pedir la Cuenta / Pagar con Yape o Plin QR</span>
               </button>
             </div>
           </div>
@@ -1232,6 +1259,20 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
         onFocusSearch={handleFocusSearch}
         onOpenCart={() => setIsCartOpen(true)}
         onCallWaiter={handleTriggerCallWaiter}
+        onOpenPayment={() => setIsPaymentModalOpen(true)}
+      />
+
+      {/* ========================================================================= */}
+      {/* 💳 CD-10 · MODAL PASARELA DE PAGO DIGITAL QR Y RESEÑAS POST-PAGO          */}
+      {/* ========================================================================= */}
+      <PaymentModal
+        isOpen={isPaymentModalOpen}
+        onClose={() => setIsPaymentModalOpen(false)}
+        tableNumber={activeTicket?.table || selectedTable}
+        totalAmount={activeTicket?.total || (cartTotal > 0 ? cartTotal : 86.00)}
+        orderId={activeTicket?.id}
+        onRequestTableAccount={onRequestTableAccount}
+        onShowToast={onShowToast}
       />
 
     </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { BookOpen, ConciergeBell, Search, ShoppingBag } from 'lucide-react';
+import { BookOpen, ConciergeBell, QrCode, Search, ShoppingBag } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface MenuBottomNavProps {
@@ -11,16 +11,14 @@ interface MenuBottomNavProps {
   onFocusSearch: () => void;
   onOpenCart: () => void;
   onCallWaiter: () => void;
+  onOpenPayment?: () => void;
   className?: string;
 }
 
 /**
- * GastroPulse OS · CD-13
+ * GastroPulse OS · CD-10 & CD-13
  * Barra de navegación inferior de la carta digital del comensal (solo móvil).
- *
- * Cada acción cumple el touch target mínimo de 44x44 px exigido por las guías
- * de accesibilidad móvil (WCAG 2.5.5 / Material), especialmente en pantallas
- * de menos de 380 px de ancho.
+ * Incluye accesos táctiles de 44x44 px: Carta, Buscar, Pedido, Pagar QR y Garzón.
  */
 export function MenuBottomNav({
   cartItemsCount,
@@ -29,11 +27,12 @@ export function MenuBottomNav({
   onFocusSearch,
   onOpenCart,
   onCallWaiter,
+  onOpenPayment,
   className
 }: MenuBottomNavProps) {
   const itemBaseClass = cn(
     'flex flex-col items-center justify-center gap-0.5',
-    'min-h-[44px] min-w-[44px] rounded-xl px-2 py-2',
+    'min-h-[44px] min-w-[44px] rounded-xl px-1.5 py-1.5',
     'text-[10px] font-semibold leading-none tracking-tight',
     'transition-colors active:scale-95 cursor-pointer',
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5708] focus-visible:ring-inset'
@@ -52,14 +51,14 @@ export function MenuBottomNav({
         className
       )}
     >
-      <div className="mx-auto grid max-w-md grid-cols-4 items-stretch justify-items-center px-2 pt-1.5 pb-safe">
+      <div className="mx-auto grid max-w-md grid-cols-5 items-stretch justify-items-center px-1 pt-1.5 pb-safe">
         <button type="button" onClick={onGoToMenu} className={cn(itemBaseClass, idleClass)}>
-          <BookOpen aria-hidden="true" size={20} />
+          <BookOpen aria-hidden="true" size={19} />
           <span>Carta</span>
         </button>
 
         <button type="button" onClick={onFocusSearch} className={cn(itemBaseClass, idleClass)}>
-          <Search aria-hidden="true" size={20} />
+          <Search aria-hidden="true" size={19} />
           <span>Buscar</span>
         </button>
 
@@ -75,7 +74,7 @@ export function MenuBottomNav({
           )}
         >
           <span className="relative">
-            <ShoppingBag aria-hidden="true" size={20} />
+            <ShoppingBag aria-hidden="true" size={19} />
             {cartItemsCount > 0 && (
               <span className="absolute -right-2 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#ff5708] px-1 text-[9px] font-bold text-[#2b0b00]">
                 {cartItemsCount}
@@ -83,6 +82,17 @@ export function MenuBottomNav({
             )}
           </span>
           <span>Pedido</span>
+        </button>
+
+        {/* CD-10 · Acceso rápido a Pasarela de Pago Digital QR */}
+        <button
+          type="button"
+          onClick={onOpenPayment}
+          className={cn(itemBaseClass, idleClass, 'text-[#c2410c] dark:text-[#ffb59c]')}
+          title="Pedir la cuenta y pagar con Yape o Plin QR"
+        >
+          <QrCode aria-hidden="true" size={19} />
+          <span>Pagar QR</span>
         </button>
 
         <button
@@ -97,7 +107,7 @@ export function MenuBottomNav({
               : idleClass
           )}
         >
-          <ConciergeBell aria-hidden="true" size={20} />
+          <ConciergeBell aria-hidden="true" size={19} />
           <span>{waiterCalled ? 'Llamando' : 'Garzón'}</span>
         </button>
       </div>
