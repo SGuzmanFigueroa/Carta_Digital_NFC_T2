@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { usePathname } from 'next/navigation';
 import { Ticket, OrderTicket, TableStatus, Runner, MenuItem, StationId, TicketItem, AuthUser } from '../types';
 import { INITIAL_TICKETS, INITIAL_RUNNERS } from '../data/initialData';
 import { INITIAL_ORDERS, INITIAL_TABLES, INITIAL_MENU_ITEMS } from '../data/mockData';
@@ -95,6 +96,8 @@ const ALLOWED_BROADCAST_ACTIONS = [
 ];
 
 export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const pathname = usePathname();
+  const isPublicDinerRoute = pathname?.startsWith('/menu');
   const [tickets, setTickets] = useState<Ticket[]>(INITIAL_TICKETS);
   const [orders, setOrders] = useState<OrderTicket[]>(INITIAL_ORDERS);
   const [tables, setTables] = useState<TableStatus[]>(INITIAL_TABLES);
@@ -304,9 +307,9 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
     };
   }, []);
 
-  // Inactivity auto-lock monitor (5 minutes of idle on management terminals)
+  // Inactivity auto-lock monitor (solo para terminales de gestión del personal, NUNCA en /menu)
   useEffect(() => {
-    if (!currentUser || isTerminalLocked) return;
+    if (!currentUser || isTerminalLocked || isPublicDinerRoute) return;
 
     let timeoutId: NodeJS.Timeout;
     const INACTIVITY_LIMIT_MS = 5 * 60 * 1000; // 5 minutes
@@ -1231,8 +1234,8 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
     >
       {children}
 
-      {/* Terminal Inactivity Quick Lock Screen Overlay */}
-      {isTerminalLocked && currentUser && (
+      {/* Terminal Inactivity Quick Lock Screen Overlay (solo en terminales staff, NUNCA en /menu del comensal) */}
+      {isTerminalLocked && currentUser && !isPublicDinerRoute && (
         <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-xl flex items-center justify-center p-4 animate-fadeIn">
           <div className="bg-[#161619] max-w-sm w-full rounded-2xl border border-[#ff5708]/50 p-6 space-y-5 text-center shadow-[0_0_50px_rgba(255,87,8,0.25)]">
             <div className="w-14 h-14 mx-auto rounded-2xl bg-[#ff5708]/20 border border-[#ff5708]/40 flex items-center justify-center text-[#ff5708]">
