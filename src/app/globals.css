@@ -297,16 +297,20 @@ html[data-menu-theme="dark"] body {
 
 /* ==========================================================
    CD-13 · ANIMACIÓN ULTRA-FLUIDA DE CAMBIO DE TEMA (60 FPS)
-   Acelerada por hardware y limitada estrictamente a superficies principales
+   Transición cinematográfica suave de colores sin pérdida de frames
    ========================================================== */
-body {
-  transition: background-color 0.25s cubic-bezier(0.16, 1, 0.3, 1),
-              color 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-header, nav, article {
-  transition: background-color 0.25s cubic-bezier(0.16, 1, 0.3, 1),
-              border-color 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+body,
+.min-h-screen,
+[data-menu-theme],
+header,
+nav,
+main,
+article,
+.product-card {
+  transition: background-color 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              color 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.35s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
 

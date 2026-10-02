@@ -85,7 +85,7 @@ export default function MenuPage() {
 
   return (
     <MenuThemeProvider>
-      <div className="min-h-screen bg-[#f4f5f7] text-[#0f172a] dark:bg-[#0e0e10] dark:text-[#e5e1e4] relative">
+      <div className="min-h-screen bg-[#f4f5f7] text-[#0f172a] dark:bg-[#0e0e10] dark:text-[#e5e1e4] transition-colors duration-350 ease-in-out relative">
         {/* Offline Status Banner */}
         {!isOnline && (
           <div className="sticky top-0 z-50 bg-amber-500/90 backdrop-blur-md text-black px-4 py-2 text-center text-xs font-bold flex items-center justify-center gap-2 shadow-lg transition-all animate-in slide-in-from-top duration-300">
