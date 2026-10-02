@@ -179,14 +179,16 @@ export const Header: React.FC<HeaderProps> = ({
 
           <div className="h-4 w-px bg-[#353437] hidden sm:block shrink-0"></div>
 
-          {/* Restaurant Selector Dropdown */}
-          <div className="relative hidden sm:block min-w-0">
+          {/* Restaurant Selector Dropdown con ancho fijo blindado anti-layout-shift */}
+          <div className="relative hidden sm:block w-[190px] xl:w-[215px] shrink-0">
             <button
               onClick={() => setBistroOpen(!bistroOpen)}
-              className="flex items-center gap-1.5 bg-[#1c1b1d] hover:bg-[#2a2a2c] px-2 sm:px-2.5 py-1 rounded border border-[#353437]/50 text-left transition-colors max-w-[190px] xl:max-w-none"
+              className="w-full flex items-center justify-between gap-1.5 bg-[#1c1b1d] hover:bg-[#2a2a2c] px-2.5 py-1 rounded border border-[#353437]/50 text-left transition-colors cursor-pointer"
             >
-              <span className="material-symbols-outlined text-[#ff5708] text-[15px] sm:text-[16px] shrink-0">storefront</span>
-              <span className="text-[12px] sm:text-[13px] text-[#e5e1e4] font-semibold truncate">{selectedBistro}</span>
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="material-symbols-outlined text-[#ff5708] text-[15px] sm:text-[16px] shrink-0">storefront</span>
+                <span className="text-[12px] sm:text-[13px] text-[#e5e1e4] font-semibold truncate">{selectedBistro}</span>
+              </div>
               <span className="material-symbols-outlined text-[#c6c5cf] text-[15px] sm:text-[16px] shrink-0">expand_more</span>
             </button>
 
