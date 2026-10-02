@@ -23,7 +23,7 @@ export const Header: React.FC<HeaderProps> = ({
   const t = getTranslations(language);
   const { currentUser, lockTerminal, logoutUser, tickets = [], orders = [] } = useRestaurant();
   const [bistroOpen, setBistroOpen] = useState(false);
-  const [selectedBistro, setSelectedBistro] = useState('AUREA Bistro');
+  const [selectedBistro, setSelectedBistro] = useState('AUREA Bistro (Principal)');
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
@@ -109,7 +109,7 @@ export const Header: React.FC<HeaderProps> = ({
     return list;
   }, [tickets, orders]);
 
-  const bistros = [selectedBistro, 'AUREA Rooftop Lounge', 'AUREA Privé Salón'];
+  const bistros = ['AUREA Bistro (Principal)', 'AUREA Rooftop Lounge', 'AUREA Privé Salón'];
 
   const roleNameMap: Record<string, string> = {
     admin: 'Gerente General',
@@ -214,12 +214,7 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </div>
 
-          {/* WebSocket Online Tag */}
-          <div className="hidden 2xl:flex items-center gap-1.5 px-2 py-1 rounded bg-[#0e0e10] border border-[#353437]/40 shrink-0">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span className="font-mono-code text-[11px] text-[#c6c5cf] font-bold tracking-wider">SECURE SYNC</span>
-            <span className="font-mono-code text-[11px] text-emerald-400">ENCRYPTED</span>
-          </div>
+          
         </div>
 
         {/* Center Navigation Tabs (Pantallas del sistema filtradas por rol) */}
