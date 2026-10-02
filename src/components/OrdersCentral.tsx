@@ -743,9 +743,7 @@ export const OrdersCentral: React.FC<OrdersCentralProps> = ({
             {/* Header */}
             <div className="p-4 bg-[#201f22] border-b border-[#353437]/50 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-[#ff5708]/15 flex items-center justify-center text-[#ff5708]">
-                  <span className="material-symbols-outlined text-[20px]">edit_note</span>
-                </div>
+                <span className="material-symbols-outlined text-[#ff5708] text-[26px]">edit_note</span>
                 <div>
                   <h3 className="text-[15px] font-bold text-[#e5e1e4]">Agregar Nota Especial a Cocina</h3>
                   <p className="text-[12px] text-[#c6c5cf]">
@@ -770,15 +768,15 @@ export const OrdersCentral: React.FC<OrdersCentralProps> = ({
                 </label>
                 <div className="flex flex-wrap gap-1.5">
                   {[
-                    '🥩 Término 3/4',
-                    '🥩 Término Medio',
-                    '🥩 Bien Cocido',
-                    '⚠️ Alergia Severa (Sin Sésamo)',
-                    '⚠️ Sin Gluten / Celiaco',
-                    '⚡ Urgente: Mesa con Prisa',
-                    '🧂 Sin Sal / Bajo en Sodio',
-                    '👶 Plato de Niño (Servir Primero)',
-                    '🍷 Servir Junto con Bebidas'
+                    'Término 3/4',
+                    'Término Medio',
+                    'Bien Cocido',
+                    'Alergia Severa (Sin Sésamo)',
+                    'Sin Gluten / Celiaco',
+                    'Urgente: Mesa con Prisa',
+                    'Sin Sal / Bajo en Sodio',
+                    'Plato de Niño (Servir Primero)',
+                    'Servir Junto con Bebidas'
                   ].map((preset) => (
                     <button
                       key={preset}
