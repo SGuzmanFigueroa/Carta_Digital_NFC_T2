@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { ScreenTab } from '../types';
 import { useRestaurant } from '../context/RestaurantContext';
 import { getTranslations } from '../utils/i18n';
@@ -132,12 +133,12 @@ export const Header: React.FC<HeaderProps> = ({
   const isAdmin = isAdminRole(currentUser?.role, currentUser?.roleTitle);
 
   // Screens available in the navigation filtered by role matrix (CD-5)
-  const navTabs: Array<{ id: ScreenTab; label: string; adminOnly?: boolean }> = [
-    { id: 'central_pedidos', label: t.orders_central },
-    { id: 'cocina_kds', label: t.kitchen_kds },
-    { id: 'panel_admin', label: t.admin_panel, adminOnly: true },
-    { id: 'gestion_usuarios', label: t.user_management, adminOnly: true },
-    { id: 'configuracion', label: t.configuration, adminOnly: true }
+  const navTabs: Array<{ id: ScreenTab; label: string; href: string; adminOnly?: boolean }> = [
+    { id: 'central_pedidos', label: t.orders_central, href: '/pedidos' },
+    { id: 'cocina_kds', label: t.kitchen_kds, href: '/kds' },
+    { id: 'panel_admin', label: t.admin_panel, href: '/dashboard', adminOnly: true },
+    { id: 'gestion_usuarios', label: t.user_management, href: '/personal', adminOnly: true },
+    { id: 'configuracion', label: t.configuration, href: '/configuracion', adminOnly: true }
   ];
 
   const visibleNavTabs = navTabs.filter((tab) => !tab.adminOnly || isAdmin);
@@ -222,10 +223,11 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Center Navigation Tabs (Pantallas del sistema filtradas por rol) */}
         <nav className="hidden xl:flex items-center gap-0.5 2xl:gap-1 h-full shrink-0">
           {visibleNavTabs.map((tab) => (
-            <button
+            <Link
               key={tab.id}
+              href={tab.href}
               onClick={() => onSelectTab(tab.id)}
-              className={`h-full flex items-center gap-1.5 px-2.5 2xl:px-3.5 font-sans text-[12px] 2xl:text-[13px] font-medium transition-colors border-b-2 whitespace-nowrap ${
+              className={`h-full flex items-center gap-1.5 px-2.5 2xl:px-3.5 font-sans text-[12px] 2xl:text-[13px] font-medium transition-all border-b-2 whitespace-nowrap cursor-pointer select-none active:scale-[0.98] ${
                 currentTab === tab.id
                   ? 'bg-[#2a2a2c] text-[#e5e1e4] font-semibold border-[#ff5708]'
                   : 'border-transparent text-[#bcbbc5] hover:text-[#e5e1e4] hover:bg-[#1c1b1d]'
@@ -239,12 +241,8 @@ export const Header: React.FC<HeaderProps> = ({
                   {activeOrdersCount}
                 </span>
               )}
-            </button>
+            </Link>
           ))}
-
-          {/* Los tabs administrativos (Panel Admin, Gestión de Usuarios y Configuración)
-              ya se renderizan desde `visibleNavTabs` según la matriz de roles, por lo que
-              aparecen y desaparecen en vivo al cambiar de usuario (login / logout). */}
         </nav>
 
         {/* Right Controls: Quick Lock, Notifications & Staff Profile */}
@@ -416,13 +414,14 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="absolute left-0 right-0 top-full xl:hidden bg-[#1c1b1d] border-b border-[#353437] shadow-2xl max-h-[calc(100dvh-4rem)] overflow-y-auto animate-fadeIn">
             <nav className="py-1" aria-label="Pantallas del sistema">
               {visibleNavTabs.map((tab) => (
-                <button
+                <Link
                   key={tab.id}
+                  href={tab.href}
                   onClick={() => {
                     setNavOpen(false);
                     onSelectTab(tab.id);
                   }}
-                  className={`w-full min-h-12 flex items-center justify-between gap-2 px-4 text-left font-sans text-[14px] font-medium transition-colors border-l-2 ${
+                  className={`w-full min-h-12 flex items-center justify-between gap-2 px-4 text-left font-sans text-[14px] font-medium transition-colors border-l-2 cursor-pointer active:bg-[#353437] ${
                     currentTab === tab.id
                       ? 'bg-[#2a2a2c] text-[#e5e1e4] font-semibold border-[#ff5708]'
                       : 'border-transparent text-[#bcbbc5] hover:text-[#e5e1e4] hover:bg-[#2a2a2c]'
@@ -438,7 +437,7 @@ export const Header: React.FC<HeaderProps> = ({
                       {activeOrdersCount}
                     </span>
                   )}
-                </button>
+                </Link>
               ))}
             </nav>
 

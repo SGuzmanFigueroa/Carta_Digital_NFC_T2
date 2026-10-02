@@ -20,6 +20,8 @@ export const OrdersCentral: React.FC<OrdersCentralProps> = ({
   const [isPrinting, setIsPrinting] = useState(false);
   const [printSuccessAlert, setPrintSuccessAlert] = useState(false);
   const [activeStationFilter, setActiveStationFilter] = useState<'all' | 'parrilla' | 'wok' | 'barra'>('all');
+  const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
+  const [noteInput, setNoteInput] = useState('');
 
   const filteredOrders = orders.filter((o) => {
     const matchesSearch =
@@ -45,7 +47,36 @@ export const OrdersCentral: React.FC<OrdersCentralProps> = ({
   const enCocina = filteredOrders.filter((o) => o.status === 'en-cocina');
   const paseListo = filteredOrders.filter((o) => o.status === 'pase-listo');
 
-  const activeTicket = orders.find((o) => o.id === selectedTicketId) || orders[0];
+  // Contadores por partida / estación para feedback operacional en vivo
+  const countAll = orders.length;
+  const countParrilla = orders.filter((o) =>
+    o.items.some((i) => i.station?.toLowerCase().includes('parrilla') || o.stationTarget?.toLowerCase().includes('parrilla'))
+  ).length;
+  const countWok = orders.filter((o) =>
+    o.items.some((i) => i.station?.toLowerCase().includes('wok') || o.stationTarget?.toLowerCase().includes('wok'))
+  ).length;
+  const countBarra = orders.filter((o) =>
+    o.items.some((i) => i.station?.toLowerCase().includes('bar') || o.stationTarget?.toLowerCase().includes('bar'))
+  ).length;
+
+  const fallbackTicket: OrderTicket = {
+    id: 'cmd-0482',
+    table: 'MESA 04',
+    pax: 2,
+    timeAgo: '00:48 min',
+    createdTime: '20:42:15',
+    origin: 'GARZÓN',
+    status: 'en-cocina',
+    items: [
+      { id: 'i-1', name: '1x Wagyu Ribeye A5 250g', quantity: 1, price: 115.00, notes: 'Término: 3/4 sellado', station: 'Parrilla' },
+      { id: 'i-2', name: '1x Tartar Nikkei Trufa', quantity: 1, price: 42.50, allergen: 'Sésamo', station: 'Wok' },
+      { id: 'i-3', name: '1x Copa Gran Malbec Reserva', quantity: 1, price: 21.00, station: 'Barra' }
+    ],
+    subtotal: 178.50,
+    total: 178.50
+  };
+
+  const activeTicket = orders.find((o) => o.id === selectedTicketId) || filteredOrders[0] || orders[0] || fallbackTicket;
 
   const handleTestPrint = () => {
     setIsPrinting(true);
@@ -59,15 +90,21 @@ export const OrdersCentral: React.FC<OrdersCentralProps> = ({
     }, 450);
   };
 
-  const handleAddNote = () => {
-    const note = prompt('Ingresar nota especial para cocina/pase:', 'Urgente: Alergia severa o término específico');
-    if (note) {
-      if (onAddOrderNote) {
-        onAddOrderNote(activeTicket.id, note);
-      } else {
-        onShowToast(`Nota agregada a ${activeTicket.table}: "${note}"`, 'edit_note');
-      }
+  const handleOpenAddNote = () => {
+    setNoteInput('');
+    setIsNoteModalOpen(true);
+  };
+
+  const handleSaveKitchenNote = (presetNote?: string) => {
+    const finalNote = (presetNote || noteInput).trim();
+    if (!finalNote) return;
+
+    if (onAddOrderNote) {
+      onAddOrderNote(activeTicket.id, finalNote);
     }
+    onShowToast(`Nota agregada a comanda ${activeTicket.table}: "${finalNote}"`, 'edit_note');
+    setIsNoteModalOpen(false);
+    setNoteInput('');
   };
 
   return (
@@ -96,11 +133,7 @@ export const OrdersCentral: React.FC<OrdersCentralProps> = ({
             </span>
           </div>
 
-          <div className="hidden md:flex items-center gap-1.5 px-3 py-1 bg-[#0e0e10] rounded border border-[#353437]/30">
-            <span className="font-label-code text-[11px] text-[#c6c5cf] tracking-widest uppercase">
-              KDS SYNC: 100% OK
-            </span>
-          </div>
+          
         </div>
 
         {/* Live Controls */}
@@ -118,39 +151,75 @@ export const OrdersCentral: React.FC<OrdersCentralProps> = ({
             />
           </div>
 
-          {/* Station filter pills */}
-          <div className="flex items-center gap-1 bg-[#1c1b1d] p-1 rounded-lg border border-[#353437]/30">
+          {/* Station filter pills con contexto claro */}
+          <div className="flex items-center gap-1.5 bg-[#1c1b1d] p-1 rounded-lg border border-[#353437]/30">
+            <span className="hidden sm:flex items-center gap-1 text-[11px] text-[#c6c5cf] px-1.5 font-medium select-none">
+              <span className="material-symbols-outlined text-[15px] text-[#ff5708]">restaurant</span>
+              <span>Partida:</span>
+            </span>
             <button
               onClick={() => setActiveStationFilter('all')}
-              className={`px-2 py-1 rounded text-[11px] font-label-code transition-colors cursor-pointer ${
-                activeStationFilter === 'all' ? 'bg-[#ff5708] text-[#511500] font-bold' : 'text-[#c6c5cf] hover:text-white'
+              className={`px-2.5 py-1 rounded text-[11px] font-label-code transition-all cursor-pointer flex items-center gap-1 ${
+                activeStationFilter === 'all'
+                  ? 'bg-[#ff5708] text-[#511500] font-bold shadow-md'
+                  : 'text-[#c6c5cf] hover:text-white hover:bg-[#2a2a2c]'
               }`}
+              title="Ver todas las comandas de todas las partidas de cocina"
             >
-              Todas
+              <span>Todas</span>
+              <span className={`text-[10px] px-1 rounded-full font-bold ${
+                activeStationFilter === 'all' ? 'bg-[#511500]/25 text-[#511500]' : 'bg-[#2a2a2c] text-[#a1a1aa]'
+              }`}>
+                {countAll}
+              </span>
             </button>
             <button
               onClick={() => setActiveStationFilter('parrilla')}
-              className={`px-2 py-1 rounded text-[11px] font-label-code transition-colors cursor-pointer ${
-                activeStationFilter === 'parrilla' ? 'bg-[#ff5708] text-[#511500] font-bold' : 'text-[#c6c5cf] hover:text-white'
+              className={`px-2.5 py-1 rounded text-[11px] font-label-code transition-all cursor-pointer flex items-center gap-1 ${
+                activeStationFilter === 'parrilla'
+                  ? 'bg-[#ff5708] text-[#511500] font-bold shadow-md'
+                  : 'text-[#c6c5cf] hover:text-white hover:bg-[#2a2a2c]'
               }`}
+              title="Filtrar platos y carnes de la estación Parrilla & Carbón"
             >
-              Parrilla
+              <span>Parrilla</span>
+              <span className={`text-[10px] px-1 rounded-full font-bold ${
+                activeStationFilter === 'parrilla' ? 'bg-[#511500]/25 text-[#511500]' : 'bg-[#2a2a2c] text-[#a1a1aa]'
+              }`}>
+                {countParrilla}
+              </span>
             </button>
             <button
               onClick={() => setActiveStationFilter('wok')}
-              className={`px-2 py-1 rounded text-[11px] font-label-code transition-colors cursor-pointer ${
-                activeStationFilter === 'wok' ? 'bg-[#ff5708] text-[#511500] font-bold' : 'text-[#c6c5cf] hover:text-white'
+              className={`px-2.5 py-1 rounded text-[11px] font-label-code transition-all cursor-pointer flex items-center gap-1 ${
+                activeStationFilter === 'wok'
+                  ? 'bg-[#ff5708] text-[#511500] font-bold shadow-md'
+                  : 'text-[#c6c5cf] hover:text-white hover:bg-[#2a2a2c]'
               }`}
+              title="Filtrar salteados y arroces de la estación Wok & Sauté"
             >
-              Wok
+              <span>Wok</span>
+              <span className={`text-[10px] px-1 rounded-full font-bold ${
+                activeStationFilter === 'wok' ? 'bg-[#511500]/25 text-[#511500]' : 'bg-[#2a2a2c] text-[#a1a1aa]'
+              }`}>
+                {countWok}
+              </span>
             </button>
             <button
               onClick={() => setActiveStationFilter('barra')}
-              className={`px-2 py-1 rounded text-[11px] font-label-code transition-colors cursor-pointer ${
-                activeStationFilter === 'barra' ? 'bg-[#ff5708] text-[#511500] font-bold' : 'text-[#c6c5cf] hover:text-white'
+              className={`px-2.5 py-1 rounded text-[11px] font-label-code transition-all cursor-pointer flex items-center gap-1 ${
+                activeStationFilter === 'barra'
+                  ? 'bg-[#ff5708] text-[#511500] font-bold shadow-md'
+                  : 'text-[#c6c5cf] hover:text-white hover:bg-[#2a2a2c]'
               }`}
+              title="Filtrar bebidas, coctelería y vinos de Barra"
             >
-              Barra
+              <span>Barra</span>
+              <span className={`text-[10px] px-1 rounded-full font-bold ${
+                activeStationFilter === 'barra' ? 'bg-[#511500]/25 text-[#511500]' : 'bg-[#2a2a2c] text-[#a1a1aa]'
+              }`}>
+                {countBarra}
+              </span>
             </button>
           </div>
         </div>
@@ -160,6 +229,23 @@ export const OrdersCentral: React.FC<OrdersCentralProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
         {/* Kanban Board Columns (1 to 9) */}
         <div className="lg:col-span-8 xl:col-span-9 grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+          {activeStationFilter !== 'all' && filteredOrders.length === 0 && (
+            <div className="md:col-span-3 p-4 bg-[#1c1b1d] rounded-xl border border-amber-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-[13px] text-[#e5e1e4]">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-amber-400 text-[20px]">info</span>
+                <span>
+                  No hay comandas activas pendientes para la partida <strong className="text-[#ff5708] capitalize">{activeStationFilter}</strong>.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveStationFilter('all')}
+                className="px-3 py-1.5 bg-[#ff5708] hover:brightness-110 text-[#511500] font-bold rounded-lg text-[12px] cursor-pointer transition-all shadow"
+              >
+                Ver Todas las Comandas ({orders.length})
+              </button>
+            </div>
+          )}
           {/* COLUMN 1: POR VALIDAR */}
           <section className="flex flex-col bg-[#0e0e10] rounded-xl p-2.5 gap-3 border border-[#2a2a2c]">
             <div className="flex items-center justify-between px-2.5 py-1.5 bg-[#1c1b1d] rounded-lg">
@@ -595,7 +681,7 @@ export const OrdersCentral: React.FC<OrdersCentralProps> = ({
               </button>
               <button
                 type="button"
-                onClick={handleAddNote}
+                onClick={handleOpenAddNote}
                 className="w-full py-2 bg-transparent hover:bg-[#1c1b1d] text-[#c6c5cf] hover:text-[#e5e1e4] font-medium rounded-lg text-[13px] flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-[#353437]/20"
               >
                 <span className="material-symbols-outlined text-[17px]">edit_note</span>
@@ -649,6 +735,100 @@ export const OrdersCentral: React.FC<OrdersCentralProps> = ({
           </div>
         </aside>
       </div>
+
+      {/* MODAL NATIVO: AGREGAR NOTA ESPECIAL DE COCINA */}
+      {isNoteModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-[#1c1b1d] border border-[#353437] rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-150">
+            {/* Header */}
+            <div className="p-4 bg-[#201f22] border-b border-[#353437]/50 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-[#ff5708]/15 flex items-center justify-center text-[#ff5708]">
+                  <span className="material-symbols-outlined text-[20px]">edit_note</span>
+                </div>
+                <div>
+                  <h3 className="text-[15px] font-bold text-[#e5e1e4]">Agregar Nota Especial a Cocina</h3>
+                  <p className="text-[12px] text-[#c6c5cf]">
+                    Comanda <strong className="text-[#ffb59c]">#{activeTicket.id.replace('cmd-', '')}</strong> • Mesa <strong className="text-[#ffb59c]">{activeTicket.table}</strong>
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsNoteModalOpen(false)}
+                className="w-8 h-8 rounded-lg hover:bg-[#2a2a2c] text-[#c6c5cf] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-4 space-y-4">
+              <div>
+                <label className="text-[11px] uppercase tracking-wider font-label-code text-[#a1a1aa] font-bold block mb-2">
+                  Atajos Rápidos de Cocina (1 clic):
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    '🥩 Término 3/4',
+                    '🥩 Término Medio',
+                    '🥩 Bien Cocido',
+                    '⚠️ Alergia Severa (Sin Sésamo)',
+                    '⚠️ Sin Gluten / Celiaco',
+                    '⚡ Urgente: Mesa con Prisa',
+                    '🧂 Sin Sal / Bajo en Sodio',
+                    '👶 Plato de Niño (Servir Primero)',
+                    '🍷 Servir Junto con Bebidas'
+                  ].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setNoteInput((prev) => (prev ? `${prev} | ${preset}` : preset))}
+                      className="px-2.5 py-1 bg-[#2a2a2c] hover:bg-[#353437] text-[#e5e1e4] hover:text-white rounded-lg text-[11px] font-medium border border-[#353437]/40 transition-colors cursor-pointer"
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] uppercase tracking-wider font-label-code text-[#a1a1aa] font-bold block mb-1.5">
+                  Instrucción Detallada para Jefe de Cocina / KDS:
+                </label>
+                <textarea
+                  value={noteInput}
+                  onChange={(e) => setNoteInput(e.target.value)}
+                  placeholder="Ej: El cliente solicita que el corte venga con salsa aparte y término exacto..."
+                  rows={3}
+                  className="w-full bg-[#121214] text-[#e5e1e4] p-3 rounded-xl border border-[#353437] text-[13px] placeholder:text-[#71717a] focus:outline-none focus:ring-1 focus:ring-[#ff5708] resize-none"
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 bg-[#201f22] border-t border-[#353437]/50 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setIsNoteModalOpen(false)}
+                className="px-4 py-2 bg-[#2a2a2c] hover:bg-[#353437] text-[#c6c5cf] hover:text-white rounded-xl text-[13px] font-medium transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSaveKitchenNote()}
+                disabled={!noteInput.trim()}
+                className="px-5 py-2 bg-[#ff5708] hover:brightness-110 disabled:opacity-40 disabled:pointer-events-none text-[#511500] font-bold rounded-xl text-[13px] flex items-center gap-1.5 transition-all cursor-pointer shadow-lg shadow-[#ff5708]/20"
+              >
+                <span className="material-symbols-outlined text-[17px]">check</span>
+                <span>Guardar Nota en Comanda</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
