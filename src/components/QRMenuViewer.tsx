@@ -681,27 +681,27 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
             </div>
 
             {/* Main Action Buttons */}
-            <div className="pt-2 flex items-center gap-2.5">
+            <div className="pt-2 flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => {
                   setArDish(heroItem);
                   setIsArModalOpen(true);
                 }}
-                className="px-3.5 py-2.5 min-h-[44px] rounded-xl bg-[#f1f5f9] hover:bg-[#e2e8f0] text-[#334155] hover:text-[#0f172a] dark:bg-[#1e1f28] dark:hover:bg-[#282935] dark:text-[#e5e1e4] text-[13px] font-medium flex items-center gap-1.5 border border-[#cbd5e1] dark:border-[#353642] transition-colors cursor-pointer"
+                className="h-11 px-3.5 rounded-xl bg-[#f1f5f9] hover:bg-[#e2e8f0] text-[#334155] hover:text-[#0f172a] dark:bg-[#1e1f28] dark:hover:bg-[#282935] dark:text-[#e5e1e4] text-[13px] font-medium flex items-center justify-center gap-1.5 border border-[#cbd5e1] dark:border-[#353642] transition-colors cursor-pointer shrink-0 whitespace-nowrap active:scale-95"
                 title="Proyectar plato con cámara en tu mesa"
               >
-                <span className="material-symbols-outlined text-[17px] text-[#ff5708]">view_in_ar</span>
-                <span>Visor AR en Mesa</span>
+                <span className="material-symbols-outlined text-[18px] text-[#ff5708]">view_in_ar</span>
+                <span>Visor AR</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => handleAddToCart(heroItem)}
-                className="flex-1 py-2.5 min-h-[44px] rounded-xl bg-[#ff5708] hover:bg-[#ff6924] text-[#2b0b00] font-bold text-[13px] sm:text-[14px] flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(255,87,8,0.4)] active:scale-98 transition-all cursor-pointer"
+                className="flex-1 h-11 px-3.5 rounded-xl bg-[#ff5708] hover:bg-[#ff6924] text-[#2b0b00] font-bold text-[13px] sm:text-[14px] flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(255,87,8,0.35)] active:scale-98 transition-all cursor-pointer whitespace-nowrap"
               >
                 <span className="material-symbols-outlined text-[18px]">add_shopping_cart</span>
-                <span>Agregar al Pedido • S/ {heroItem.price.toFixed(2)}</span>
+                <span>Agregar • S/ {heroItem.price.toFixed(2)}</span>
               </button>
             </div>
           </div>
