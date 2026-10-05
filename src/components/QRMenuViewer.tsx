@@ -94,6 +94,39 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   const [arCameraActive, setArCameraActive] = useState(false);
   const [arScale, setArScale] = useState(1.0);
   const [arDish, setArDish] = useState<MenuItem>(menuItems[0]); // default to Chaufa or current
+
+  // Re-order / Welcome Back feature for returning diners
+  interface LastOrderRecord {
+    date: number;
+    table: string;
+    items: { item: MenuItem; quantity: number; notes?: string }[];
+    total: number;
+  }
+  const [lastOrder, setLastOrder] = useState<LastOrderRecord | null>(null);
+  const [showWelcomeBack, setShowWelcomeBack] = useState(false);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('gastropulse_last_order');
+      if (saved) {
+        const parsed: LastOrderRecord = JSON.parse(saved);
+        if (parsed && Array.isArray(parsed.items) && parsed.items.length > 0) {
+          setLastOrder(parsed);
+          setShowWelcomeBack(true);
+        }
+      }
+    } catch (e) {
+      console.warn('Could not read last order from storage:', e);
+    }
+  }, []);
+
+  const handleRepeatLastOrder = () => {
+    if (!lastOrder || !lastOrder.items) return;
+    setCart(lastOrder.items);
+    setShowWelcomeBack(false);
+    setIsCartOpen(true);
+    onShowToast('¡Comanda favorita cargada en tu pedido! 🎉', 'receipt_long');
+  };
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
 
@@ -274,6 +307,20 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
         total: cartTotal
       };
       onAddNewOrder(newTicket);
+    }
+
+    try {
+      localStorage.setItem(
+        'gastropulse_last_order',
+        JSON.stringify({
+          date: Date.now(),
+          table: selectedTable,
+          items: cart,
+          total: cartTotal
+        })
+      );
+    } catch (e) {
+      console.warn('Could not save last order:', e);
     }
 
     setCart([]);
@@ -463,6 +510,71 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                   <span>Pedir Cuenta / Pagar QR</span>
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* ✨ RE-ORDER / WELCOME BACK VIP BANNER */}
+      {/* ========================================================================= */}
+      {showWelcomeBack && lastOrder && !activeTicket && (
+        <div className="max-w-4xl mx-auto px-3.5 sm:px-6 pt-3.5 animate-fadeIn">
+          <div className="bg-gradient-to-r from-white via-[#fff7ed] to-white dark:from-[#171821] dark:via-[#22212c] dark:to-[#171821] border border-[#ff5708]/30 dark:border-[#ff5708]/40 rounded-2xl p-4 shadow-[0_4px_25px_rgba(255,87,8,0.12)] flex flex-col gap-3 relative overflow-hidden">
+            {/* Subtle glow background */}
+            <div className="absolute -top-12 -right-12 w-32 h-32 bg-[#ff5708]/10 rounded-full blur-2xl pointer-events-none" />
+
+            <div className="flex items-start justify-between gap-3 relative z-10">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-[#ff5708]/15 border border-[#ff5708]/30 flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-[#ff5708] text-[20px]">auto_awesome</span>
+                </div>
+                <div>
+                  <span className="font-mono-code text-[10px] text-[#c2410c] dark:text-[#ffb59c] font-bold tracking-wider uppercase flex items-center gap-1">
+                    <span>Cliente Frecuente</span>
+                    <span className="text-[8px] text-[#ff5708]">•</span>
+                    <span>AUREA Bistro</span>
+                  </span>
+                  <h4 className="text-[14px] sm:text-[15px] font-bold text-[#0f172a] dark:text-white tracking-tight leading-snug">
+                    ¡Qué gusto tenerte de nuevo en mesa! ✨
+                  </h4>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowWelcomeBack(false)}
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-[#64748b] dark:text-[#94a3b8] hover:text-[#0f172a] dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer shrink-0"
+                title="Descartar recordatorio"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            </div>
+
+            <p className="text-[12px] sm:text-[13px] text-[#475569] dark:text-[#cbd5e1] leading-relaxed relative z-10">
+              En tu visita anterior disfrutaste de:{' '}
+              <strong className="text-[#0f172a] dark:text-white font-semibold">
+                {lastOrder.items.map((it) => `${it.quantity}x ${it.item.name}`).join(', ')}
+              </strong>. ¿Deseas repetir tu combinación favorita hoy?
+            </p>
+
+            <div className="flex flex-wrap items-center gap-2 pt-1 relative z-10">
+              <button
+                type="button"
+                onClick={handleRepeatLastOrder}
+                className="h-10 px-4 rounded-xl bg-[#ff5708] hover:bg-[#ff6924] text-[#2b0b00] font-bold text-[12px] sm:text-[13px] flex items-center gap-1.5 shadow-md shadow-[#ff5708]/25 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+              >
+                <span className="material-symbols-outlined text-[17px]">replay</span>
+                <span>Repetir este Pedido • S/ {lastOrder.total.toFixed(2)}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowWelcomeBack(false)}
+                className="h-10 px-3.5 rounded-xl bg-[#f1f5f9] hover:bg-[#e2e8f0] text-[#334155] dark:bg-white/5 dark:hover:bg-white/10 dark:text-[#e2e8f0] text-[12px] font-medium border border-[#cbd5e1] dark:border-white/10 transition-colors cursor-pointer whitespace-nowrap"
+              >
+                Explorar Otros Platos
+              </button>
             </div>
           </div>
         </div>
