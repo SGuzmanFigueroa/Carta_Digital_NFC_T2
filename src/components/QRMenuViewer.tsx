@@ -25,6 +25,32 @@ import { ThemeToggle } from './menu/ThemeToggle';
 import { MenuBottomNav } from './menu/MenuBottomNav';
 import { PaymentModal } from './menu/PaymentModal';
 import { ComplaintBookModal } from './menu/ComplaintBookModal';
+// CD-16 · Pop-up promocional "Oferta Flash" con platos reales del menú.
+import { PromoDealModal } from './menu/PromoDealModal';
+import { calculatePromoPricing, formatSoles } from '@/utils/promo';
+
+// =============================================================================
+// 🎯 CD-16 · CONFIGURACIÓN DE LA OFERTA FLASH (POP-UP PROMOCIONAL DEL COMENSAL)
+// =============================================================================
+/** Porcentaje de descuento aplicado a los platos promocionados. */
+const PROMO_DEAL_DISCOUNT = 15;
+/** Duración de la cuenta regresiva del pop-up (755s = "¡TERMINA EN 12:35!"). */
+const PROMO_DEAL_DURATION_SECONDS = 755;
+/** Platos reales del menú que se rotan en el pop-up (con respaldo automático). */
+const PROMO_DEAL_IDS = ['wagyu-a5', 'pulpo-brasa', 'esfera-chocolate'];
+/**
+ * Beat mínimo (ms) entre el primer frame ya pintado de la carta y la aparición
+ * del pop-up. Bajarlo de ~300ms hace que la oferta tape el primer pintado (LCP);
+ * subirlo retrasa el impacto comercial. 350ms = sensación instantánea sin brinco.
+ */
+const PROMO_DEAL_OPEN_DELAY_MS = 350;
+/**
+ * Apertura garantizada (ms) aunque el navegador estrangule requestAnimationFrame
+ * (pestaña en segundo plano, equipo muy lento): la oferta nunca se pierde.
+ */
+const PROMO_DEAL_OPEN_TIMEOUT_MS = 1200;
+/** Bandera de sesión: evita repetir el auto-apertura en cada recarga del comensal. */
+const PROMO_DEAL_SEEN_KEY = 'gastropulse_promo_seen';
 
 interface QRMenuViewerProps {
   menuItems: MenuItem[];
@@ -63,6 +89,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   const [selectedTable, setSelectedTable] = useState('MESA 04');
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isComplaintModalOpen, setIsComplaintModalOpen] = useState(false);
+  const [isPromoModalOpen, setIsPromoModalOpen] = useState(false);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'Efectivo' | 'Tarjeta POS (Visa/MC)' | 'Yape / Plin'>('Tarjeta POS (Visa/MC)');
   const [waiterCalled, setWaiterCalled] = useState(false);
 
@@ -262,6 +289,97 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       return [...prev, { item, quantity: 1 }];
     });
     onShowToast(`Agregado: ${item.name}`, 'add_shopping_cart');
+  };
+
+  // ==========================================================================
+  // 🎯 CD-16 · OFERTA FLASH: platos reales + estado del pop-up promocional
+  // ==========================================================================
+  const promoDeals = React.useMemo(() => {
+    const matched = PROMO_DEAL_IDS.map((id) => menuItems.find((item) => item.id === id)).filter(
+      (item): item is MenuItem => Boolean(item)
+    );
+    return matched.length > 0 ? matched : menuItems.slice(0, 3);
+  }, [menuItems]);
+
+  const promoHeroDeal = promoDeals[0];
+  const promoHeroPricing = promoHeroDeal
+    ? calculatePromoPricing(promoHeroDeal.price, PROMO_DEAL_DISCOUNT)
+    : null;
+
+  // El pop-up se abre apenas la carta está pintada (una sola vez por sesión) y
+  // puede reabrirse desde la tira promocional o desde la tarjeta del menú.
+  //
+  // Estrategia de timing "instantánea": en lugar de un reloj fijo largo, se espera
+  // al primer frame realmente pintado por el navegador (doble requestAnimationFrame
+  // tras la hidratación) y recién ahí corre el beat mínimo. Así la oferta aparece en
+  // ~0.4s tras pintar la carta, sin tapar el primer render (protege el LCP) y con un
+  // temporizador de seguridad que la garantiza incluso en equipos/pestañas lentas.
+  useEffect(() => {
+    if (promoDeals.length === 0) return;
+
+    try {
+      if (sessionStorage.getItem(PROMO_DEAL_SEEN_KEY) === '1') return;
+    } catch {
+      // Navegación privada sin sessionStorage: se muestra igualmente.
+    }
+
+    // Precalentado de fotos en la caché del navegador: el pop-up se despliega ya
+    // renderizado (sin parpadeo de imagen) en cuanto se abre.
+    promoDeals.forEach((deal) => {
+      if (!deal.image) return;
+      const preload = new window.Image();
+      preload.decoding = 'async';
+      preload.src = deal.image;
+    });
+
+    let beatTimer: number | undefined;
+    let opened = false;
+
+    const openPromoDeal = () => {
+      if (opened) return;
+      opened = true;
+      setIsPromoModalOpen(true);
+      try {
+        sessionStorage.setItem(PROMO_DEAL_SEEN_KEY, '1');
+      } catch {
+        // Sin sessionStorage disponible: la oferta igualmente se muestra.
+      }
+    };
+
+    // El segundo frame ya corre con el primer pintado de la carta confirmado.
+    const firstFrame = window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        beatTimer = window.setTimeout(openPromoDeal, PROMO_DEAL_OPEN_DELAY_MS);
+      });
+    });
+
+    const safetyTimer = window.setTimeout(openPromoDeal, PROMO_DEAL_OPEN_TIMEOUT_MS);
+
+    return () => {
+      window.cancelAnimationFrame(firstFrame);
+      if (beatTimer !== undefined) window.clearTimeout(beatTimer);
+      window.clearTimeout(safetyTimer);
+    };
+  }, [promoDeals.length]);
+
+  // Aplica la oferta: agrega el plato al pedido con su PRECIO PROMOCIONAL real
+  // (el precio de lista del menú se mantiene intacto para el resto de la carta).
+  const handleApplyPromoDeal = (dish: MenuItem, promoPrice: number) => {
+    setCart((prev) => {
+      const existing = prev.find((c) => c.item.id === dish.id && c.item.price === promoPrice);
+      if (existing) {
+        return prev.map((c) =>
+          c.item.id === dish.id && c.item.price === promoPrice ? { ...c, quantity: c.quantity + 1 } : c
+        );
+      }
+      return [...prev, { item: { ...dish, price: promoPrice }, quantity: 1 }];
+    });
+
+    setIsPromoModalOpen(false);
+    onShowToast(
+      `🔥 Oferta aplicada: ${dish.name} a ${formatSoles(promoPrice)} (-${PROMO_DEAL_DISCOUNT}%)`,
+      'local_fire_department'
+    );
   };
 
   const handleRemoveFromCart = (itemId: string) => {
@@ -666,6 +784,42 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
             )}
           </div>
         </div>
+
+        {/* ========================================================================= */}
+        {/* ⚡ CD-16 · TIRA DE OFERTA FLASH (dispara el pop-up promocional)            */}
+        {/* ========================================================================= */}
+        {promoHeroDeal && promoHeroPricing && (
+          <button
+            type="button"
+            onClick={() => setIsPromoModalOpen(true)}
+            aria-haspopup="dialog"
+            className="w-full text-left relative overflow-hidden rounded-2xl border border-[#ff5708]/35 bg-gradient-to-r from-[#ff5708]/15 via-[#ff5708]/5 to-transparent p-2.5 flex items-center gap-3 shadow-[0_4px_20px_rgba(255,87,8,0.12)] active:scale-[0.99] transition-transform cursor-pointer"
+          >
+            <span className="w-11 h-11 min-w-[44px] rounded-xl bg-[#ff5708] text-white flex items-center justify-center shrink-0 shadow-md shadow-[#ff5708]/30">
+              <span className="material-symbols-outlined text-[20px]">bolt</span>
+            </span>
+
+            <span className="flex flex-col min-w-0 flex-1">
+              <span className="font-mono-code text-[10px] font-bold uppercase tracking-wider text-[#c2410c] dark:text-[#ffb59c]">
+                Oferta Flash · -{PROMO_DEAL_DISCOUNT}% del día
+              </span>
+              <span className="text-[13px] font-semibold text-[#0f172a] dark:text-white truncate">
+                {promoHeroDeal.name}
+              </span>
+              <span className="flex items-center gap-2 font-mono-code text-[11px] pt-0.5">
+                <span className="text-[#ff5708] font-bold">{formatSoles(promoHeroPricing.promoPrice)}</span>
+                <span className="text-[#64748b] dark:text-[#71717a] line-through">
+                  {formatSoles(promoHeroPricing.originalPrice)}
+                </span>
+                <span className="text-emerald-700 dark:text-emerald-400 font-bold">
+                  Ahorras {formatSoles(promoHeroPricing.savings)}
+                </span>
+              </span>
+            </span>
+
+            <span className="material-symbols-outlined text-[#ff5708] text-[22px] shrink-0">chevron_right</span>
+          </button>
+        )}
 
         {/* ========================================================================= */}
         {/* ⭐ HERO FEATURED DISH (DUAL VIEW: 📸 FOTO HD / 🧊 3D 360°) */}
@@ -1439,6 +1593,18 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
         onClose={() => setIsComplaintModalOpen(false)}
         currentTable={selectedTable}
         onShowToast={onShowToast}
+      />
+
+      {/* ========================================================================= */}
+      {/* ⚡ CD-16 · POP-UP PROMOCIONAL "OFERTA FLASH" (PLATOS REALES + DESCUENTO)   */}
+      {/* ========================================================================= */}
+      <PromoDealModal
+        isOpen={isPromoModalOpen}
+        onClose={() => setIsPromoModalOpen(false)}
+        deals={promoDeals}
+        discountPercent={PROMO_DEAL_DISCOUNT}
+        countdownSeconds={PROMO_DEAL_DURATION_SECONDS}
+        onApply={handleApplyPromoDeal}
       />
 
     </div>
