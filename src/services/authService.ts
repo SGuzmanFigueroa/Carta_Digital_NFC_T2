@@ -34,6 +34,57 @@ export async function loginStaffWithPin(pin: string): Promise<AuthUser | null> {
   }
 }
 
+export async function loginStaffWithCredentials(
+  userOrEmail: string,
+  plainPassword: string
+): Promise<{ success: boolean; user?: AuthUser; error?: string }> {
+  try {
+    const clean = userOrEmail.trim().toLowerCase();
+    const { data, error } = await supabase
+      .from('staff')
+      .select('*')
+      .or(`email.ilike.${clean},username.ilike.${clean},name.ilike.${clean}`)
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.warn('[AuthService] Error querying staff in Supabase:', error.message);
+      return { success: false, error: 'Error de conexión con la base de datos de autenticación.' };
+    }
+
+    if (!data) {
+      return { success: false, error: 'Usuario o correo no encontrado en el sistema.' };
+    }
+
+    if (['inactivo', 'inactive', 'disabled', 'desactivado', 'suspended'].includes(data.status?.trim().toLowerCase() || '')) {
+      return { success: false, error: 'Cuenta inactiva. Por favor contacta al administrador del restaurante.' };
+    }
+
+    const isValidPass = (data.password && data.password === plainPassword) || (data.pin && data.pin === plainPassword);
+    if (!isValidPass) {
+      return { success: false, error: 'Contraseña o credenciales incorrectas.' };
+    }
+
+    const authUser: AuthUser = {
+      id: data.id,
+      name: data.name,
+      username: data.username,
+      email: data.email || `${data.username}@aureabistro.pe`,
+      role: (data.role?.toLowerCase().trim() as AuthUser['role']) || 'floor',
+      roleTitle: data.role_title || 'Personal GastroPulse',
+      pin: data.pin || '1234',
+      assignment: data.station || 'Salón Principal',
+      terminal: 'TERM-04',
+      loginTime: new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
+    };
+
+    return { success: true, user: authUser };
+  } catch (err: any) {
+    console.error('Error during staff credentials login:', err);
+    return { success: false, error: 'Error inesperado durante la autenticación.' };
+  }
+}
+
 export async function fetchStaffFromDb(): Promise<StaffMember[]> {
   try {
     const { data, error } = await supabase

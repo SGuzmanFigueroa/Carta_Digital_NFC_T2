@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { setAuthSessionCookie, AuditLogger, sanitizeText } from '../utils/security';
 import { kitchenAudio } from '../utils/audio';
 import { AuthUser, StaffMember } from '../types';
-import { getPersistedStaffList, sendPasswordResetEmail } from '../services/authService';
+import { getPersistedStaffList, sendPasswordResetEmail, loginStaffWithCredentials, loginStaffWithPin } from '../services/authService';
 import { INITIAL_STAFF } from '../data/mockData';
 
 interface LoginScreenProps {
@@ -93,9 +93,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
   const handlePasswordChange = (val: string) => {
     setPassword(val);
-    const regex = /^(?=.*\d)(?=.*[@$!%*#?&]).{8,}$/;
-    if (!regex.test(val) && val.length > 0) {
-      setPasswordError('Mínimo 8 caracteres, incluir números y caracteres seguros (@$!%*#?&).');
+    if (val.length < 4 && val.length > 0) {
+      setPasswordError('Mínimo 4 caracteres.');
     } else {
       setPasswordError('');
     }
@@ -113,7 +112,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     router.replace(destination);
   };
 
-  const handleCredentialsLogin = (e: React.FormEvent) => {
+  const handleCredentialsLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (lockoutSeconds > 0 || passwordError || emailError) return;
     setErrorMessage('');
@@ -126,38 +125,46 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
     setIsLoading(true);
 
-    setTimeout(() => {
-      const trimmedInput = sanitizedUser.toLowerCase();
-      const matched = activeStaff.find((st) => {
-        const emailMatches = st.email && st.email.toLowerCase() === trimmedInput;
-        const userMatches = st.username && st.username.toLowerCase() === trimmedInput;
-        const nameMatches = st.name.toLowerCase() === trimmedInput;
-        const passMatches = (st.password && st.password === password) || st.pin === password;
-        return (emailMatches || userMatches || nameMatches) && passMatches;
-      });
+    try {
+      // 1. Intento de autenticación en vivo con Supabase
+      const res = await loginStaffWithCredentials(sanitizedUser, password);
+      let authUser: AuthUser | null = res.success && res.user ? res.user : null;
 
-      if (matched) {
-        // CD-14 (Punto 3): Validación de cuenta inactiva
-        if (['inactivo', 'inactive', 'disabled', 'desactivado', 'suspended'].includes(matched.status?.trim().toLowerCase() || '')) {
-          setErrorMessage('Cuenta inactiva. Por favor, contacta a Recursos Humanos.');
-          setIsLoading(false);
-          return;
+      // 2. Resiliencia / Fallback si no está en la base de datos o fallo de red
+      if (!authUser) {
+        const trimmedInput = sanitizedUser.toLowerCase();
+        const matched = activeStaff.find((st) => {
+          const emailMatches = st.email && st.email.toLowerCase() === trimmedInput;
+          const userMatches = st.username && st.username.toLowerCase() === trimmedInput;
+          const nameMatches = st.name.toLowerCase() === trimmedInput;
+          const passMatches = (st.password && st.password === password) || st.pin === password;
+          return (emailMatches || userMatches || nameMatches) && passMatches;
+        });
+
+        if (matched) {
+          if (['inactivo', 'inactive', 'disabled', 'desactivado', 'suspended'].includes(matched.status?.trim().toLowerCase() || '')) {
+            setErrorMessage('Cuenta inactiva. Por favor, contacta a Recursos Humanos.');
+            setIsLoading(false);
+            return;
+          }
+
+          authUser = {
+            id: matched.id,
+            name: matched.name,
+            username: matched.username || matched.name.toLowerCase().replace(/\s+/g, '.'),
+            email: matched.email || `${matched.id}@aureabistro.pe`,
+            role: (matched.role as AuthUser['role']) || 'floor',
+            roleTitle: matched.roleTitle || 'Personal GastroPulse',
+            pin: matched.pin || '1234',
+            assignment: matched.assignment || 'Salón Principal',
+            terminal: 'TERM-04',
+            loginTime: new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
+          };
         }
+      }
 
+      if (authUser) {
         setFailedAttempts(0);
-        const authUser: AuthUser = {
-          id: matched.id,
-          name: matched.name,
-          username: matched.username || matched.name.toLowerCase().replace(/\s+/g, '.'),
-          email: matched.email || `${matched.id}@aureabistro.pe`,
-          role: (matched.role as AuthUser['role']) || 'floor',
-          roleTitle: matched.roleTitle || 'Personal',
-          pin: matched.pin || '1234',
-          assignment: matched.assignment || 'Salón Principal',
-          terminal: 'TERM-04',
-          loginTime: new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
-        };
-
         try {
           if (rememberMe) {
             localStorage.setItem('gastropulse_auth_user', JSON.stringify(authUser));
@@ -170,16 +177,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         AuditLogger.log({
           eventType: 'LOGIN_SUCCESS',
           severity: 'INFO',
-          user: matched.name,
-          role: matched.role,
-          details: `Inicio de sesión exitoso vía credenciales (Usuario: ${sanitizedUser})`
+          user: authUser.name,
+          role: authUser.role,
+          details: `Inicio de sesión exitoso vía credenciales Supabase (Usuario: ${sanitizedUser})`
         });
 
         setIsLoading(false);
-        onShowToast(`¡Bienvenido/a, ${matched.name}! Sesión iniciada.`, 'verified_user');
+        onShowToast(`¡Bienvenido/a, ${authUser.name}! Sesión iniciada.`, 'verified_user');
         onLoginSuccess(authUser);
 
-        // CD-14 (Punto 4): Ejecutar ruteo estricto
         executeRoleRedirection(authUser);
       } else {
         const nextAttempts = failedAttempts + 1;
@@ -198,15 +204,19 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           AuditLogger.log({
             eventType: 'PIN_LOCKOUT',
             severity: 'CRITICAL',
-            details: 'Terminal bloqueada por 30 segundos tras 4 intentos fallidos'
+            user: 'TERMINAL',
+            details: 'Bloqueo temporal de 30 segundos por 4 intentos fallidos de credenciales'
           });
-          setErrorMessage('⚠️ Terminal bloqueada temporalmente (30s) por exceso de intentos.');
+          setErrorMessage('Demasiados intentos fallidos. Terminal bloqueada por 30s.');
         } else {
-          // CD-14 (Punto 3): Feedback visual accesible descriptivo
-          setErrorMessage(`Credenciales inválidas. Verifica tu correo y contraseña. (Intento ${nextAttempts}/4)`);
+          setErrorMessage(res.error || `Credenciales incorrectas. Intento ${nextAttempts} de 4.`);
+          kitchenAudio.playAllergyWarning();
         }
       }
-    }, 60);
+    } catch (err) {
+      setIsLoading(false);
+      setErrorMessage('Error de comunicación durante el inicio de sesión.');
+    }
   };
 
   const handlePinInput = (digit: string) => {
@@ -230,42 +240,48 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     setErrorMessage('');
   };
 
-  const validatePin = (enteredPin: string) => {
+  const validatePin = async (enteredPin: string) => {
     if (lockoutSeconds > 0) return;
     setIsLoading(true);
-    setTimeout(() => {
-      let matched: StaffMember | undefined;
 
-      if (selectedStaffForPin) {
-        if (selectedStaffForPin.pin === enteredPin) {
-          matched = selectedStaffForPin;
+    try {
+      // 1. Intento de autenticación en vivo con Supabase
+      let authUser: AuthUser | null = await loginStaffWithPin(enteredPin);
+
+      // 2. Fallback local si la red está offline o usuario local
+      if (!authUser) {
+        let matched: StaffMember | undefined;
+        if (selectedStaffForPin) {
+          if (selectedStaffForPin.pin === enteredPin) matched = selectedStaffForPin;
+        } else {
+          matched = activeStaff.find((st) => st.pin === enteredPin);
         }
-      } else {
-        matched = activeStaff.find((st) => st.pin === enteredPin);
+
+        if (matched) {
+          if (['inactivo', 'inactive', 'disabled', 'desactivado', 'suspended'].includes(matched.status?.trim().toLowerCase() || '')) {
+            setErrorMessage('Cuenta inactiva. Por favor, contacta a Recursos Humanos.');
+            setIsLoading(false);
+            setPinDigits('');
+            return;
+          }
+
+          authUser = {
+            id: matched.id,
+            name: matched.name,
+            username: matched.username || matched.name.toLowerCase().replace(/\s+/g, '.'),
+            email: matched.email || `${matched.id}@aureabistro.pe`,
+            role: (matched.role as AuthUser['role']) || 'floor',
+            roleTitle: matched.roleTitle || 'Personal',
+            pin: matched.pin || '1234',
+            assignment: matched.assignment || 'Salón Principal',
+            terminal: 'TERM-04',
+            loginTime: new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
+          };
+        }
       }
 
-      if (matched) {
-        if (['inactivo', 'inactive', 'disabled', 'desactivado', 'suspended'].includes(matched.status?.trim().toLowerCase() || '')) {
-          setErrorMessage('Cuenta inactiva. Por favor, contacta a Recursos Humanos.');
-          setIsLoading(false);
-          setPinDigits('');
-          return;
-        }
-
+      if (authUser) {
         setFailedAttempts(0);
-        const authUser: AuthUser = {
-          id: matched.id,
-          name: matched.name,
-          username: matched.username || matched.name.toLowerCase().replace(/\s+/g, '.'),
-          email: matched.email || `${matched.id}@aureabistro.pe`,
-          role: (matched.role as AuthUser['role']) || 'floor',
-          roleTitle: matched.roleTitle || 'Personal',
-          pin: matched.pin || '1234',
-          assignment: matched.assignment || 'Salón Principal',
-          terminal: 'TERM-04',
-          loginTime: new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
-        };
-
         try {
           localStorage.setItem('gastropulse_auth_user', JSON.stringify(authUser));
           setAuthSessionCookie(authUser);
@@ -274,13 +290,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         AuditLogger.log({
           eventType: 'LOGIN_SUCCESS',
           severity: 'INFO',
-          user: matched.name,
-          role: matched.role,
-          details: `Acceso exitoso vía PIN en terminal TERM-04`
+          user: authUser.name,
+          role: authUser.role,
+          details: `Acceso exitoso vía PIN Supabase en terminal`
         });
 
         setIsLoading(false);
-        onShowToast(`Acceso concedido vía PIN: ${matched.name}`, 'key');
+        onShowToast(`Acceso concedido vía PIN: ${authUser.name}`, 'key');
         onLoginSuccess(authUser);
         executeRoleRedirection(authUser);
       } else {
@@ -292,7 +308,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         AuditLogger.log({
           eventType: 'LOGIN_FAILED',
           severity: 'WARN',
-          details: `Intento de PIN fallido #${nextAttempts}`
+          details: `Fallo de autenticación por PIN (intento #${nextAttempts})`
         });
 
         if (nextAttempts >= 4) {
@@ -301,14 +317,20 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           AuditLogger.log({
             eventType: 'PIN_LOCKOUT',
             severity: 'CRITICAL',
-            details: 'Terminal bloqueada por 30s tras 4 intentos fallidos de PIN'
+            user: 'TERMINAL',
+            details: 'Bloqueo temporal de 30 segundos por 4 intentos fallidos de PIN'
           });
-          setErrorMessage('⚠️ Terminal bloqueada temporalmente (30s) por exceso de intentos fallidos.');
+          setErrorMessage('Demasiados intentos fallidos. Terminal bloqueada por 30s.');
         } else {
-          setErrorMessage(`PIN incorrecto. Intento ${nextAttempts}/4 antes del bloqueo temporal.`);
+          setErrorMessage(`PIN incorrecto. Intento ${nextAttempts} de 4.`);
+          kitchenAudio.playAllergyWarning();
         }
       }
-    }, 50);
+    } catch (err) {
+      setIsLoading(false);
+      setPinDigits('');
+      setErrorMessage('Error al validar el PIN en el servidor.');
+    }
   };
 
   const fillQuickDemoUser = (targetRole: 'admin' | 'kitchen' | 'floor' | 'bar') => {
@@ -331,6 +353,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     setUsernameOrEmail(user.email || user.username || 'admin');
     setPassword(user.password || user.pin || 'admin123');
     setPinDigits(user.pin || '9021');
+    setPasswordError('');
+    setEmailError('');
     setErrorMessage('');
 
     const authUser: AuthUser = {
