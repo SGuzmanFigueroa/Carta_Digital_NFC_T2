@@ -27,7 +27,9 @@ import { PaymentModal } from './menu/PaymentModal';
 import { ComplaintBookModal } from './menu/ComplaintBookModal';
 // CD-16 · Pop-up promocional "Oferta Flash" con platos reales del menú.
 import { PromoDealModal } from './menu/PromoDealModal';
-import { calculatePromoPricing, formatSoles } from '@/utils/promo';
+// CD-16 · Tira "Oferta Flash" de portada: rota sola entre las ofertas activas.
+import { PromoFlashTicker } from './menu/PromoFlashTicker';
+import { formatSoles } from '@/utils/promo';
 
 // =============================================================================
 // 🎯 CD-16 · CONFIGURACIÓN DE LA OFERTA FLASH (POP-UP PROMOCIONAL DEL COMENSAL)
@@ -38,6 +40,13 @@ const PROMO_DEAL_DISCOUNT = 15;
 const PROMO_DEAL_DURATION_SECONDS = 755;
 /** Platos reales del menú que se rotan en el pop-up (con respaldo automático). */
 const PROMO_DEAL_IDS = ['wagyu-a5', 'pulpo-brasa', 'esfera-chocolate'];
+/**
+ * ⏱️ Autoplay de la tira "Oferta Flash" de portada: cada cuánto rota de plato.
+ * 2000ms = ritmo "2s" (dentro del rango 1.8-2s pedido para el banner): pasa de
+ * oferta en oferta como un carrusel llamativo sin cortes secos. Se pausa al
+ * pasar el mouse / apoyar el dedo (ver `PromoFlashTicker`).
+ */
+const PROMO_TICKER_ROTATION_MS = 2000;
 /**
  * Beat mínimo (ms) entre el primer frame ya pintado de la carta y la aparición
  * del pop-up. Bajarlo de ~300ms hace que la oferta tape el primer pintado (LCP);
@@ -51,6 +60,14 @@ const PROMO_DEAL_OPEN_DELAY_MS = 350;
 const PROMO_DEAL_OPEN_TIMEOUT_MS = 1200;
 /** Bandera de sesión: evita repetir el auto-apertura en cada recarga del comensal. */
 const PROMO_DEAL_SEEN_KEY = 'gastropulse_promo_seen';
+/**
+ * ⚠️ SOLO DESARROLLO: cuando es `true`, el pop-up ignora la bandera de sesión y
+ * se vuelve a abrir en cada carga de la carta. Es lo que permite re-testear el
+ * modal en el celular / emulación móvil de DevTools sin limpiar sessionStorage
+ * a mano. En producción (`false`) se conserva el comportamiento de siempre
+ * ("una vez por sesión").
+ */
+const IS_DEV = process.env.NODE_ENV !== 'production';
 
 interface QRMenuViewerProps {
   menuItems: MenuItem[];
@@ -90,6 +107,8 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isComplaintModalOpen, setIsComplaintModalOpen] = useState(false);
   const [isPromoModalOpen, setIsPromoModalOpen] = useState(false);
+  /** Oferta con la que debe abrir el pop-up (la que se veía en la tira flash). */
+  const [promoInitialDealId, setPromoInitialDealId] = useState<string | null>(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'Efectivo' | 'Tarjeta POS (Visa/MC)' | 'Yape / Plin'>('Tarjeta POS (Visa/MC)');
   const [waiterCalled, setWaiterCalled] = useState(false);
 
@@ -301,10 +320,23 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     return matched.length > 0 ? matched : menuItems.slice(0, 3);
   }, [menuItems]);
 
-  const promoHeroDeal = promoDeals[0];
-  const promoHeroPricing = promoHeroDeal
-    ? calculatePromoPricing(promoHeroDeal.price, PROMO_DEAL_DISCOUNT)
-    : null;
+  /**
+   * Abre el pop-up promocional. Si llega el `id` de un plato (toque en la tira
+   * "Oferta Flash"), el carrusel del pop-up se abre YA en esa oferta; sin
+   * argumento arranca en la primera (auto-apertura de la carta y demás entradas
+   * genéricas). Se memoiza para que la tira del ticker no se re-renderice con
+   * cada render de la carta.
+   */
+  const openPromoModal = React.useCallback((dealId: string | null = null) => {
+    setPromoInitialDealId(dealId);
+    setIsPromoModalOpen(true);
+  }, []);
+
+  /** Toque/click en la tira: abre el detalle de la oferta que se está viendo. */
+  const handleOpenDealFromTicker = React.useCallback(
+    (deal: MenuItem) => openPromoModal(deal.id),
+    [openPromoModal]
+  );
 
   // El pop-up se abre apenas la carta está pintada (una sola vez por sesión) y
   // puede reabrirse desde la tira promocional o desde la tarjeta del menú.
@@ -317,10 +349,13 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   useEffect(() => {
     if (promoDeals.length === 0) return;
 
-    try {
-      if (sessionStorage.getItem(PROMO_DEAL_SEEN_KEY) === '1') return;
-    } catch {
-      // Navegación privada sin sessionStorage: se muestra igualmente.
+    // El guard de sesión se omite en desarrollo para poder re-testear el pop-up.
+    if (!IS_DEV) {
+      try {
+        if (sessionStorage.getItem(PROMO_DEAL_SEEN_KEY) === '1') return;
+      } catch {
+        // Navegación privada sin sessionStorage: se muestra igualmente.
+      }
     }
 
     // Precalentado de fotos en la caché del navegador: el pop-up se despliega ya
@@ -338,11 +373,16 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     const openPromoDeal = () => {
       if (opened) return;
       opened = true;
-      setIsPromoModalOpen(true);
-      try {
-        sessionStorage.setItem(PROMO_DEAL_SEEN_KEY, '1');
-      } catch {
-        // Sin sessionStorage disponible: la oferta igualmente se muestra.
+      // Sin `initialDealId`: la auto-apertura siempre muestra la primera oferta.
+      openPromoModal();
+      // En desarrollo NO marcamos la bandera: así el pop-up vuelve a abrirse en
+      // cada recarga durante las pruebas (incluida la emulación móvil).
+      if (!IS_DEV) {
+        try {
+          sessionStorage.setItem(PROMO_DEAL_SEEN_KEY, '1');
+        } catch {
+          // Sin sessionStorage disponible: la oferta igualmente se muestra.
+        }
       }
     };
 
@@ -360,7 +400,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       if (beatTimer !== undefined) window.clearTimeout(beatTimer);
       window.clearTimeout(safetyTimer);
     };
-  }, [promoDeals.length]);
+  }, [promoDeals.length, openPromoModal]);
 
   // Aplica la oferta: agrega el plato al pedido con su PRECIO PROMOCIONAL real
   // (el precio de lista del menú se mantiene intacto para el resto de la carta).
@@ -786,40 +826,18 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
         </div>
 
         {/* ========================================================================= */}
-        {/* ⚡ CD-16 · TIRA DE OFERTA FLASH (dispara el pop-up promocional)            */}
+        {/* ⚡ CD-16 · TIRA DE OFERTA FLASH (autoplay + dispara el pop-up)            */}
         {/* ========================================================================= */}
-        {promoHeroDeal && promoHeroPricing && (
-          <button
-            type="button"
-            onClick={() => setIsPromoModalOpen(true)}
-            aria-haspopup="dialog"
-            className="w-full text-left relative overflow-hidden rounded-2xl border border-[#ff5708]/35 bg-gradient-to-r from-[#ff5708]/15 via-[#ff5708]/5 to-transparent p-2.5 flex items-center gap-3 shadow-[0_4px_20px_rgba(255,87,8,0.12)] active:scale-[0.99] transition-transform cursor-pointer"
-          >
-            <span className="w-11 h-11 min-w-[44px] rounded-xl bg-[#ff5708] text-white flex items-center justify-center shrink-0 shadow-md shadow-[#ff5708]/30">
-              <span className="material-symbols-outlined text-[20px]">bolt</span>
-            </span>
-
-            <span className="flex flex-col min-w-0 flex-1">
-              <span className="font-mono-code text-[10px] font-bold uppercase tracking-wider text-[#c2410c] dark:text-[#ffb59c]">
-                Oferta Flash · -{PROMO_DEAL_DISCOUNT}% del día
-              </span>
-              <span className="text-[13px] font-semibold text-[#0f172a] dark:text-white truncate">
-                {promoHeroDeal.name}
-              </span>
-              <span className="flex items-center gap-2 font-mono-code text-[11px] pt-0.5">
-                <span className="text-[#ff5708] font-bold">{formatSoles(promoHeroPricing.promoPrice)}</span>
-                <span className="text-[#64748b] dark:text-[#71717a] line-through">
-                  {formatSoles(promoHeroPricing.originalPrice)}
-                </span>
-                <span className="text-emerald-700 dark:text-emerald-400 font-bold">
-                  Ahorras {formatSoles(promoHeroPricing.savings)}
-                </span>
-              </span>
-            </span>
-
-            <span className="material-symbols-outlined text-[#ff5708] text-[22px] shrink-0">chevron_right</span>
-          </button>
-        )}
+        {/* Rota sola entre las ofertas activas cada `PROMO_TICKER_ROTATION_MS`. Se
+            pausa al pasar el mouse / apoyar el dedo y, al tocarla, abre el pop-up
+            detallado EN la oferta que se está viendo en ese instante. */}
+        <PromoFlashTicker
+          deals={promoDeals}
+          discountPercent={PROMO_DEAL_DISCOUNT}
+          rotationMs={PROMO_TICKER_ROTATION_MS}
+          isPaused={isPromoModalOpen}
+          onOpenDeal={handleOpenDealFromTicker}
+        />
 
         {/* ========================================================================= */}
         {/* ⭐ HERO FEATURED DISH (DUAL VIEW: 📸 FOTO HD / 🧊 3D 360°) */}
@@ -1602,6 +1620,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
         isOpen={isPromoModalOpen}
         onClose={() => setIsPromoModalOpen(false)}
         deals={promoDeals}
+        initialDealId={promoInitialDealId}
         discountPercent={PROMO_DEAL_DISCOUNT}
         countdownSeconds={PROMO_DEAL_DURATION_SECONDS}
         onApply={handleApplyPromoDeal}

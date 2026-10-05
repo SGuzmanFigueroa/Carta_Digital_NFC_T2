@@ -835,7 +835,7 @@ export function PromoOffersManager({
         aria-modal="true"
         aria-label="Vista previa móvil de la oferta"
       >
-        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[90] flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/75 backdrop-blur-md border border-white/15 text-white text-[11px] font-semibold shadow-xl whitespace-nowrap">
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[10000] flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/75 backdrop-blur-md border border-white/15 text-white text-[11px] font-semibold shadow-xl whitespace-nowrap">
           <span className="material-symbols-outlined text-[16px] text-[#FF5A1F]">smartphone</span>
           <span>Vista previa móvil · así verá el comensal la oferta</span>
           <button

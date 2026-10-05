@@ -149,6 +149,21 @@ body {
   animation: fadeIn 0.18s ease-out forwards;
 }
 
+/* CD-16 · Ticker de la tira "Oferta Flash" de la carta del comensal: cada vez
+   que la barra rota de plato (autoplay de 2s, ver `PromoFlashTicker`), el bloque
+   de datos entra con un desvanecido + deslizamiento vertical (500ms, la misma
+   curva que el resto de entradas del sistema) en vez de un corte seco. El nodo se
+   remonta vía `key={deal.id}`, así que la animación siempre arranca de cero y no
+   hay tirones a mitad de transición. */
+@keyframes promoDealTicker {
+  from { opacity: 0; transform: translate3d(0, 12px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+.promo-deal-ticker {
+  animation: promoDealTicker 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 /* ==========================================================
    GASTROPULSE OS: THEMES & ERGONOMICS (CLARO MINIMAL & KDS)
    ========================================================== */
@@ -372,6 +387,22 @@ html {
     opacity: 1 !important;
     transform: none !important;
     transition: none !important;
+  }
+
+  /* CD-16 · El pop-up promocional NO debe depender de la animación para verse:
+     con movimiento reducido (Android "Quitar animaciones", iOS "Reducir
+     movimiento", batería baja) se pinta de inmediato en su estado final visible. */
+  .animate-fadeIn {
+    animation: none !important;
+  }
+
+  /* CD-16 · Ticker "Oferta Flash": sin deslizamiento, el plato aparece ya
+     colocado. La rotación automática la desactiva el propio componente al
+     detectar la misma preferencia del sistema. */
+  .promo-deal-ticker {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
   }
 }
 

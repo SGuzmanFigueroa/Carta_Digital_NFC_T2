@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRight, Clock, Star, TrendingUp, X, Zap } from 'lucide-react';
 import type { MenuItem } from '@/types';
 import { buildPromoSubtitleText, calculatePromoPricing, formatPromoCountdown, formatSoles } from '@/utils/promo';
@@ -10,8 +10,14 @@ import { getPromoMechanic } from '@/utils/promoOffers';
 interface PromoDealModalProps {
   isOpen: boolean;
   onClose: () => void;
-  /** Platos reales promocionados: uno por cada punto del carrusel inferior. */
+  /** Platos reales promocionados: una tarjeta por cada punto del carrusel inferior. */
   deals: MenuItem[];
+  /**
+   * Oferta que debe quedar centrada al abrir: el `id` del plato que el comensal
+   * tenía delante en la tira "Oferta Flash" de la carta. Si falta (o esa oferta ya
+   * no existe), el carrusel arranca en la primera.
+   */
+  initialDealId?: string | null;
   /** Porcentaje de descuento aplicado a cada plato (por defecto 15%). */
   discountPercent?: number;
   /**
@@ -50,17 +56,23 @@ interface DraggableScrollHandlers {
 
 /**
  * Drag-to-scroll para escritorio: manteniendo el mouse presionado sobre el riel
- * y moviéndolo en horizontal, las fotos se desplazan igual que con el dedo en
+ * y moviéndolo en horizontal, las tarjetas se desplazan igual que con el dedo en
  * móvil. Sin librerías externas: sólo eventos nativos de React + DOM.
+ *
+ * El mismo hook alimenta el carrusel de OFERTAS (riel principal del pop-up) y la
+ * galería de FOTOS de cada tarjeta (mecánicas "2da Unidad %" y "Combo").
  *
  * Decisiones de UX:
  * - `startX` / `scrollLeft` viven en un `ref` (no en estado) para NO
  *   re-renderizar en cada `mousemove`; el estado sólo cambia al empezar y al
  *   terminar el arrastre (cursor "agarrando" + snap desactivado).
  * - Mientras se arrastra se quita el `scroll-snap` (`snap-none`) porque el
- *   `mandatory` "tiraría" de la foto de vuelta en cada actualización; al soltar
+ *   `mandatory` "tiraría" de la tarjeta de vuelta en cada actualización; al soltar
  *   se reactiva y se remata con un `scrollTo` suave al slide más cercano, así la
- *   foto siempre queda centrada y nunca a medias.
+ *   tarjeta siempre queda centrada y nunca a medias.
+ * - Si el gesto nace dentro de OTRO riel horizontal desplazable (la galería de
+ *   fotos de la tarjeta, marcada con `data-horizontal-rail`) se le cede el
+ *   control: dos carruseles anidados nunca compiten por el mismo arrastre.
  * - En táctil no se interviene: el navegador conserva el swipe nativo.
  * - Un arrastre deja un `click` "fantasma" en el ancestro común de mousedown y
  *   mouseup: se anula sólo durante 150 ms (fase de captura) para que soltar el
@@ -100,6 +112,13 @@ function useDraggableScroll(enabled: boolean): {
     const node = railRef.current;
     if (!enabled || !node || event.button !== 0) return; // sólo botón principal
 
+    // Riel anidado (galería de fotos de la tarjeta): si ESE riel puede
+    // desplazarse, el gesto es suyo y el carrusel de ofertas se hace a un lado.
+    // Con una sola foto el riel interno no scrollea y el arrastre sube aquí.
+    const origin = event.target instanceof Element ? event.target : null;
+    const nestedRail = origin?.closest<HTMLElement>('[data-horizontal-rail]') ?? null;
+    if (nestedRail && nestedRail !== node && nestedRail.scrollWidth > nestedRail.clientWidth + 1) return;
+
     event.preventDefault(); // sin selección de texto ni drag nativo de la foto
     dragState.current = {
       isDown: true,
@@ -117,7 +136,7 @@ function useDraggableScroll(enabled: boolean): {
     const distance = event.clientX - dragState.current.startX;
     if (Math.abs(distance) > 3) dragState.current.moved = true;
 
-    // La imagen sigue al cursor: más scroll a la izquierda = mover la foto a la derecha.
+    // La tarjeta sigue al cursor: más scroll a la izquierda = mover a la derecha.
     node.scrollLeft = dragState.current.startScrollLeft - distance;
   };
 
@@ -139,10 +158,11 @@ function useDraggableScroll(enabled: boolean): {
       suppressClickRef.current = false;
     }, 150);
 
-    // Remate: la foto más cercana se centra con una animación suave.
+    // Remate: la tarjeta más cercana se centra con una animación suave.
     if (node.clientWidth > 0) {
       node.scrollTo({
         left: Math.round(node.scrollLeft / node.clientWidth) * node.clientWidth,
+        top: node.scrollTop, // el riel también puede scrollear en vertical: no se pierde
         behavior: 'smooth'
       });
     }
@@ -161,20 +181,22 @@ function useDraggableScroll(enabled: boolean): {
 }
 
 /**
- * Galería de la cabecera del pop-up: imagen estática o carrusel deslizable.
+ * Galería de la cabecera de una tarjeta: imagen estática o carrusel deslizable.
  *
  * El swipe es 100% nativo del navegador (CSS Scroll Snap de Tailwind), sin
  * librerías externas: `overflow-x-auto` + `snap-x snap-mandatory` en el riel y
  * `snap-center` en cada foto. Se oculta la barra de scroll con `no-scrollbar`.
+ * Se marca con `data-horizontal-rail` para que el carrusel de OFERTAS le ceda el
+ * arrastre con el mouse cuando esta galería sí puede desplazarse (2 fotos).
  *
  * El componente NO se posiciona ni lleva z-index: vive en el flujo normal del
- * contenedor `relative` de la cabecera, de modo que los overlays flotantes que
- * vienen después en el DOM (badge "FLASH DEAL", temporizador y botón "X" con
- * z-20) quedan siempre ENCIMA: las fotos se deslizan por debajo y el clic de la
- * "X" nunca queda bloqueado por el riel.
+ * contenedor `relative` de la cabecera. El badge "FLASH DEAL", la cuenta
+ * regresiva y el botón "X" viven en el marco del pop-up, por ENCIMA del riel de
+ * ofertas: las fotos se deslizan por debajo y el clic de la "X" nunca queda
+ * bloqueado.
  *
  * El estado local (dot activo) vive aquí para que el swipe no re-renderice el
- * resto del modal; el padre lo remonta con `key={deal.id}` al cambiar de oferta.
+ * resto del carrusel; el padre lo remonta con `key={deal.id}` al cambiar de oferta.
  */
 interface PromoPhotoGalleryProps {
   /** 1 foto (Descuento %/$ y 2x1 Flash) o 2 (2da Unidad % y Combo / Maridaje). */
@@ -205,6 +227,7 @@ function PromoPhotoGallery({ images, altTexts, ariaLabel }: PromoPhotoGalleryPro
       <div
         ref={railRef}
         {...dragHandlers}
+        data-horizontal-rail=""
         onScroll={isCarousel ? handleScroll : undefined}
         role={isCarousel ? 'group' : undefined}
         aria-label={isCarousel ? ariaLabel : undefined}
@@ -259,6 +282,161 @@ function PromoPhotoGallery({ images, altTexts, ariaLabel }: PromoPhotoGalleryPro
 }
 
 /**
+ * Cuenta regresiva "¡TERMINA EN 12:35!" de la oferta flash.
+ *
+ * Aísla el tick de 1 segundo en este componente: el carrusel (y sus tarjetas
+ * memoizadas) NO se vuelven a renderizar por el temporizador, así el swipe queda
+ * libre de tirones. Se ancla al borde inferior de la foto de SU tarjeta, de modo
+ * que el temporizador siempre pertenece a la oferta que se está viendo.
+ */
+const PromoFlashCountdown = React.memo(function PromoFlashCountdown({ seconds }: { seconds: number }) {
+  // Arranca con la duración de la oferta. Si el pop-up cambiara de duración, el
+  // `key={countdownSeconds}` del padre remonta este temporizador (sin efectos).
+  const [remainingSeconds, setRemainingSeconds] = useState(seconds);
+
+  useEffect(() => {
+    const ticker = window.setInterval(() => {
+      setRemainingSeconds((previous) => (previous <= 1 ? 0 : previous - 1));
+    }, 1000);
+
+    return () => window.clearInterval(ticker);
+  }, []);
+
+  const isUrgent = remainingSeconds <= 60;
+
+  return (
+    <span
+      className={`pointer-events-none absolute bottom-0 left-1/2 z-10 inline-flex -translate-x-1/2 translate-y-1/2 items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#0b0c0e] border font-mono-code text-[11px] font-bold whitespace-nowrap shadow-xl ${
+        isUrgent ? 'border-rose-500/60 text-rose-300' : 'border-[#ff5708]/45 text-[#ffb59c]'
+      }`}
+    >
+      <Clock size={12} strokeWidth={2.8} className={isUrgent ? 'text-rose-400' : 'text-[#ff5708]'} />
+      <span>¡Termina en {formatPromoCountdown(remainingSeconds)}!</span>
+    </span>
+  );
+});
+
+/**
+ * Modelo precalculado de una tarjeta del carrusel de ofertas.
+ *
+ * Se memoiza en el padre para que el deslizamiento (que actualiza el índice
+ * activo varias veces por gesto) NO entregue props nuevas: las tarjetas no se
+ * vuelven a renderizar y el swipe se siente fluido, sin tirones.
+ */
+interface PromoDealSlideModel {
+  /** Plato real promocionado en esta tarjeta. */
+  deal: MenuItem;
+  /** Montos reales de la oferta (motor de ofertas `promo.ts`). */
+  pricing: PromoPricing;
+  /** Subtítulo honesto bajo "¡Oferta Especial!" según la mecánica. */
+  subtitleText: string;
+  /** 1 foto (Descuento %/$ y 2x1 Flash) o 2 (2da Unidad % y Combo / Maridaje). */
+  images: string[];
+  /** Texto alternativo de cada foto (mismo orden que `images`). */
+  altTexts: string[];
+  /** `id` único del <h2>: el diálogo toma su nombre de la tarjeta visible. */
+  titleId: string;
+  /** Etiqueta accesible de la tarjeta: "Oferta 2 de 3: Lomo Saltado". */
+  positionLabel: string;
+  /** Duración inicial de la cuenta regresiva de la oferta (755 = "12:35"). */
+  countdownSeconds: number;
+}
+
+/**
+ * Una tarjeta de oferta dentro del riel horizontal: cabecera con la foto real
+ * del plato y cuerpo con el nombre de la mecánica, rating, precio promocional,
+ * ahorro y reseñas.
+ *
+ * El ✕ y el CTA "Aplicar Descuento" viven en el MARCO del pop-up (fuera del
+ * riel), así permanecen fijos y accesibles para cada tarjeta mientras el comensal
+ * desliza de una oferta a otra. La cuenta regresiva, en cambio, se ancla al borde
+ * inferior de la foto de SU tarjeta, de modo que viaja con la oferta.
+ *
+ * `React.memo`: sus props provienen de un modelo memoizado, así el swipe no
+ * re-renderiza las tarjetas. El tick del temporizador queda aislado dentro de
+ * `PromoFlashCountdown`, así que tampoco escala al carrusel.
+ */
+const PromoDealSlide = React.memo(function PromoDealSlide({
+  deal,
+  pricing,
+  subtitleText,
+  images,
+  altTexts,
+  titleId,
+  positionLabel,
+  countdownSeconds
+}: PromoDealSlideModel) {
+  return (
+    <div
+      role="group"
+      aria-roledescription="oferta"
+      aria-label={positionLabel}
+      className="flex w-full min-w-full shrink-0 basis-full snap-center snap-always flex-col bg-white dark:bg-[#131418]"
+    >
+      {/* ===================================================================== */}
+      {/* 🖼️ CABECERA VISUAL DEL PLATO REAL DE ESTA OFERTA                      */}
+      {/* ===================================================================== */}
+      <div className="relative shrink-0 h-44 sm:h-48 w-full bg-[#e2e8f0] dark:bg-[#0e0e10]">
+        {/* 🖼️ Galería: 1 foto estática, o 2 deslizables en "2da Unidad %" y
+            "Combo / Maridaje". El `key={deal.id}` remonta el carrusel al
+            cambiar de oferta (vuelve a la foto 1 y a su dot). */}
+        <PromoPhotoGallery
+          key={deal.id}
+          images={images}
+          altTexts={altTexts}
+          ariaLabel={`Fotos de la oferta: ${deal.name}`}
+        />
+
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-white via-white/25 to-black/45 dark:from-[#131418] dark:via-[#131418]/25 dark:to-black/45" />
+
+        {/* ⏱️ Cuenta regresiva del flash deal, anclada al borde inferior de SU foto */}
+        <PromoFlashCountdown key={countdownSeconds} seconds={countdownSeconds} />
+      </div>
+
+      {/* ===================================================================== */}
+      {/* 📝 CUERPO: TÍTULO, DESCUENTO REAL DEL PLATO, PRECIO Y RESEÑAS          */}
+      {/* ===================================================================== */}
+      <div className="relative z-10 flex-1 px-5 pt-7 pb-6 text-center space-y-3.5">
+        <div className="space-y-2">
+          <h2
+            id={titleId}
+            className="text-[22px] sm:text-[24px] leading-none font-black text-[#0f172a] dark:text-white uppercase tracking-tight"
+          >
+            ¡Oferta Especial!
+          </h2>
+
+          <p className="text-[12px] sm:text-[12.5px] font-black text-[#475569] dark:text-[#e5e1e4] uppercase leading-snug">
+            {subtitleText}
+          </p>
+
+          <p className="inline-flex items-center justify-center gap-1.5 text-[11.5px] font-mono-code text-[#64748b] dark:text-[#a1a1aa]">
+            <Star size={12} strokeWidth={2.6} className="text-amber-400" fill="currentColor" />
+            <span className="text-[#0f172a] dark:text-[#e5e1e4] font-bold">{deal.rating.toFixed(1)}</span>
+            <span>({deal.reviewsCount} valoraciones)</span>
+          </p>
+        </div>
+
+        {/* Precio promocional y ahorro calculados desde el precio real del menú */}
+        <div className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1.5">
+          <span className="font-mono-code text-[30px] leading-none font-black text-[#ff5708]">
+            {formatSoles(pricing.promoPrice)}
+          </span>
+          <span className="font-mono-code text-[14px] leading-none text-[#64748b] dark:text-[#71717a] line-through">
+            {formatSoles(pricing.originalPrice)}
+          </span>
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/35 text-emerald-700 dark:text-emerald-400 text-[10.5px] font-black uppercase tracking-wide">
+            <TrendingUp size={11} strokeWidth={3} />
+            <span>Ahorra {formatSoles(pricing.savings)}</span>
+          </span>
+        </div>
+
+        <p className="text-[12.5px] text-[#64748b] dark:text-[#a1a1aa] leading-relaxed">{deal.description}</p>
+      </div>
+    </div>
+  );
+});
+
+/**
  * CD-16 · Pop-up promocional "Oferta Flash" de la Carta Digital.
  *
  * Replica el diseño premium de referencia (backdrop desenfocado, tarjeta
@@ -266,17 +444,30 @@ function PromoPhotoGallery({ images, altTexts, ariaLabel }: PromoPhotoGalleryPro
  * naranja) pero alimentado 100% con platos reales del menú: nombre, rating,
  * reseñas, descripción y precio se calculan dinámicamente.
  *
+ * 🎠 CARRUSEL DE OFERTAS: todas las ofertas activas se pintan en un riel
+ * horizontal (`flex` + `overflow-x-auto` + `snap-x snap-mandatory`, con la barra
+ * de scroll oculta) donde cada tarjeta ocupa el ancho completo (`shrink-0 w-full`
+ * + `snap-center`). El comensal cambia de oferta deslizando el dedo en cualquier
+ * punto del cuerpo del pop-up (swipe táctil nativo) o arrastrando con el mouse
+ * en PC (drag-to-scroll). Los dots y el contador "(1 de 3 ofertas)" se
+ * sincronizan en tiempo real con la posición del scroll (`onScroll`).
+ *
+ * El ✕ y el CTA "Aplicar Descuento" viven FUERA del riel, anclados al marco de
+ * la tarjeta: siguen accesibles (44px) y en el mismo sitio mientras se desliza.
+ *
  * CD-13 · Tema Claro/Oscuro nativo: el modo claro es la base (tarjeta blanca,
  * overlay gris translúcido y textos oscuros/grises) y el modo Obsidian previo
  * se conserva al 100% mediante la variante `dark:` (clase `.dark` en <html>).
  * Solo cambian colores: maquetación, blur, opacidades y radios quedan intactos.
  *
- * Mobile-first: se cierra con la "X" (44px), tocando el fondo o con la tecla Esc.
+ * Mobile-first: se cierra con la "X" (44px), tocando el fondo, con la tecla Esc
+ * o con las flechas ←/→ para pasar de oferta.
  */
 export function PromoDealModal({
   isOpen,
   onClose,
   deals,
+  initialDealId = null,
   discountPercent = 15,
   pricingOverride = null,
   promoCopy = null,
@@ -285,19 +476,8 @@ export function PromoDealModal({
   onApply
 }: PromoDealModalProps) {
   const [activeIndex, setActiveIndex] = useState(0);
-  const [remainingSeconds, setRemainingSeconds] = useState(countdownSeconds);
   const [wasOpen, setWasOpen] = useState(isOpen);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-
-  // Al abrirse, reinicia el carrusel y la cuenta regresiva usando el patrón
-  // oficial de React (ajustar estado durante el render, no dentro de un efecto).
-  if (isOpen !== wasOpen) {
-    setWasOpen(isOpen);
-    if (isOpen) {
-      setActiveIndex(0);
-      setRemainingSeconds(countdownSeconds);
-    }
-  }
 
   // Solo ofertas válidas: evita renderizar tarjetas sin datos reales.
   const validDeals = useMemo(
@@ -306,40 +486,143 @@ export function PromoDealModal({
   );
 
   const totalDeals = validDeals.length;
-  const currentIndex = totalDeals > 0 ? Math.min(activeIndex, totalDeals - 1) : 0;
-  const deal = totalDeals > 0 ? validDeals[currentIndex] : null;
-  // Montos del motor de ofertas (2x1, 2da unidad y combos) o, en su defecto, los
-  // derivados del precio del plato y el porcentaje de descuento.
-  const pricing = deal ? pricingOverride ?? calculatePromoPricing(deal.price, discountPercent) : null;
 
-  // 📣 Subtítulo bajo "¡OFERTA ESPECIAL!": se redacta según la MECÁNICA para que el
-  // comensal entienda a qué plato aplica el descuento (el 2x1 nunca menciona un %).
-  // Sin contexto de oferta (carta viva) cae al copy estándar de descuento.
-  const subtitleText = deal
-    ? buildPromoSubtitleText(
-        promoCopy ?? {
+  /**
+   * Oferta en la que debe abrirse el carrusel: la que el comensal tenía delante
+   * en la tira "Oferta Flash" (`initialDealId`) o la primera si falta o ya no
+   * existe. Es función pura de las props: no necesita estado ni efectos.
+   */
+  const requestedIndex = useMemo(() => {
+    if (!initialDealId) return 0;
+    const found = validDeals.findIndex((deal) => deal.id === initialDealId);
+    return found >= 0 ? found : 0;
+  }, [initialDealId, validDeals]);
+
+  // Al abrirse, el carrusel se posiciona en la oferta solicitada con el patrón
+  // oficial de React (ajustar estado durante el render, no dentro de un efecto).
+  // La cuenta regresiva se reinicia sola: cada tarjeta monta su temporizador al
+  // abrirse.
+  if (isOpen !== wasOpen) {
+    setWasOpen(isOpen);
+    if (isOpen) {
+      setActiveIndex(requestedIndex);
+    }
+  }
+
+  const currentIndex = totalDeals > 0 ? Math.min(activeIndex, totalDeals - 1) : 0;
+
+  // 🧾 Tarjetas del carrusel: precio real, subtítulo por mecánica y fotos se
+  // calculan UNA vez por juego de ofertas, no en cada frame del deslizamiento.
+  const slideModels = useMemo<PromoDealSlideModel[]>(() => {
+    // El copy y los montos que envía el motor de ofertas describen UNA oferta
+    // concreta (vista previa del panel admin): solo se aplican cuando el carrusel
+    // tiene una única tarjeta. Con varias ofertas, cada tarjeta redacta su propio
+    // subtítulo con SU plato y su % real, para que el swipe muestre información
+    // distinta y honesta en cada punto.
+    const isSingleOffer = validDeals.length <= 1;
+    const offerCopy = isSingleOffer ? promoCopy : null;
+    const offerPricing = isSingleOffer ? pricingOverride : null;
+    const complementImage = isSingleOffer ? complementDishImage : null;
+    // 📣 El subtítulo se redacta según la MECÁNICA para que el comensal entienda
+    // a qué plato aplica el descuento (el 2x1 nunca menciona un %). Sin contexto
+    // de oferta (carta viva) cae al copy estándar de descuento.
+    const needsSecondPhoto = offerCopy
+      ? getPromoMechanic(offerCopy.mechanic).requiresComplement
+      : false;
+
+    return validDeals.map((item, index) => {
+      const itemPricing = offerPricing ?? calculatePromoPricing(item.price, discountPercent);
+      const subtitleText = buildPromoSubtitleText(
+        offerCopy ?? {
           mechanic: 'discount',
-          mainDishName: deal.name,
-          discountLabel: `${Math.round(pricing?.discountPercent ?? discountPercent)}%`,
+          mainDishName: item.name,
+          discountLabel: `${Math.round(itemPricing.discountPercent)}%`,
           complementDishName: null
         }
-      )
-    : '';
+      );
 
-  // 🖼️ Galería de la cabecera: 2 fotos sólo cuando la mecánica usa un SEGUNDO
-  // plato DISTINTO ("2da Unidad %" y "Combo / Maridaje"). "Descuento %/$" y
-  // "2x1 Flash" conservan una única imagen estática (la 2ª unidad es la misma).
-  const galleryImages = useMemo((): string[] => {
-    if (!deal) return [];
+      // 🖼️ Galería de la cabecera: 2 fotos sólo cuando la mecánica usa un SEGUNDO
+      // plato DISTINTO ("2da Unidad %" y "Combo / Maridaje"). "Descuento %/$" y
+      // "2x1 Flash" conservan una única imagen (la 2ª unidad es la misma).
+      const secondPhoto = needsSecondPhoto ? complementImage : null;
+      // Nunca se repite la misma foto: evita un carrusel de 2 imágenes idénticas.
+      const images = secondPhoto && secondPhoto !== item.image ? [item.image, secondPhoto] : [item.image];
 
-    const needsSecondPhoto = promoCopy
-      ? getPromoMechanic(promoCopy.mechanic).requiresComplement
-      : false;
-    const secondPhoto = needsSecondPhoto ? complementDishImage : null;
+      return {
+        deal: item,
+        pricing: itemPricing,
+        subtitleText,
+        images,
+        altTexts: [
+          item.name,
+          offerCopy?.complementDishName
+            ? `${offerCopy.complementDishName} (segundo plato de la oferta)`
+            : 'Segundo plato de la oferta'
+        ],
+        titleId: `promo-deal-title-${item.id}`,
+        positionLabel: `Oferta ${index + 1} de ${validDeals.length}: ${item.name}`,
+        countdownSeconds
+      };
+    });
+  }, [validDeals, pricingOverride, promoCopy, complementDishImage, discountPercent, countdownSeconds]);
 
-    // Nunca se repite la misma foto: evita un carrusel de 2 imágenes idénticas.
-    return secondPhoto && secondPhoto !== deal.image ? [deal.image, secondPhoto] : [deal.image];
-  }, [deal, promoCopy, complementDishImage]);
+  /** Tarjeta centrada AHORA: gobierna el CTA del pie y el título del diálogo. */
+  const currentSlide: PromoDealSlideModel | null =
+    totalDeals > 0 ? slideModels[currentIndex] ?? null : null;
+
+  // 🎠 Riel de ofertas: swipe táctil nativo (móvil) + arrastre con mouse (PC).
+  const { railRef, isDragging, dragHandlers } = useDraggableScroll(totalDeals > 1);
+
+  // 📌 Al abrir el pop-up desde la tira "Oferta Flash", el riel arranca YA
+  // posicionado en la oferta que el comensal tenía delante: el salto va sin
+  // animación porque es el estado inicial, no un swipe. Solo toca el DOM (nada de
+  // setState), así que no provoca renders en cascada; los cambios posteriores de
+  // oferta siguen gobernados por el swipe, los dots y las flechas.
+  useEffect(() => {
+    if (!isOpen || requestedIndex <= 0) return;
+
+    const node = railRef.current;
+    if (!node || node.clientWidth <= 0) return;
+
+    node.scrollTo({ left: requestedIndex * node.clientWidth, behavior: 'auto' });
+  }, [isOpen, requestedIndex, railRef]);
+
+  /** Lleva el carrusel a una oferta concreta (dots, teclado o atajos). */
+  const goToOffer = useCallback(
+    (index: number) => {
+      const target = Math.max(0, Math.min(index, totalDeals - 1));
+      setActiveIndex(target); // respuesta inmediata en dots y contador
+      const node = railRef.current;
+      if (node && node.clientWidth > 0) {
+        node.scrollTo({ left: target * node.clientWidth, behavior: 'smooth' });
+      }
+    },
+    [totalDeals, railRef]
+  );
+
+  /** Avanza/retrocede una tarjeta leyendo la posición REAL del scroll. */
+  const stepOffer = useCallback(
+    (delta: number) => {
+      const node = railRef.current;
+      if (!node || node.clientWidth <= 0) return;
+
+      goToOffer(Math.round(node.scrollLeft / node.clientWidth) + delta);
+    },
+    [goToOffer, railRef]
+  );
+
+  /**
+   * Sincroniza dots + contador con la posición del scroll: funciona igual con el
+   * swipe táctil, con el arrastre de mouse y con el remate animado del snap.
+   * Sólo re-renderiza el marco (las tarjetas están memoizadas).
+   */
+  const handleRailScroll = (event: React.UIEvent<HTMLDivElement>) => {
+    const node = event.currentTarget;
+    if (!node.clientWidth) return;
+
+    const nextIndex = Math.max(0, Math.min(Math.round(node.scrollLeft / node.clientWidth), totalDeals - 1));
+    setActiveIndex((previous) => (previous === nextIndex ? previous : nextIndex));
+  };
 
   // Al abrir: bloquea el scroll de fondo, habilita el cierre con Esc y lleva el
   // foco al botón de cierre (garantiza usabilidad táctil y de teclado).
@@ -363,119 +646,121 @@ export function PromoDealModal({
     };
   }, [isOpen, onClose]);
 
-  // Cuenta regresiva viva de la oferta flash ("¡TERMINA EN 12:35!").
+  // ⌨️ Flechas ←/→: pasan de oferta sin soltar el teclado. Efecto independiente
+  // del de apertura para que cambiar de oferta no vuelva a robar el foco al ✕.
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || totalDeals <= 1) return;
 
-    const ticker = window.setInterval(() => {
-      setRemainingSeconds((prev) => (prev <= 1 ? 0 : prev - 1));
-    }, 1000);
+    const handleArrowKeys = (event: KeyboardEvent) => {
+      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
 
-    return () => window.clearInterval(ticker);
-  }, [isOpen]);
+      event.preventDefault();
+      stepOffer(event.key === 'ArrowRight' ? 1 : -1);
+    };
 
-  if (!isOpen || !deal || !pricing) return null;
+    window.addEventListener('keydown', handleArrowKeys);
+    return () => window.removeEventListener('keydown', handleArrowKeys);
+  }, [isOpen, totalDeals, stepOffer]);
 
-  const isUrgent = remainingSeconds <= 60;
+  if (!isOpen || !currentSlide) return null;
 
+  const { deal, pricing, titleId } = currentSlide;
+
+  // 🎠 Clases del riel: `flex` + `overflow-x-auto` (deslizamiento nativo) +
+  // `snap-x snap-mandatory` (la tarjeta siempre queda centrada) + `no-scrollbar`
+  // (la barra se oculta: la paginación del pie ya indica la página). Mientras se
+  // arrastra con el mouse el snap se apaga para que no salte de vuelta, y el
+  // `overflow-y-auto` interno evita que el pop-up se recorte en móviles bajos.
+  const railClassName = [
+    'relative z-0 flex w-full min-h-0 flex-1 overflow-auto overscroll-contain no-scrollbar',
+    totalDeals > 1 ? 'select-none' : '',
+    totalDeals > 1 ? (isDragging ? 'snap-none cursor-grabbing' : 'snap-x snap-mandatory cursor-grab') : ''
+  ].join(' ');
+
+  // El pop-up se pinta SIEMPRE (320px → escritorio): `fixed inset-0` + `flex`
+  // universales, sin clases de ocultamiento por breakpoint. `z-[9999]` queda por
+  // encima de la top bar sticky (z-40), la barra inferior del comensal (z-40) y
+  // cualquier toast/overlay móvil. `overflow-y-auto` + `my-auto` en la tarjeta:
+  // si el contenido supera la pantalla, el pop-up hace scroll en lugar de
+  // recortarse (clave en móvil).
+  //
+  // Estructura del carrusel:
+  //   [ marco ] ─ chrome FIJO (badge FLASH DEAL · ✕ de cierre)
+  //             ─ riel horizontal (todas las ofertas activas, una por tarjeta,
+  //               cada una con su foto, su cuenta regresiva y sus datos)
+  //             ─ pie FIJO (CTA "Aplicar Descuento" + dots + contador)
+  // El chrome y el pie viven FUERA del riel: por eso nada se desplaza ni se
+  // recorta mientras el comensal desliza de una oferta a otra.
   return (
     <div
       role="dialog"
       aria-modal="true"
-      aria-labelledby="promo-deal-title"
+      aria-labelledby={titleId}
       onClick={onClose}
-      className="fixed inset-0 z-[60] bg-slate-400/45 dark:bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 animate-fadeIn"
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 bg-slate-400/45 dark:bg-black/80 backdrop-blur-md overflow-y-auto overscroll-contain animate-fadeIn"
     >
       <div
         onClick={(event) => event.stopPropagation()}
-        className="animate-fadeIn relative w-full max-w-[384px] max-h-[92vh] flex flex-col rounded-[28px] overflow-hidden bg-white dark:bg-[#131418] border border-[#ff5708]/35 shadow-[0_25px_60px_-15px_rgba(255,87,8,0.25)] dark:shadow-[0_25px_60px_-15px_rgba(255,87,8,0.45)]"
+        className="animate-fadeIn relative my-auto flex w-full max-w-[384px] max-h-[92dvh] flex-col rounded-[28px] overflow-hidden bg-white dark:bg-[#131418] border border-[#ff5708]/35 shadow-[0_25px_60px_-15px_rgba(255,87,8,0.25)] dark:shadow-[0_25px_60px_-15px_rgba(255,87,8,0.45)]"
       >
         {/* ===================================================================== */}
-        {/* 🖼️ CABECERA VISUAL DEL PLATO REAL + BADGE FLASH DEAL + CIERRE         */}
+        {/* 🎬 CHROME FIJO · BADGE FLASH DEAL Y CIERRE (✕)                        */}
         {/* ===================================================================== */}
-        <div className="relative shrink-0 h-44 sm:h-48 w-full bg-[#e2e8f0] dark:bg-[#0e0e10]">
-          {/* 🖼️ Galería: 1 foto estática, o 2 deslizables en "2da Unidad %" y
-              "Combo / Maridaje". El `key={deal.id}` remonta el carrusel al
-              cambiar de oferta (vuelve a la foto 1 y a su dot). */}
-          <PromoPhotoGallery
-            key={deal.id}
-            images={galleryImages}
-            altTexts={[
-              deal.name,
-              promoCopy?.complementDishName
-                ? `${promoCopy.complementDishName} (segundo plato de la oferta)`
-                : 'Segundo plato de la oferta'
-            ]}
-            ariaLabel={`Fotos de la oferta: ${deal.name}`}
-          />
+        <span className="pointer-events-none absolute top-3.5 left-3.5 z-30 inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#ff5708] text-white text-[10px] font-black uppercase tracking-[0.08em] shadow-lg shadow-[#ff5708]/40">
+          <Zap size={11} strokeWidth={3} fill="currentColor" />
+          <span>Flash Deal</span>
+        </span>
 
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-white via-white/25 to-black/45 dark:from-[#131418] dark:via-[#131418]/25 dark:to-black/45" />
+        <button
+          ref={closeButtonRef}
+          type="button"
+          onClick={onClose}
+          aria-label="Cerrar oferta flash"
+          className="absolute top-2.5 right-2.5 z-40 w-11 h-11 min-h-[44px] min-w-[44px] rounded-full bg-black/55 backdrop-blur-md border border-white/15 text-white flex items-center justify-center hover:bg-black/80 active:scale-95 transition-all cursor-pointer"
+        >
+          <X size={18} strokeWidth={2.8} />
+        </button>
 
-          <span className="pointer-events-none absolute top-3.5 left-3.5 z-10 inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#ff5708] text-white text-[10px] font-black uppercase tracking-[0.08em] shadow-lg shadow-[#ff5708]/40">
-            <Zap size={11} strokeWidth={3} fill="currentColor" />
-            <span>Flash Deal</span>
-          </span>
+        {/* ⏱️ La cuenta regresiva vive dentro de cada tarjeta, anclada al borde
+            inferior de su propia foto: así el temporizador viaja con la oferta y
+            nunca se desalinea, por corto que sea el alto de la pantalla. */}
 
-          <button
-            ref={closeButtonRef}
-            type="button"
-            onClick={onClose}
-            aria-label="Cerrar oferta flash"
-            className="absolute top-2.5 right-2.5 z-20 w-11 h-11 min-h-[44px] min-w-[44px] rounded-full bg-black/55 backdrop-blur-md border border-white/15 text-white flex items-center justify-center hover:bg-black/80 active:scale-95 transition-all cursor-pointer"
-          >
-            <X size={18} strokeWidth={2.8} />
-          </button>
-
-          {/* Cuenta regresiva centrada sobre el borde de la imagen */}
-          <span
-            className={`pointer-events-none absolute bottom-0 left-1/2 z-10 -translate-x-1/2 translate-y-1/2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#0b0c0e] border font-mono-code text-[11px] font-bold whitespace-nowrap shadow-xl ${
-              isUrgent ? 'border-rose-500/60 text-rose-300' : 'border-[#ff5708]/45 text-[#ffb59c]'
-            }`}
-          >
-            <Clock size={12} strokeWidth={2.8} className={isUrgent ? 'text-rose-400' : 'text-[#ff5708]'} />
-            <span>¡Termina en {formatPromoCountdown(remainingSeconds)}!</span>
-          </span>
+        {/* ===================================================================== */}
+        {/* 🎠 RIEL HORIZONTAL · UNA TARJETA DESLIZABLE POR OFERTA ACTIVA          */}
+        {/* ===================================================================== */}
+        {/* `flex` + `overflow-x-auto` + `snap-x snap-mandatory`: swipe táctil
+            nativo en móvil y arrastre con mouse en escritorio (drag-to-scroll).
+            Cada tarjeta es `shrink-0 w-full` + `snap-center`: el scroll siempre
+            remata con una oferta completa y centrada, nunca a medias. La barra
+            de scroll va oculta (`no-scrollbar`) porque los dots del pie ya
+            indican la página. `onScroll` actualiza dots y contador en vivo. */}
+        <div
+          ref={railRef}
+          {...dragHandlers}
+          onScroll={totalDeals > 1 ? handleRailScroll : undefined}
+          role="group"
+          aria-label={
+            totalDeals > 1
+              ? `Carrusel de ofertas: ${totalDeals} disponibles`
+              : `Oferta activa: ${deal.name}`
+          }
+          className={railClassName}
+        >
+          {slideModels.map((slide) => (
+            <PromoDealSlide key={slide.deal.id} {...slide} />
+          ))}
         </div>
 
         {/* ===================================================================== */}
-        {/* 📝 CUERPO: TÍTULO, DESCUENTO REAL DEL PLATO, PRECIO Y CTA             */}
+        {/* 🎬 PIE FIJO · "APLICAR DESCUENTO" + PAGINACIÓN (DOTS Y CONTADOR)        */}
         {/* ===================================================================== */}
-        <div className="relative z-10 flex-1 px-5 pt-7 pb-6 text-center space-y-3.5 overflow-y-auto overscroll-contain no-scrollbar">
-          <div className="space-y-2">
-            <h2
-              id="promo-deal-title"
-              className="text-[22px] sm:text-[24px] leading-none font-black text-[#0f172a] dark:text-white uppercase tracking-tight"
-            >
-              ¡Oferta Especial!
-            </h2>
-
-            <p className="text-[12px] sm:text-[12.5px] font-black text-[#475569] dark:text-[#e5e1e4] uppercase leading-snug">
-              {subtitleText}
-            </p>
-
-            <p className="inline-flex items-center justify-center gap-1.5 text-[11.5px] font-mono-code text-[#64748b] dark:text-[#a1a1aa]">
-              <Star size={12} strokeWidth={2.6} className="text-amber-400" fill="currentColor" />
-              <span className="text-[#0f172a] dark:text-[#e5e1e4] font-bold">{deal.rating.toFixed(1)}</span>
-              <span>({deal.reviewsCount} valoraciones)</span>
-            </p>
-          </div>
-
-          {/* Precio promocional y ahorro calculados desde el precio real del menú */}
-          <div className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1.5">
-            <span className="font-mono-code text-[30px] leading-none font-black text-[#ff5708]">
-              {formatSoles(pricing.promoPrice)}
-            </span>
-            <span className="font-mono-code text-[14px] leading-none text-[#64748b] dark:text-[#71717a] line-through">
-              {formatSoles(pricing.originalPrice)}
-            </span>
-            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/35 text-emerald-700 dark:text-emerald-400 text-[10.5px] font-black uppercase tracking-wide">
-              <TrendingUp size={11} strokeWidth={3} />
-              <span>Ahorra {formatSoles(pricing.savings)}</span>
-            </span>
-          </div>
-
-          <p className="text-[12.5px] text-[#64748b] dark:text-[#a1a1aa] leading-relaxed">{deal.description}</p>
-
+        {/* Vive fuera del riel: el botón de acción y la paginación quedan anclados
+            al pie de la tarjeta y siguen accesibles (44px de alto) en CADA
+            oferta, incluso a mitad del deslizamiento. `shrink-0` evita que el pie
+            se comprima cuando el cuerpo del pop-up necesita scroll vertical.
+            Los dots y el contador reflejan la oferta centrada: se actualizan en
+            vivo desde `onScroll`. */}
+        <div className="relative z-20 shrink-0 space-y-3 border-t border-[#0f172a]/5 dark:border-white/5 bg-white dark:bg-[#131418] px-5 pt-3.5 pb-4 text-center">
           <button
             type="button"
             onClick={() => onApply(deal, pricing.promoPrice)}
@@ -487,14 +772,14 @@ export function PromoDealModal({
 
           {/* Carrusel de ofertas reales (puntos + contador) */}
           {totalDeals > 1 && (
-            <div className="space-y-1 pt-0.5">
+            <div className="space-y-1">
               <div className="flex items-center justify-center gap-0.5">
-                {validDeals.map((item, index) => (
+                {slideModels.map((slide, index) => (
                   <button
-                    key={item.id}
+                    key={`promo-dot-${slide.deal.id}`}
                     type="button"
-                    onClick={() => setActiveIndex(index)}
-                    aria-label={`Ver oferta ${index + 1} de ${totalDeals}: ${item.name}`}
+                    onClick={() => goToOffer(index)}
+                    aria-label={`Ver oferta ${index + 1} de ${totalDeals}: ${slide.deal.name}`}
                     aria-current={index === currentIndex}
                     className="group flex h-9 w-7 items-center justify-center cursor-pointer"
                   >
