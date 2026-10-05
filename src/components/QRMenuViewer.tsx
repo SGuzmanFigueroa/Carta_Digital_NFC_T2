@@ -24,6 +24,7 @@ import { ARTableViewer } from './ARTableViewer';
 import { ThemeToggle } from './menu/ThemeToggle';
 import { MenuBottomNav } from './menu/MenuBottomNav';
 import { PaymentModal } from './menu/PaymentModal';
+import { ComplaintBookModal } from './menu/ComplaintBookModal';
 
 interface QRMenuViewerProps {
   menuItems: MenuItem[];
@@ -61,6 +62,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [selectedTable, setSelectedTable] = useState('MESA 04');
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isComplaintModalOpen, setIsComplaintModalOpen] = useState(false);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'Efectivo' | 'Tarjeta POS (Visa/MC)' | 'Yape / Plin'>('Tarjeta POS (Visa/MC)');
   const [waiterCalled, setWaiterCalled] = useState(false);
 
@@ -953,6 +955,34 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
           </div>
           )}
         </section>
+
+        {/* ========================================================================= */}
+        {/* 🏛️ RESTAURANT FOOTER & LEGAL BAR (INDECOPI) */}
+        {/* ========================================================================= */}
+        <footer className="pt-10 pb-28 sm:pb-12 border-t border-[#e2e8f0] dark:border-[#24252e] space-y-4 text-center">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-[12px] text-[#64748b] dark:text-[#94a3b8]">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-[#0f172a] dark:text-white">AUREA BISTRO</span>
+              <span>• RUC: 20608945231</span>
+              <span className="hidden sm:inline">• Gastronomía Peruana de Autor</span>
+            </div>
+
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => setIsComplaintModalOpen(true)}
+                className="inline-flex min-h-[44px] items-center gap-2 px-3.5 py-2 rounded-xl bg-[#f1f5f9] hover:bg-[#e2e8f0] text-[#0f172a] dark:bg-[#1a1b22] dark:hover:bg-[#252630] dark:text-[#e2e8f0] border border-[#cbd5e1] dark:border-[#2d2e38] text-[12px] font-semibold transition-all cursor-pointer shadow-sm hover:border-[#ff5708]/50 active:scale-95"
+                title="Libro de Reclamaciones Oficial conforme a ley INDECOPI"
+              >
+                <span className="material-symbols-outlined text-[#ff5708] text-[18px]">menu_book</span>
+                <span>Libro de Reclamaciones</span>
+              </button>
+            </div>
+          </div>
+          <p className="text-[10px] text-[#94a3b8] dark:text-[#64748b] font-mono-code">
+            Conforme al D.S. N° 011-2011-PCM / Ley N° 29571 Código de Protección y Defensa del Consumidor.
+          </p>
+        </footer>
       </main>
 
       {/* ========================================================================= */}
@@ -1402,6 +1432,14 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
           />
         );
       })()}
+
+      {/* 📖 LIBRO DE RECLAMACIONES VIRTUAL (INDECOPI) */}
+      <ComplaintBookModal
+        isOpen={isComplaintModalOpen}
+        onClose={() => setIsComplaintModalOpen(false)}
+        currentTable={selectedTable}
+        onShowToast={onShowToast}
+      />
 
     </div>
   );
