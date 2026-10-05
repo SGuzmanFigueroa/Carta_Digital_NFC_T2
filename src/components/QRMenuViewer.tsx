@@ -25,6 +25,7 @@ import { ThemeToggle } from './menu/ThemeToggle';
 import { MenuBottomNav } from './menu/MenuBottomNav';
 import { PaymentModal } from './menu/PaymentModal';
 import { ComplaintBookModal } from './menu/ComplaintBookModal';
+import { DishDetailModal } from './menu/DishDetailModal';
 
 interface QRMenuViewerProps {
   menuItems: MenuItem[];
@@ -63,6 +64,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   const [selectedTable, setSelectedTable] = useState('MESA 04');
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isComplaintModalOpen, setIsComplaintModalOpen] = useState(false);
+  const [selectedDishDetails, setSelectedDishDetails] = useState<MenuItem | null>(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'Efectivo' | 'Tarjeta POS (Visa/MC)' | 'Yape / Plin'>('Tarjeta POS (Visa/MC)');
   const [waiterCalled, setWaiterCalled] = useState(false);
 
@@ -715,14 +717,21 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
           <div className="relative">
             {heroViewMode === 'photo' ? (
               <div className="relative w-full h-64 sm:h-80 overflow-hidden bg-[#e2e8f0] dark:bg-[#0e0e10] group">
-                <img
-                  src={heroItem.image}
-                  alt={heroItem.name}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-white dark:from-[#15161c] via-transparent to-black/40" />
+                <button
+                  type="button"
+                  onClick={() => setSelectedDishDetails(heroItem)}
+                  aria-label={`Abrir ficha técnica de ${heroItem.name}`}
+                  className="absolute inset-0 h-full w-full cursor-zoom-in text-left"
+                >
+                  <img
+                    src={heroItem.image_url_hd || heroItem.image}
+                    alt={heroItem.name}
+                    className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                  />
+                </button>
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-white dark:from-[#15161c] via-transparent to-black/40" />
 
-                <div className="absolute top-3 left-3 flex items-center gap-1.5">
+                <div className="pointer-events-none absolute top-3 left-3 flex items-center gap-1.5">
                   <span className="px-2.5 py-0.5 rounded-full bg-[#ff5708] text-[#2b0b00] font-mono-code text-[10px] font-bold shadow-lg">
                     {heroItem.badge}
                   </span>
@@ -798,6 +807,15 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
             <div className="pt-2 flex items-center gap-2">
               <button
                 type="button"
+                onClick={() => setSelectedDishDetails(heroItem)}
+                className="h-11 px-3 rounded-xl bg-white hover:bg-[#f1f5f9] text-[#334155] border border-[#cbd5e1] text-[12px] sm:text-[13px] font-semibold flex items-center justify-center gap-1.5 dark:bg-[#1e1f28] dark:hover:bg-[#282935] dark:text-[#e5e1e4] dark:border-[#353642] transition-colors cursor-pointer shrink-0 whitespace-nowrap active:scale-95"
+                aria-label={`Abrir ficha HD de ${heroItem.name}`}
+              >
+                <span className="material-symbols-outlined text-[17px] text-[#ff5708]">photo</span>
+                <span>Ficha HD</span>
+              </button>
+              <button
+                type="button"
                 onClick={() => {
                   setArDish(heroItem);
                   setIsArModalOpen(true);
@@ -867,14 +885,21 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
               >
                 {/* Image & Badges */}
                 <div className="relative h-44 sm:h-48 overflow-hidden bg-[#e2e8f0] dark:bg-[#0e0e10]">
-                  <img
-                    src={dish.image}
-                    alt={dish.name}
-                    loading="lazy"
-                    decoding="async"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 will-change-transform"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-white dark:from-[#15161c] via-transparent to-black/30" />
+                  <button
+                    type="button"
+                    onClick={() => setSelectedDishDetails(dish)}
+                    aria-label={`Ver ficha técnica de ${dish.name}`}
+                    className="absolute inset-0 h-full w-full cursor-zoom-in text-left"
+                  >
+                    <img
+                      src={dish.image}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                    <span className="absolute inset-0 bg-gradient-to-t from-white dark:from-[#15161c] via-transparent to-black/30" />
+                  </button>
 
                   {dish.badge && (
                     <span className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-full bg-[#ff5708] text-[#2b0b00] font-mono-code text-[9px] font-bold shadow">
@@ -955,6 +980,11 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
           </div>
           )}
         </section>
+
+        <DishDetailModal
+          item={selectedDishDetails}
+          onClose={() => setSelectedDishDetails(null)}
+        />
 
         {/* ========================================================================= */}
         {/* 🏛️ RESTAURANT FOOTER & LEGAL BAR (INDECOPI) */}

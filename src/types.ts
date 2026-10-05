@@ -135,8 +135,10 @@ export interface MenuItem {
   price: number;
   category: 'fondos' | 'entradas' | 'postres' | 'bebidas';
   image: string;
+  image_url_hd?: string;
   rating: number;
   reviewsCount: number;
+  allergens?: string[];
   badge?: string;
   tag?: string;
   dietary?: string;
