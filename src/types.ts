@@ -232,3 +232,69 @@ export interface SystemConfigState {
   autoCut: boolean;
   acousticBuzzer: boolean;
 }
+
+// ==========================================
+// CD-17 · Ofertas Flash (Panel de Administración)
+// ==========================================
+
+/** Mecánica promocional elegible desde las 4 pestañas del formulario. */
+export type PromoMechanic = 'discount' | 'two_for_one' | 'second_unit' | 'combo';
+
+/** Tipo de valor del descuento para la mecánica de descuento directo. */
+export type PromoDiscountType = 'percent' | 'fixed';
+
+/**
+ * Borrador centralizado del formulario "Gestión de Ofertas Flash".
+ * Agrupa TODOS los valores de los inputs en un único objeto de estado,
+ * listo para persistirse en Supabase en la siguiente fase.
+ */
+export interface PromoOfferDraft {
+  /** Pestaña mecánica activa: Descuento %/$ · 2x1 · 2da Unidad · Combo. */
+  mechanic: PromoMechanic;
+  /** Plato principal de la oferta (id real de la carta). */
+  mainDishId: string;
+  /** Plato / bebida complementaria: solo en 2da Unidad y Combo / Maridaje
+   *  (el 2x1 asume que la segunda unidad es idéntica a la primera). */
+  complementaryDishId: string;
+  discountType: PromoDiscountType;
+  /** Valor del descuento como texto para permitir edición libre en el input. */
+  discountValue: string;
+  /** Límite de porciones o unidades promocionadas ('' = sin límite). */
+  portionLimit: string;
+  /** Prioridad en la Carta QR: '1' (máxima) a '5' (mínima). */
+  priority: string;
+  /** false = Oferta Flash (fecha puntual) · true = Oferta Recurrente (días fijos). */
+  isRecurring: boolean;
+  /** Vigencia exacta (solo modo Flash) en formato `YYYY-MM-DDTHH:mm`. */
+  startAt: string;
+  endAt: string;
+  /** Días aplicables (solo modo Recurrente). 0 = Domingo … 6 = Sábado (ISO). */
+  weekdays: number[];
+  /** Ventana horaria recurrente (solo modo Recurrente) en formato `HH:mm`. */
+  scheduleFrom: string;
+  scheduleTo: string;
+  /** Publicación inmediata en la Carta QR + Pop-up de Mesa. */
+  syncToPosImmediately: boolean;
+}
+
+/** Oferta activa tal como se muestra en las tarjetas del panel. */
+export interface ActivePromoOffer {
+  id: string;
+  mechanic: PromoMechanic;
+  /** Id real del plato principal en la carta (permite editar la oferta). */
+  mainDishId: string;
+  /** Id real del complemento (vacío en "Descuento %/$" y en el 2x1). */
+  complementaryDishId: string;
+  badge: string;
+  kicker: string;
+  timingLabel: string;
+  title: string;
+  subtitle: string;
+  image: string;
+  originalPrice: number;
+  promoPrice: number;
+  /** % pactado de la mecánica (se usa para editar la oferta y pintar badges). */
+  discountPercent: number;
+  note: string;
+  isActive: boolean;
+}

@@ -1,4 +1,5 @@
-import { MenuItem, TableStatus, OrderTicket, StaffMember, SystemConfigState } from '../types';
+import { ActivePromoOffer, MenuItem, TableStatus, OrderTicket, StaffMember, SystemConfigState } from '../types';
+import { calculatePromoPricing } from '../utils/promo';
 
 export const INITIAL_MENU_ITEMS: MenuItem[] = [
   {
@@ -558,3 +559,95 @@ export const INITIAL_CONFIG: SystemConfigState = {
   autoCut: true,
   acousticBuzzer: true
 };
+
+// ==========================================
+// CD-17 · Ofertas Flash del panel de administración
+// ==========================================
+
+/**
+ * Oferta demo del panel: el precio promocional y el ahorro se derivan del
+ * precio real de carta (nunca se escribe un precio "a mano").
+ */
+function seedPromoOffer(
+  offer: Omit<ActivePromoOffer, 'originalPrice' | 'promoPrice' | 'discountPercent'> & {
+    basePrice: number;
+    percent: number;
+  }
+): ActivePromoOffer {
+  const { basePrice, percent, ...rest } = offer;
+  const pricing = calculatePromoPricing(basePrice, percent);
+  return {
+    ...rest,
+    originalPrice: pricing.originalPrice,
+    promoPrice: pricing.promoPrice,
+    discountPercent: pricing.discountPercent
+  };
+}
+
+/** Promociones en curso que alimentan la parrilla "Ofertas Activas Actualmente". */
+export const INITIAL_ACTIVE_PROMO_OFFERS: ActivePromoOffer[] = [
+  seedPromoOffer({
+    id: 'promo-wagyu-15',
+    mechanic: 'discount',
+    mainDishId: 'wagyu-a5',
+    complementaryDishId: '',
+    badge: '-15% OFF',
+    kicker: 'PLATO DEL CHEF',
+    timingLabel: 'Termina en 12:35 (Hoy)',
+    title: 'Wagyu Ribeye A5 Trufado',
+    subtitle: '280g corte japonés con escamas de sal marina',
+    image: '/images/pulpo-anticuchero.jpg',
+    note: 'Ahorro S/ 17.25',
+    isActive: true,
+    basePrice: 115,
+    percent: 15
+  }),
+  seedPromoOffer({
+    id: 'promo-tartar-2da',
+    mechanic: 'second_unit',
+    mainDishId: 'tartar-nikkei',
+    complementaryDishId: 'causa-limena',
+    badge: '2da -50%',
+    kicker: '2DA UNIDAD',
+    timingLabel: 'Termina en 08:45 (Hoy)',
+    title: 'Tartar & Ceviche Nikkei',
+    subtitle: 'Atún rojo, leche de tigre al ají amarillo y palta',
+    image: '/images/tartar-salmon.jpg',
+    note: '2da al 50%',
+    isActive: true,
+    basePrice: 38,
+    percent: 50
+  }),
+  seedPromoOffer({
+    id: 'promo-pisco-2x1',
+    mechanic: 'two_for_one',
+    mainDishId: 'smoked-old-fashioned',
+    complementaryDishId: '',
+    badge: '2x1 FLASH',
+    kicker: 'HAPPY HOUR BAR',
+    timingLabel: 'Hasta 21:00',
+    title: '2x1 Pisco Sour & Cócteles',
+    subtitle: 'Destilados premium de autor en barra principal',
+    image: '/images/smoked-old-fashioned.jpg',
+    note: 'Lleva 2 x 1',
+    isActive: true,
+    basePrice: 19,
+    percent: 50
+  }),
+  seedPromoOffer({
+    id: 'promo-volcan-pack',
+    mechanic: 'combo',
+    mainDishId: 'esfera-chocolate',
+    complementaryDishId: 'smoked-old-fashioned',
+    badge: 'MARIDAJE',
+    kicker: 'POSTRE + DIGESTIVO',
+    timingLabel: 'Turno Cena',
+    title: 'Volcán Belga + Maridaje',
+    subtitle: 'Volcán 70% cacao + Copa de Oporto o Amaro',
+    image: '/images/esfera-chocolate.jpg',
+    note: '-25% Pack',
+    isActive: true,
+    basePrice: 22,
+    percent: 25
+  })
+];

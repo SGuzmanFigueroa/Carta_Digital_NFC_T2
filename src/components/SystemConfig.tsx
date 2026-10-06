@@ -10,6 +10,8 @@ import { fetchDishesFromDb, updateDishPrice, deleteDishFromDb } from '@/services
 import { Dish3DScannerModal } from './Dish3DScannerModal';
 import { getPaymentConfig, savePaymentConfig, PaymentGatewayConfig } from '@/services/paymentConfigService';
 import { DishCatalogAdmin } from './DishCatalogAdmin';
+// CD-17 · Sección 09: Gestión de Ofertas Flash (formulario + vista previa móvil).
+import { PromoOffersManager } from './PromoOffersManager';
 
 interface SystemConfigProps {
   config: SystemConfigState;
@@ -27,7 +29,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
   const [showLogoModal, setShowLogoModal] = useState(false);
   const [customLogoInput, setCustomLogoInput] = useState('');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
-    const [activeSection, setActiveSection] = useState<'perfil' | 'notificaciones' | 'tema' | 'idioma' | 'impresion' | 'qr-mesas' | 'carta-platos'>('perfil');
+    const [activeSection, setActiveSection] = useState<'perfil' | 'notificaciones' | 'tema' | 'idioma' | 'impresion' | 'qr-mesas' | 'carta-platos' | 'ofertas'>('perfil');
   const [selectedTableNumber, setSelectedTableNumber] = useState('01');
   const [selectedZone, setSelectedZone] = useState('Salón Principal');
   const [customTableName, setCustomTableName] = useState('');
@@ -688,6 +690,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
     'qr-mesas': t.nav_qr_tables,
     'carta-platos': 'Carta & Platos 3D',
     'pagos-digitales': 'Pagos QR (Yape / Plin)',
+    ofertas: 'Ofertas & Promociones',
   } as Record<string, string>)[activeSection];
   const isLight = formData.themeMode === 'light';
   const isHighContrast = formData.themeMode === 'kds-high-contrast';
@@ -732,7 +735,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
       { rootMargin: '-20% 0px -60% 0px' }
     );
 
-    const sectionIds = ['perfil', 'notificaciones', 'tema', 'idioma', 'impresion', 'qr-mesas'];
+    const sectionIds = ['perfil', 'notificaciones', 'tema', 'idioma', 'impresion', 'qr-mesas', 'carta-platos', 'pagos-digitales', 'ofertas'];
     sectionIds.forEach((id) => {
       const element = document.getElementById(id);
       if (element) observer.observe(element);
@@ -946,6 +949,12 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                 num: '08',
                 label: 'Pagos QR (Yape / Plin)',
                 icon: 'M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z'
+              },
+              {
+                id: 'ofertas',
+                num: '09',
+                label: 'Ofertas & Promociones',
+                icon: 'M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z'
               },
             ].map((item) => {
               const isActive = activeSection === item.id;
@@ -2528,6 +2537,15 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
             </div>
           </section>
 
+          {/* SEC_09: GESTIÓN DE OFERTAS FLASH (FORMULARIO INTERACTIVO + VISTA PREVIA MÓVIL) */}
+          <PromoOffersManager
+            isLight={isLight}
+            isHighContrast={isHighContrast}
+            dishes={dishes}
+            sectionBg={sectionBg}
+            sectionHeaderBorder={sectionHeaderBorder}
+            onShowToast={onShowToast}
+          />
 
         </div>
       </div>
