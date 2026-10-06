@@ -178,7 +178,9 @@ body[data-theme="light"] {
   color-scheme: light;
 }
 
-html[data-theme="light"] main {
+html[data-theme="light"] main,
+html[data-theme="light"] .min-h-screen.bg-\[\#0e0e10\],
+html[data-theme="light"] main.min-h-screen {
   background-color: #f4f5f7 !important;
 }
 
@@ -233,19 +235,267 @@ html[data-theme="light"] header nav a.text-\[\#bcbbc5\],
   color: #64748b !important;
 }
 
-/* Light mode dropdowns and badges */
+/* Base Light Mode Containers, Cards and Typography */
+html[data-theme="light"] .text-\[\#e5e1e4\] {
+  color: #0f172a !important;
+}
+html[data-theme="light"] .text-\[\#c6c5cf\] {
+  color: #475569 !important;
+}
+html[data-theme="light"] .text-\[\#a1a1aa\] {
+  color: #64748b !important;
+}
+html[data-theme="light"] .border-\[\#353437\],
+html[data-theme="light"] .border-\[\#353437\]\/40,
+html[data-theme="light"] .border-\[\#353437\]\/30,
+html[data-theme="light"] .border-\[\#353437\]\/20,
+html[data-theme="light"] .border-\[\#2a2a2c\],
+html[data-theme="light"] .border-\[\#27272a\],
+html[data-theme="light"] .border-\[\#2d2e38\],
+html[data-theme="light"] .border-\[\#5c4037\]\/20,
+html[data-theme="light"] .border-\[\#5c4037\]\/25 {
+  border-color: #e2e8f0 !important;
+}
+
+/* Light mode primary cards and containers */
 html[data-theme="light"] .bg-\[\#1c1b1d\] {
   background-color: #ffffff !important;
   border-color: #e2e8f0 !important;
   color: #0f172a !important;
 }
 
-/* --- PEDIDOS (KANBAN & TELEMETRY) EN MODO CLARO MINIMAL --- */
-html[data-theme="light"] .min-h-screen.bg-\[\#0e0e10\],
-html[data-theme="light"] main.min-h-screen {
-  background-color: #f4f5f7 !important;
+/* Neutral secondary backgrounds & inner cards */
+html[data-theme="light"] .bg-\[\#201f22\] {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
 }
 
+html[data-theme="light"] .bg-\[\#18181b\],
+html[data-theme="light"] .bg-\[\#141416\] {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+/* Inner detail boxes (elimina las 'cajas negras' residuales en cards) */
+html[data-theme="light"] .bg-\[\#0e0e10\]\/80,
+html[data-theme="light"] .bg-\[\#0e0e10\]\/40 {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+/* Badges, avatars y botones secundarios #2a2a2c en modo claro */
+html[data-theme="light"] .bg-\[\#2a2a2c\] {
+  background-color: #f1f5f9 !important;
+  border-color: #e2e8f0 !important;
+  color: #334155 !important;
+}
+html[data-theme="light"] button.bg-\[\#2a2a2c\]:hover {
+  background-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+/* Inputs, selects y campos en modales y paneles */
+html[data-theme="light"] input.bg-\[\#1c1b1d\],
+html[data-theme="light"] input.bg-\[\#141416\],
+html[data-theme="light"] select.bg-\[\#141416\],
+html[data-theme="light"] textarea.bg-\[\#141416\] {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+html[data-theme="light"] input::placeholder,
+html[data-theme="light"] textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* Modales flotantes y backdrops */
+html[data-theme="light"] .bg-\[\#1c1b1d\].shadow-2xl {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+html[data-theme="light"] .bg-\[\#1c1b1d\].shadow-2xl .text-white {
+  color: #0f172a !important;
+}
+
+/* --- MODULO 1: GESTIÓN DE PERSONAL (/personal) --- */
+html[data-theme="light"] [href*="personal"],
+html[data-theme="light"] .grid > div.bg-\[\#1c1b1d\] {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Fades de scroll horizontal de pestañas */
+html[data-theme="light"] .from-\[\#0e0e10\] {
+  --tw-gradient-from: #f4f5f7 !important;
+  --tw-gradient-to: rgba(244, 245, 247, 0) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+}
+
+/* Iniciales y status en tarjeta de personal */
+html[data-theme="light"] .w-11.h-11.bg-\[\#2a2a2c\] {
+  background-color: #f1f5f9 !important;
+  color: var(--primary-accent, #ff5708) !important;
+  border-color: #cbd5e1 !important;
+}
+html[data-theme="light"] span.bg-\[\#0e0e10\].text-\[\#a1c9ff\] {
+  background-color: #f0f9ff !important;
+  color: #0284c7 !important;
+  border-color: #bae6fd !important;
+}
+
+/* --- MODULO 2: PANEL ADMIN & ESTADO DE SALA (/dashboard) --- */
+/* Barra superior de modo de vista (Plano de Mesas & 3D / Métricas) */
+html[data-theme="light"] .bg-\[\#121318\] {
+  background-color: #ffffff !important;
+  border-bottom-color: #e2e8f0 !important;
+}
+html[data-theme="light"] .bg-\[\#181920\] {
+  background-color: #f1f5f9 !important;
+  color: #475569 !important;
+}
+html[data-theme="light"] .bg-\[\#181920\]:hover {
+  background-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+/* Tarjetas de mesa: cancelar fondo negro de degradado y aplicar fondo blanco puro */
+html[data-theme="light"] .rounded-xl.bg-\[\#1c1b1d\] {
+  background-image: none !important;
+  background-color: #ffffff !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Cajas internas de tarjetas de mesa */
+html[data-theme="light"] .rounded-xl.bg-\[\#1c1b1d\] > div.bg-\[\#0e0e10\]\/80,
+html[data-theme="light"] .rounded-xl.bg-\[\#1c1b1d\] > div.bg-\[\#0e0e10\]\/40 {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+}
+
+/* Sub-tabs de zonas de mesas */
+html[data-theme="light"] button.bg-\[\#2a2a2c\].text-\[\#e5e1e4\] {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+  font-weight: 700 !important;
+}
+
+/* Platos populares hoy (Top Selection) */
+html[data-theme="light"] .p-2.rounded-lg.bg-\[\#201f22\] {
+  background-color: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+}
+html[data-theme="light"] .p-2.rounded-lg.bg-\[\#201f22\]:hover {
+  background-color: #f1f5f9 !important;
+}
+html[data-theme="light"] .p-2.rounded-lg.bg-\[\#201f22\] h3 {
+  color: #0f172a !important;
+}
+html[data-theme="light"] .bg-\[\#0e0e10\].h-1\.5,
+html[data-theme="light"] .bg-\[\#353437\].h-2 {
+  background-color: #e2e8f0 !important;
+}
+
+/* Footer operativo */
+html[data-theme="light"] footer.bg-\[\#0e0e10\] {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}
+
+/* --- MODULO 3: COCINA KDS (/kds) --- */
+/* Barra superior de estaciones y telemetría */
+html[data-theme="light"] .bg-\[\#0e0e10\]\/95 {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  border-bottom-color: #e2e8f0 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Chips de estaciones no seleccionadas */
+html[data-theme="light"] button.bg-\[\#201f22\].text-\[\#c6c5cf\] {
+  background-color: #f1f5f9 !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #475569 !important;
+}
+html[data-theme="light"] button.bg-\[\#201f22\].text-\[\#c6c5cf\]:hover {
+  background-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+html[data-theme="light"] .bg-\[\#0e0e10\]\/40 {
+  background-color: rgba(0, 0, 0, 0.08) !important;
+  color: inherit !important;
+}
+
+/* Columnas y cuerpo de tickets KDS */
+html[data-theme="light"] .bg-\[\#131315\] {
+  background-color: #f8fafc !important;
+}
+html[data-theme="light"] .bg-\[\#1c1b1d\].rounded-xl {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.06), 0 2px 4px -2px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Cabecera de comanda normal en KDS (no retrasada) */
+html[data-theme="light"] div.bg-\[\#2a2a2c\].text-\[\#e5e1e4\] {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+}
+html[data-theme="light"] div.bg-\[\#2a2a2c\] .text-white {
+  color: #0f172a !important;
+}
+html[data-theme="light"] div.bg-\[\#2a2a2c\] .material-symbols-outlined {
+  color: #475569 !important;
+}
+
+/* Filas de platos dentro de comanda KDS */
+html[data-theme="light"] .bg-\[\#131315\] .bg-\[\#201f22\] {
+  background-color: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03) !important;
+}
+html[data-theme="light"] .bg-\[\#131315\] .bg-\[\#201f22\]:hover {
+  background-color: #f8fafc !important;
+}
+html[data-theme="light"] .bg-\[\#131315\] .bg-\[\#2a2a2c\] {
+  background-color: #f1f5f9 !important;
+  border: 1px solid #e2e8f0 !important;
+}
+html[data-theme="light"] .bg-\[\#131315\] .text-white {
+  color: #0f172a !important;
+}
+html[data-theme="light"] .bg-\[\#131315\] .text-\[\#e5beb2\] {
+  color: #475569 !important;
+  font-weight: 500 !important;
+}
+html[data-theme="light"] .bg-\[\#131315\] .bg-\[\#353437\] {
+  background-color: #e2e8f0 !important;
+  border-color: #cbd5e1 !important;
+}
+html[data-theme="light"] .bg-\[\#131315\] button.bg-\[\#1c1b1d\] {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: var(--primary-accent, #ff5708) !important;
+}
+
+/* Nota de pase interno / camarero al pie del ticket KDS */
+html[data-theme="light"] .bg-\[\#131315\] div.bg-\[\#1c1b1d\] {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+}
+
+/* Barra inferior de pausa y controles KDS */
+html[data-theme="light"] div.bg-\[\#0e0e10\].border-t {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  border-top-color: #e2e8f0 !important;
+  box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.04) !important;
+}
+html[data-theme="light"] div.bg-\[\#0e0e10\].border-t button {
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+/* --- MODULO 4: CENTRAL DE PEDIDOS (/pedidos) --- */
 /* Columnas de Kanban en modo claro */
 html[data-theme="light"] section.bg-\[\#0e0e10\] {
   background-color: #f8fafc !important;
@@ -263,8 +513,7 @@ html[data-theme="light"] .bg-\[\#1c1b1d\]\/40 {
 }
 
 /* Tarjetas de comanda en Kanban */
-html[data-theme="light"] article.bg-\[\#201f22\],
-html[data-theme="light"] .bg-\[\#201f22\] {
+html[data-theme="light"] article.bg-\[\#201f22\] {
   background-color: #ffffff !important;
   border-color: #e2e8f0 !important;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
@@ -294,27 +543,10 @@ html[data-theme="light"] article button.bg-\[\#2a2a2c\]:hover {
   color: #0f172a !important;
 }
 
-/* Barra superior de telemetría y filtros */
-html[data-theme="light"] .text-\[\#e5e1e4\] {
-  color: #0f172a !important;
-}
-html[data-theme="light"] .text-\[\#c6c5cf\] {
-  color: #475569 !important;
-}
-html[data-theme="light"] .border-\[\#353437\],
-html[data-theme="light"] .border-\[\#353437\]\/40,
-html[data-theme="light"] .border-\[\#353437\]\/30,
-html[data-theme="light"] .border-\[\#2a2a2c\] {
-  border-color: #e2e8f0 !important;
-}
-
-html[data-theme="light"] input.bg-\[\#1c1b1d\] {
+/* Inspector térmico lateral en /pedidos */
+html[data-theme="light"] aside div.bg-\[\#201f22\] {
   background-color: #ffffff !important;
-  color: #0f172a !important;
-  border-color: #cbd5e1 !important;
-}
-html[data-theme="light"] input.bg-\[\#1c1b1d\]::placeholder {
-  color: #94a3b8 !important;
+  border: 1px solid #e2e8f0 !important;
 }
 
 /* --- ALTO CONTRASTE KDS --- */
