@@ -315,12 +315,40 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   // ==========================================================================
   // 🎯 CD-16 · OFERTA FLASH: platos reales + estado del pop-up promocional
   // ==========================================================================
+    const [activeStoredOffers, setActiveStoredOffers] = useState<any[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('gastropulse_active_promo_offers');
+        if (raw) return JSON.parse(raw);
+      } catch (e) {}
+    }
+    return [];
+  });
+
+  useEffect(() => {
+    const handler = () => {
+      try {
+        const raw = localStorage.getItem('gastropulse_active_promo_offers');
+        if (raw) setActiveStoredOffers(JSON.parse(raw));
+      } catch (e) {}
+    };
+    window.addEventListener('gastropulse_promo_offers_changed', handler);
+    return () => window.removeEventListener('gastropulse_promo_offers_changed', handler);
+  }, []);
+
   const promoDeals = React.useMemo(() => {
+    const activeFromStore = activeStoredOffers.filter((o) => o.isActive !== false);
+    if (activeFromStore.length > 0) {
+      const mapped = activeFromStore
+        .map((offer) => menuItems.find((m) => m.id === offer.mainDishId))
+        .filter((item): item is MenuItem => Boolean(item));
+      if (mapped.length > 0) return mapped;
+    }
     const matched = PROMO_DEAL_IDS.map((id) => menuItems.find((item) => item.id === id)).filter(
       (item): item is MenuItem => Boolean(item)
     );
     return matched.length > 0 ? matched : menuItems.slice(0, 3);
-  }, [menuItems]);
+  }, [menuItems, activeStoredOffers]);
 
   /**
    * Abre el pop-up promocional. Si llega el `id` de un plato (toque en la tira

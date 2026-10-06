@@ -60,7 +60,30 @@ export function PromoOffersManager({
   // 📱 Modal de vista previa con el pop-up real del comensal.
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   // 🗂️ Ofertas en curso mostradas en la parrilla inferior del panel.
-  const [activeOffers, setActiveOffers] = useState<ActivePromoOffer[]>(INITIAL_ACTIVE_PROMO_OFFERS);
+  const PROMO_STORAGE_KEY = 'gastropulse_active_promo_offers';
+  const [activeOffers, setActiveOffers] = useState<ActivePromoOffer[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem(PROMO_STORAGE_KEY);
+        if (saved) return JSON.parse(saved);
+      } catch (e) {
+        console.warn('Error reading active promo offers from localStorage', e);
+      }
+    }
+    return INITIAL_ACTIVE_PROMO_OFFERS;
+  });
+
+  const persistOffers = (offers: ActivePromoOffer[]) => {
+    setActiveOffers(offers);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(PROMO_STORAGE_KEY, JSON.stringify(offers));
+        window.dispatchEvent(new Event('gastropulse_promo_offers_changed'));
+      } catch (e) {
+        console.warn('Error writing active promo offers to localStorage', e);
+      }
+    }
+  };
 
   // Tokens de color compartidos con las demás secciones del panel.
   const cardBg = isLight ? 'bg-[#f8fafc] border-[#e2e8f0] shadow-sm' : isHighContrast ? 'bg-black border-2 border-white' : 'bg-[#1C1C1C] border-[#2A2A2A]';
@@ -179,15 +202,13 @@ export function PromoOffersManager({
     }
 
     const nextOffer = buildActiveOffer(offerForm, mainDish, complementDish);
-    setActiveOffers((previous) => [nextOffer, ...previous]);
+    persistOffers([nextOffer, ...activeOffers]);
     onShowToast(`Oferta añadida: ${nextOffer.title} (${nextOffer.badge})`, 'check_circle');
     setOfferForm(createInitialOfferForm());
   };
 
   const handleToggleOfferActive = (offer: ActivePromoOffer) => {
-    setActiveOffers((previous) =>
-      previous.map((item) => (item.id === offer.id ? { ...item, isActive: !item.isActive } : item))
-    );
+    persistOffers(activeOffers.map((item) => (item.id === offer.id ? { ...item, isActive: !item.isActive } : item)));
     onShowToast(
       `"${offer.title}" ${offer.isActive ? 'retirada' : 'publicada'} en la Carta Digital QR`,
       offer.isActive ? 'visibility_off' : 'visibility'
@@ -871,14 +892,12 @@ export function PromoOffersManager({
           className={`flex flex-col sm:flex-row justify-between items-start gap-4 p-4 sm:p-6 border-b ${sectionHeaderBorder}`}
         >
           <div className="flex items-start gap-3">
-            <span className="material-symbols-outlined text-[28px] text-[#ff5708] shrink-0">bolt</span>
+            <svg className="w-6 h-6 text-[#FF5A1F] shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+            </svg>
             <div>
               <div className="flex flex-wrap items-center gap-2.5">
                 <h2 className={`text-lg font-bold ${titleColor}`}>Gestión de Ofertas Flash</h2>
-                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-[10px] font-bold font-mono uppercase tracking-wider bg-[#FF5A1F]/10 border-[#FF5A1F]/40 text-[#FF5A1F]">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#FF5A1F] animate-pulse" />
-                  En Vivo
-                </span>
               </div>
               <p className={`text-[13px] mt-0.5 ${descColor}`}>
                 Configura promociones temporales, descuentos por porcentaje o monto fijo, promociones 2x1, 2da unidad
@@ -891,7 +910,7 @@ export function PromoOffersManager({
         <div className="p-4 sm:p-6 space-y-5">
           <div className="space-y-2.5">
             <h3 className={`text-[12px] font-bold uppercase tracking-wider flex items-center gap-2 ${descColor}`}>
-              <span className="material-symbols-outlined text-[16px] text-[#FF5A1F]">sell</span>
+              <svg className="w-4 h-4 text-[#FF5A1F] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
               <span>Mecánica Promocional Gastronómica</span>
             </h3>
             {renderMechanicTabs()}

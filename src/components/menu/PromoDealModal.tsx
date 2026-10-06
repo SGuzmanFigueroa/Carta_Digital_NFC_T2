@@ -306,11 +306,11 @@ const PromoFlashCountdown = React.memo(function PromoFlashCountdown({ seconds }:
 
   return (
     <span
-      className={`pointer-events-none absolute bottom-0 left-1/2 z-10 inline-flex -translate-x-1/2 translate-y-1/2 items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#0b0c0e] border font-mono-code text-[11px] font-bold whitespace-nowrap shadow-xl ${
-        isUrgent ? 'border-rose-500/60 text-rose-300' : 'border-[#ff5708]/45 text-[#ffb59c]'
+      className={`pointer-events-none absolute bottom-2 left-1/2 z-10 inline-flex -translate-x-1/2 items-center gap-1.5 font-mono-code text-[12px] font-bold whitespace-nowrap drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] ${
+        isUrgent ? 'text-rose-400' : 'text-[#ffb59c]'
       }`}
     >
-      <Clock size={12} strokeWidth={2.8} className={isUrgent ? 'text-rose-400' : 'text-[#ff5708]'} />
+      <Clock size={13} strokeWidth={2.8} className={isUrgent ? 'text-rose-400' : 'text-[#ff5708]'} />
       <span>¡Termina en {formatPromoCountdown(remainingSeconds)}!</span>
     </span>
   );
@@ -424,8 +424,8 @@ const PromoDealSlide = React.memo(function PromoDealSlide({
           <span className="font-mono-code text-[14px] leading-none text-[#64748b] dark:text-[#71717a] line-through">
             {formatSoles(pricing.originalPrice)}
           </span>
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/35 text-emerald-700 dark:text-emerald-400 text-[10.5px] font-black uppercase tracking-wide">
-            <TrendingUp size={11} strokeWidth={3} />
+          <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-mono-code text-[12px] font-bold">
+            <TrendingUp size={13} strokeWidth={2.8} />
             <span>Ahorra {formatSoles(pricing.savings)}</span>
           </span>
         </div>
@@ -706,10 +706,7 @@ export function PromoDealModal({
         {/* ===================================================================== */}
         {/* 🎬 CHROME FIJO · BADGE FLASH DEAL Y CIERRE (✕)                        */}
         {/* ===================================================================== */}
-        <span className="pointer-events-none absolute top-3.5 left-3.5 z-30 inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#ff5708] text-white text-[10px] font-black uppercase tracking-[0.08em] shadow-lg shadow-[#ff5708]/40">
-          <Zap size={11} strokeWidth={3} fill="currentColor" />
-          <span>Flash Deal</span>
-        </span>
+        {/* Badge FLASH DEAL removido a pedido del usuario */}
 
         <button
           ref={closeButtonRef}
