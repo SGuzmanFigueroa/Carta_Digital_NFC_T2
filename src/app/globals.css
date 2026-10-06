@@ -435,6 +435,45 @@ html[data-theme="light"] .bg-\[\#1c1b1d\].rounded-xl {
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.06), 0 2px 4px -2px rgba(0, 0, 0, 0.05) !important;
 }
 
+/* Cabecera de comanda urgente / retrasada en KDS (fondo rojo oscuro #93000a): TEXTO BLANCO PURO DE ALTO CONTRASTE */
+html[data-theme="light"] div.bg-\[\#93000a\],
+html[data-theme="light"] div.bg-\[\#93000a\] *,
+html[data-theme="light"] div.bg-\[\#93000a\] .text-white,
+html[data-theme="light"] div.bg-\[\#93000a\] .text-\[\#e5e1e4\],
+html[data-theme="light"] div.bg-\[\#93000a\] .font-mono-code,
+html[data-theme="light"] div.bg-\[\#93000a\] span,
+html[data-theme="light"] div.bg-\[\#93000a\] .material-symbols-outlined {
+  color: #ffffff !important;
+}
+
+/* Pastilla de mesa en alerta roja mantiene fondo blanco y texto rojo */
+html[data-theme="light"] div.bg-\[\#93000a\] span.bg-white {
+  background-color: #ffffff !important;
+  color: #93000a !important;
+}
+
+/* Indicador "+XXm sobre meta" dentro del encabezado rojo */
+html[data-theme="light"] div.bg-\[\#93000a\] .bg-\[\#0e0e10\]\/80,
+html[data-theme="light"] div.bg-\[\#93000a\] span.text-\[\#ffb4ab\] {
+  background-color: rgba(0, 0, 0, 0.45) !important;
+  color: #ffdad6 !important;
+  border-color: rgba(255, 255, 255, 0.25) !important;
+}
+
+/* Banner de Alérgenos: fondo naranja vibrante con texto e iconos en BLANCO PURO */
+html[data-theme="light"] .bg-\[\#ff5708\].text-white,
+html[data-theme="light"] .bg-\[\#ff5708\].text-white *,
+html[data-theme="light"] div.bg-\[\#ff5708\] .text-white,
+html[data-theme="light"] div.bg-\[\#ff5708\] .material-symbols-outlined {
+  color: #ffffff !important;
+}
+
+/* Botón "+ NUEVA COMANDA" y botones de acento primario: TEXTO BLANCO */
+html[data-theme="light"] button.bg-\[\#ff5708\],
+html[data-theme="light"] button.bg-\[\#ff5708\] * {
+  color: #ffffff !important;
+}
+
 /* Cabecera de comanda normal en KDS (no retrasada) */
 html[data-theme="light"] div.bg-\[\#2a2a2c\].text-\[\#e5e1e4\] {
   background-color: #f1f5f9 !important;
@@ -446,6 +485,32 @@ html[data-theme="light"] div.bg-\[\#2a2a2c\] .text-white {
 }
 html[data-theme="light"] div.bg-\[\#2a2a2c\] .material-symbols-outlined {
   color: #475569 !important;
+}
+
+/* Franjas informativas de pase (Salida simultánea, salteado al wok, tiempos) con alto contraste */
+html[data-theme="light"] .bg-\[\#201f22\].text-\[\#e5beb2\] {
+  background-color: #f8fafc !important;
+  color: #334155 !important;
+  border-bottom-color: #e2e8f0 !important;
+}
+html[data-theme="light"] .bg-\[\#201f22\].text-\[\#e5beb2\] span {
+  color: #334155 !important;
+}
+html[data-theme="light"] .bg-\[\#201f22\].text-\[\#e5beb2\] .material-symbols-outlined {
+  color: var(--primary-accent, #ff5708) !important;
+}
+
+/* Badges de estación y estado en modo claro (LISTO EN PLANCHA, EN MONTAJE) */
+html[data-theme="light"] .bg-emerald-950\/80,
+html[data-theme="light"] .bg-emerald-950 {
+  background-color: #d1fae5 !important;
+  color: #065f46 !important;
+  border-color: #a7f3d0 !important;
+}
+html[data-theme="light"] .bg-\[\#353437\].text-\[\#ffb59c\] {
+  background-color: #ffedd5 !important;
+  color: #9a3412 !important;
+  border-color: #fed7aa !important;
 }
 
 /* Filas de platos dentro de comanda KDS */
