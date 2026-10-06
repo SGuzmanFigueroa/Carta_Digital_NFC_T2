@@ -31,6 +31,7 @@ import { PromoDealModal } from './menu/PromoDealModal';
 // CD-16 · Tira "Oferta Flash" de portada: rota sola entre las ofertas activas.
 import { PromoFlashTicker } from './menu/PromoFlashTicker';
 import { formatSoles } from '@/utils/promo';
+import { INITIAL_ACTIVE_PROMO_OFFERS } from '@/data/mockData';
 
 // =============================================================================
 // 🎯 CD-16 · CONFIGURACIÓN DE LA OFERTA FLASH (POP-UP PROMOCIONAL DEL COMENSAL)
@@ -315,32 +316,56 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   // ==========================================================================
   // 🎯 CD-16 · OFERTA FLASH: platos reales + estado del pop-up promocional
   // ==========================================================================
-    const [activeStoredOffers, setActiveStoredOffers] = useState<any[]>(() => {
+  const [activeStoredOffers, setActiveStoredOffers] = useState<any[]>(() => {
     if (typeof window !== 'undefined') {
       try {
         const raw = localStorage.getItem('gastropulse_active_promo_offers');
         if (raw) return JSON.parse(raw);
       } catch (e) {}
     }
-    return [];
+    return INITIAL_ACTIVE_PROMO_OFFERS;
   });
 
   useEffect(() => {
     const handler = () => {
       try {
         const raw = localStorage.getItem('gastropulse_active_promo_offers');
-        if (raw) setActiveStoredOffers(JSON.parse(raw));
+        if (raw) {
+          setActiveStoredOffers(JSON.parse(raw));
+        } else {
+          setActiveStoredOffers(INITIAL_ACTIVE_PROMO_OFFERS);
+        }
       } catch (e) {}
     };
     window.addEventListener('gastropulse_promo_offers_changed', handler);
-    return () => window.removeEventListener('gastropulse_promo_offers_changed', handler);
+    window.addEventListener('storage', handler);
+    return () => {
+      window.removeEventListener('gastropulse_promo_offers_changed', handler);
+      window.removeEventListener('storage', handler);
+    };
   }, []);
 
   const promoDeals = React.useMemo(() => {
     const activeFromStore = activeStoredOffers.filter((o) => o.isActive !== false);
     if (activeFromStore.length > 0) {
       const mapped = activeFromStore
-        .map((offer) => menuItems.find((m) => m.id === offer.mainDishId))
+        .map((offer) => {
+          const item = menuItems.find((m) => m.id === offer.mainDishId);
+          if (!item) return null;
+          return {
+            ...item,
+            name: offer.title || item.name,
+            promoDiscountPercent: offer.discountPercent ?? PROMO_DEAL_DISCOUNT,
+            promoPriceCustom: offer.promoPrice,
+            promoOriginalPriceCustom: offer.originalPrice,
+            promoBadge: offer.badge,
+            promoKicker: offer.kicker,
+            promoTimingLabel: offer.timingLabel,
+            promoOfferId: offer.id,
+            promoTitle: offer.title,
+            promoSubtitle: offer.subtitle,
+          };
+        })
         .filter((item): item is MenuItem => Boolean(item));
       if (mapped.length > 0) return mapped;
     }

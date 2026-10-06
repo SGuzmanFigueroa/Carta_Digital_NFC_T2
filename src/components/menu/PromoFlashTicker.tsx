@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { MenuItem } from '@/types';
 import { calculatePromoPricing, formatSoles } from '@/utils/promo';
 
@@ -234,7 +234,29 @@ export const PromoFlashTicker = React.memo(function PromoFlashTicker({
   // con módulo para no quedar nunca fuera de rango.
   const currentIndex = totalDeals > 0 ? activeIndex % totalDeals : 0;
   const deal = totalDeals > 0 ? deals[currentIndex] : undefined;
-  const pricing = deal ? calculatePromoPricing(deal.price, discountPercent) : null;
+  const effectiveDiscount = (deal as any)?.promoDiscountPercent ?? discountPercent;
+
+  const pricing = useMemo(() => {
+    if (!deal) return null;
+    if ((deal as any)?.promoPriceCustom && (deal as any)?.promoOriginalPriceCustom) {
+      return {
+        originalPrice: (deal as any).promoOriginalPriceCustom,
+        promoPrice: (deal as any).promoPriceCustom,
+        savings: (deal as any).promoOriginalPriceCustom - (deal as any).promoPriceCustom,
+        discountPercent: effectiveDiscount
+      };
+    }
+    return calculatePromoPricing(deal.price, effectiveDiscount);
+  }, [deal, effectiveDiscount]);
+
+  const bannerHeader = useMemo(() => {
+    if (!deal) return `Oferta Flash · -${Math.round(discountPercent)}% del día`;
+    const badge = (deal as any)?.promoBadge;
+    if (badge && !badge.includes('%')) {
+      return `Oferta Flash · ${badge}`;
+    }
+    return `Oferta Flash · -${Math.round(effectiveDiscount)}% del día`;
+  }, [deal, discountPercent, effectiveDiscount]);
 
   /** Toca/click: abre el detalle de la oferta que se está viendo en la tira. */
   const handleOpenDeal = useCallback(() => {
@@ -309,7 +331,9 @@ export const PromoFlashTicker = React.memo(function PromoFlashTicker({
       className="w-full text-left relative overflow-hidden rounded-2xl border border-[#ff5708]/35 bg-gradient-to-r from-[#ff5708]/15 via-[#ff5708]/5 to-transparent p-2.5 flex items-center gap-3 shadow-[0_4px_20px_rgba(255,87,8,0.12)] active:scale-[0.99] transition-transform cursor-pointer"
     >
       <span className="w-11 h-11 min-w-[44px] rounded-xl bg-[#ff5708] text-white flex items-center justify-center shrink-0 shadow-md shadow-[#ff5708]/30">
-        <span className="material-symbols-outlined text-[20px]">bolt</span>
+        <svg className="w-5 h-5 text-white shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
+        </svg>
       </span>
 
       {/* 🎞️ Bloque rotativo. `key={deal.id}` lo remonta en cada cambio de oferta,

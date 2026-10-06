@@ -531,7 +531,15 @@ export function PromoDealModal({
       : false;
 
     return validDeals.map((item, index) => {
-      const itemPricing = offerPricing ?? calculatePromoPricing(item.price, discountPercent);
+      const itemDiscount = (item as any)?.promoDiscountPercent ?? discountPercent;
+      const itemPricing = (item as any)?.promoPriceCustom && (item as any)?.promoOriginalPriceCustom
+        ? {
+            originalPrice: (item as any).promoOriginalPriceCustom,
+            promoPrice: (item as any).promoPriceCustom,
+            savings: (item as any).promoOriginalPriceCustom - (item as any).promoPriceCustom,
+            discountPercent: itemDiscount
+          }
+        : (offerPricing ?? calculatePromoPricing(item.price, itemDiscount));
       const subtitleText = buildPromoSubtitleText(
         offerCopy ?? {
           mechanic: 'discount',
