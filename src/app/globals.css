@@ -198,16 +198,24 @@ html[data-theme="light"] header .bg-\[\#0e0e10\],
   color: #0f172a !important;
 }
 
+html[data-theme="light"] header nav a:hover,
 html[data-theme="light"] header nav button:hover {
   background-color: #f1f5f9 !important;
   color: #0f172a !important;
 }
 
+html[data-theme="light"] header nav a.bg-\[\#2a2a2c\],
+[data-theme="light"] header nav a.bg-\[\#2a2a2c\],
 html[data-theme="light"] header nav button.bg-\[\#2a2a2c\],
 [data-theme="light"] header nav button.bg-\[\#2a2a2c\] {
-  background-color: #fff7ed !important;
-  color: #ff5708 !important;
-  border-bottom-color: #ff5708 !important;
+  background-color: #f1f5f9 !important;
+  color: var(--primary-accent, #ff5708) !important;
+  border-bottom-color: var(--primary-accent, #ff5708) !important;
+}
+
+html[data-theme="light"] header nav a.text-\[\#bcbbc5\],
+[data-theme="light"] header nav a.text-\[\#bcbbc5\] {
+  color: #64748b !important;
 }
 
 /* Light mode dropdowns and badges */
@@ -215,6 +223,83 @@ html[data-theme="light"] .bg-\[\#1c1b1d\] {
   background-color: #ffffff !important;
   border-color: #e2e8f0 !important;
   color: #0f172a !important;
+}
+
+/* --- PEDIDOS (KANBAN & TELEMETRY) EN MODO CLARO MINIMAL --- */
+html[data-theme="light"] .min-h-screen.bg-\[\#0e0e10\],
+html[data-theme="light"] main.min-h-screen {
+  background-color: #f4f5f7 !important;
+}
+
+/* Columnas de Kanban en modo claro */
+html[data-theme="light"] section.bg-\[\#0e0e10\] {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+}
+
+html[data-theme="light"] section.bg-\[\#0e0e10\] > div.bg-\[\#1c1b1d\] {
+  background-color: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+html[data-theme="light"] .bg-\[\#1c1b1d\]\/40 {
+  background-color: #f1f5f9 !important;
+  color: #64748b !important;
+}
+
+/* Tarjetas de comanda en Kanban */
+html[data-theme="light"] article.bg-\[\#201f22\],
+html[data-theme="light"] .bg-\[\#201f22\] {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Desglose interno de platos en tarjeta */
+html[data-theme="light"] article .bg-\[\#1c1b1d\] {
+  background-color: #f8fafc !important;
+  border: 1px solid #f1f5f9 !important;
+}
+
+/* Insignias y tiempos */
+html[data-theme="light"] article .bg-\[\#0e0e10\],
+html[data-theme="light"] article .bg-\[\#2a2a2c\] {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+/* Botones dentro de tarjetas */
+html[data-theme="light"] article button.bg-\[\#2a2a2c\] {
+  background-color: #f1f5f9 !important;
+  color: #334155 !important;
+  border: 1px solid #e2e8f0 !important;
+}
+html[data-theme="light"] article button.bg-\[\#2a2a2c\]:hover {
+  background-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+/* Barra superior de telemetría y filtros */
+html[data-theme="light"] .text-\[\#e5e1e4\] {
+  color: #0f172a !important;
+}
+html[data-theme="light"] .text-\[\#c6c5cf\] {
+  color: #475569 !important;
+}
+html[data-theme="light"] .border-\[\#353437\],
+html[data-theme="light"] .border-\[\#353437\]\/40,
+html[data-theme="light"] .border-\[\#353437\]\/30,
+html[data-theme="light"] .border-\[\#2a2a2c\] {
+  border-color: #e2e8f0 !important;
+}
+
+html[data-theme="light"] input.bg-\[\#1c1b1d\] {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+html[data-theme="light"] input.bg-\[\#1c1b1d\]::placeholder {
+  color: #94a3b8 !important;
 }
 
 /* --- ALTO CONTRASTE KDS --- */
@@ -232,38 +317,6 @@ html[data-theme="kds-high-contrast"] header {
   border-bottom: 2px solid #ffffff !important;
 }
 
-/* --- COLOR ACCENTS --- */
-[data-accent="emerald"] .bg-\[\#FF5A1F\],
-[data-accent="emerald"] .bg-\[\#ff5708\] {
-  background-color: #00ff88 !important;
-  color: #0a2015 !important;
-}
-
-[data-accent="emerald"] .text-\[\#FF5A1F\],
-[data-accent="emerald"] .text-\[\#ff5708\] {
-  color: #00ff88 !important;
-}
-
-[data-accent="emerald"] .border-\[\#FF5A1F\],
-[data-accent="emerald"] .border-\[\#ff5708\] {
-  border-color: #00ff88 !important;
-}
-
-[data-accent="cyan"] .bg-\[\#FF5A1F\],
-[data-accent="cyan"] .bg-\[\#ff5708\] {
-  background-color: #00b4d8 !important;
-  color: #041a22 !important;
-}
-
-[data-accent="cyan"] .text-\[\#FF5A1F\],
-[data-accent="cyan"] .text-\[\#ff5708\] {
-  color: #00b4d8 !important;
-}
-
-[data-accent="cyan"] .border-\[\#FF5A1F\],
-[data-accent="cyan"] .border-\[\#ff5708\] {
-  border-color: #00b4d8 !important;
-}
 
 /* ==========================================================
    CD-13 · TEMA DEL COMENSAL (ruta pública /menu)

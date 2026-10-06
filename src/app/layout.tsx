@@ -71,8 +71,28 @@ export default function RootLayout({
                   if (t === 'light') {
                     document.documentElement.classList.remove('dark');
                     document.documentElement.classList.add('light');
+                  } else {
+                    document.documentElement.classList.remove('light');
+                    document.documentElement.classList.add('dark');
                   }
-                  if (p.colorAccent) document.documentElement.setAttribute('data-accent', p.colorAccent);
+                  if (p.colorAccent) {
+                    document.documentElement.setAttribute('data-accent', p.colorAccent);
+                    var palette = {
+                      amber: '#ff5708',
+                      emerald: '#10b981',
+                      cyan: '#00b4d8',
+                      ruby: '#e11d48',
+                      champagne: '#eab308',
+                      indigo: '#6366f1',
+                      terracotta: '#ea580c',
+                      lavender: '#a855f7',
+                      titanium: '#94a3b8'
+                    };
+                    var hex = palette[p.colorAccent] || '#ff5708';
+                    document.documentElement.style.setProperty('--primary-accent', hex);
+                    document.documentElement.style.setProperty('--color-primary', hex);
+                    document.documentElement.style.setProperty('--color-kinetic-amber', hex);
+                  }
                   if (p.density) document.documentElement.setAttribute('data-density', p.density);
                 }
               } catch(e) {}

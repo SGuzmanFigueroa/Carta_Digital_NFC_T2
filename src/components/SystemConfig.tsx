@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { SystemConfigState } from '../types';
-import { applyTheme } from '@/utils/theme';
+import { applyTheme, ACCENT_PALETTE } from '@/utils/theme';
 import { getTranslations, getLanguageCode } from '@/utils/i18n';
 import { kitchenAudio } from '@/utils/audio';
 import { MenuItem } from '../types';
@@ -1332,66 +1332,46 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                 {/* Acento Cromático */}
                 <div className="flex flex-col gap-3">
                   <label className={`text-[10px] uppercase tracking-[0.1em] font-bold ${labelColor}`}>{t.chromatic_accent}</label>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFormData({ ...formData, colorAccent: 'amber' });
-                        applyTheme(formData.themeMode, 'amber', formData.density);
-                      }}
-                      className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg border text-[12px] font-medium transition-all cursor-pointer ${
-                        formData.colorAccent === 'amber'
-                          ? isLight
-                            ? 'border-[#FF5A1F] bg-[#fff7ed] text-[#c2410c] font-bold shadow-sm'
-                            : 'border-[#FF5A1F] bg-[#221A15] text-white'
-                          : isLight
-                          ? 'border-[#cbd5e1] bg-white text-[#475569] hover:bg-[#f8fafc]'
-                          : 'border-[#2A2A2A] bg-[#141414] text-gray-400 hover:border-[#444]'
-                      }`}
-                    >
-                      <span className="w-3.5 h-3.5 rounded-full bg-[#FF5A1F] shadow-[0_0_8px_rgba(255,90,31,0.5)]" />
-                      <span>Kinetic Amber</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFormData({ ...formData, colorAccent: 'emerald' });
-                        applyTheme(formData.themeMode, 'emerald', formData.density);
-                      }}
-                      className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg border text-[12px] font-medium transition-all cursor-pointer ${
-                        formData.colorAccent === 'emerald'
-                          ? isLight
-                            ? 'border-[#00FF88] bg-[#f0fdf4] text-[#15803d] font-bold shadow-sm'
-                            : 'border-[#00FF88] bg-[#10221A] text-white'
-                          : isLight
-                          ? 'border-[#cbd5e1] bg-white text-[#475569] hover:bg-[#f8fafc]'
-                          : 'border-[#2A2A2A] bg-[#141414] text-gray-400 hover:border-[#444]'
-                      }`}
-                    >
-                      <span className="w-3.5 h-3.5 rounded-full bg-[#00FF88] shadow-[0_0_8px_rgba(0,255,136,0.5)]" />
-                      <span>Esmeralda</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFormData({ ...formData, colorAccent: 'cyan' });
-                        applyTheme(formData.themeMode, 'cyan', formData.density);
-                      }}
-                      className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg border text-[12px] font-medium transition-all cursor-pointer ${
-                        formData.colorAccent === 'cyan'
-                          ? isLight
-                            ? 'border-[#00B4D8] bg-[#f0f9ff] text-[#0369a1] font-bold shadow-sm'
-                            : 'border-[#00B4D8] bg-[#102028] text-white'
-                          : isLight
-                          ? 'border-[#cbd5e1] bg-white text-[#475569] hover:bg-[#f8fafc]'
-                          : 'border-[#2A2A2A] bg-[#141414] text-gray-400 hover:border-[#444]'
-                      }`}
-                    >
-                      <span className="w-3.5 h-3.5 rounded-full bg-[#00B4D8] shadow-[0_0_8px_rgba(0,180,216,0.5)]" />
-                      <span>Cibernético</span>
-                    </button>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {Object.values(ACCENT_PALETTE).map((accent) => {
+                      const isSelected = formData.colorAccent === accent.id;
+                      return (
+                        <button
+                          key={accent.id}
+                          type="button"
+                          onClick={() => {
+                            setFormData({ ...formData, colorAccent: accent.id });
+                            applyTheme(formData.themeMode, accent.id, formData.density);
+                          }}
+                          className={`flex items-center gap-2 py-2 px-2.5 rounded-lg border text-[12px] font-medium transition-all cursor-pointer text-left ${
+                            isSelected
+                              ? isLight
+                                ? 'font-bold shadow-sm'
+                                : 'text-white font-bold'
+                              : isLight
+                              ? 'border-[#cbd5e1] bg-white text-[#475569] hover:bg-[#f8fafc]'
+                              : 'border-[#2A2A2A] bg-[#141414] text-gray-400 hover:border-[#444]'
+                          }`}
+                          style={
+                            isSelected
+                              ? isLight
+                                ? { borderColor: accent.hex, backgroundColor: accent.lightBg, color: accent.textLight }
+                                : { borderColor: accent.hex, backgroundColor: accent.darkBg, color: '#ffffff' }
+                              : undefined
+                          }
+                        >
+                          <span
+                            className="w-3 h-3 rounded-full shrink-0 transition-transform"
+                            style={{
+                              backgroundColor: accent.hex,
+                              boxShadow: isSelected ? `0 0 8px ${accent.hex}99` : undefined,
+                              transform: isSelected ? 'scale(1.15)' : 'scale(1)'
+                            }}
+                          />
+                          <span className="truncate">{accent.name}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                   <p className={`text-[11px] ${descColor}`}>El acento determina el foco de órdenes críticas y botones de acción rápida.</p>
                 </div>

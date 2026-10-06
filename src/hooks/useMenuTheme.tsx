@@ -1,5 +1,6 @@
 'use client';
 
+import { ACCENT_PALETTE } from '@/utils/theme';
 import React, {
   createContext,
   useCallback,
@@ -121,6 +122,19 @@ export function MenuThemeProvider({ children }: { children: React.ReactNode }) {
     /* eslint-disable react-hooks/set-state-in-effect -- hidratación de un store externo (localStorage/matchMedia) */
     setThemeState(resolveInitialMenuTheme());
     setIsMounted(true);
+    try {
+      var raw = window.localStorage.getItem('gastropulse_system_config');
+      if (raw) {
+        var p = JSON.parse(raw);
+        if (p.colorAccent && ACCENT_PALETTE[p.colorAccent]) {
+          var acc = ACCENT_PALETTE[p.colorAccent];
+          document.documentElement.setAttribute('data-accent', p.colorAccent);
+          document.documentElement.style.setProperty('--primary-accent', acc.hex);
+          document.documentElement.style.setProperty('--color-primary', acc.hex);
+          document.documentElement.style.setProperty('--color-kinetic-amber', acc.hex);
+        }
+      }
+    } catch (e) {}
     /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
 
