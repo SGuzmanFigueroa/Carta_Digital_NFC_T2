@@ -7,6 +7,7 @@ import { INITIAL_CONFIG } from '@/data/mockData';
 import { SystemConfigState } from '@/types';
 import { useRouter } from 'next/navigation';
 import { fetchSystemConfigFromDb, saveSystemConfigToDb } from '@/services/configService';
+import { applyTheme } from '@/utils/theme';
 
 export default function ConfiguracionPage() {
   const router = useRouter();
@@ -33,6 +34,7 @@ export default function ConfiguracionPage() {
   }, []);
 
   const handleSaveConfig = async (updated: SystemConfigState) => {
+    applyTheme(updated.themeMode, updated.colorAccent, updated.density);
     setConfig(updated);
     const success = await saveSystemConfigToDb(updated);
     if (success) {

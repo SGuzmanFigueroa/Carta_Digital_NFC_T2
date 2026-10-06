@@ -798,6 +798,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
 
   const handleSave = () => {
     onSaveConfig(formData);
+    applyTheme(formData.themeMode, formData.colorAccent, formData.density);
   };
 
   const handleTestPrint = () => {
@@ -1351,6 +1352,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                           onClick={() => {
                             setFormData({ ...formData, colorAccent: accent.id });
                             applyTheme(formData.themeMode, accent.id, formData.density);
+                            onShowToast(`Acento cromático: ${accent.name}`, 'palette');
                           }}
                           className={`flex items-center gap-2 py-2 px-2.5 rounded-lg border text-[12px] font-medium transition-all cursor-pointer text-left ${
                             isSelected

@@ -332,6 +332,105 @@ html[data-theme="kds-high-contrast"] header {
   border-bottom: 2px solid #ffffff !important;
 }
 
+/* --- ACENTOS CROMÁTICOS OPERATIVOS (9 PALETAS EN VIVO) --- */
+[data-accent] .bg-\[\#FF5A1F\],
+[data-accent] .bg-\[\#ff5708\],
+[data-accent] button.bg-\[\#FF5A1F\],
+[data-accent] button.bg-\[\#ff5708\],
+[data-accent] a.bg-\[\#FF5A1F\],
+[data-accent] a.bg-\[\#ff5708\] {
+  background-color: var(--primary-accent) !important;
+}
+
+[data-accent] .bg-\[\#FF5A1F\]\/10,
+[data-accent] .bg-\[\#ff5708\]\/10 {
+  background-color: color-mix(in srgb, var(--primary-accent) 12%, transparent) !important;
+}
+
+[data-accent] .bg-\[\#FF5A1F\]\/20,
+[data-accent] .bg-\[\#ff5708\]\/20 {
+  background-color: color-mix(in srgb, var(--primary-accent) 20%, transparent) !important;
+}
+
+[data-accent] .bg-\[\#fff7ed\]\/50 {
+  background-color: color-mix(in srgb, var(--primary-accent) 8%, transparent) !important;
+}
+
+[data-accent] .hover\:bg-\[\#FF703D\]:hover,
+[data-accent] .hover\:bg-\[\#ff6924\]:hover,
+[data-accent] .hover\:bg-\[\#e04800\]:hover {
+  filter: brightness(1.1) !important;
+}
+
+[data-accent] .text-\[\#FF5A1F\],
+[data-accent] .text-\[\#ff5708\],
+[data-accent] .text-\[\#c2410c\] {
+  color: var(--primary-accent) !important;
+}
+
+[data-accent] .hover\:text-\[\#ff5708\]:hover,
+[data-accent] .hover\:text-\[\#FF5A1F\]:hover {
+  color: var(--primary-accent) !important;
+}
+
+[data-accent] .border-\[\#FF5A1F\],
+[data-accent] .border-\[\#ff5708\],
+[data-accent] .hover\:border-\[\#ff5708\]:hover,
+[data-accent] .hover\:border-\[\#FF5A1F\]:hover,
+[data-accent] .focus\:border-\[\#FF5A1F\]:focus {
+  border-color: var(--primary-accent) !important;
+}
+
+[data-accent] .border-\[\#FF5A1F\]\/30,
+[data-accent] .border-\[\#ff5708\]\/30,
+[data-accent] .border-\[\#FF5A1F\]\/40,
+[data-accent] .border-\[\#ff5708\]\/40 {
+  border-color: color-mix(in srgb, var(--primary-accent) 35%, transparent) !important;
+}
+
+[data-accent] .border-l-\[\#FF5A1F\],
+[data-accent] .border-l-\[\#ff5708\] {
+  border-left-color: var(--primary-accent) !important;
+}
+
+[data-accent] .border-b-\[\#FF5A1F\],
+[data-accent] .border-b-\[\#ff5708\] {
+  border-bottom-color: var(--primary-accent) !important;
+}
+
+[data-accent] .border-t-\[\#FF5A1F\],
+[data-accent] .border-t-\[\#ff5708\] {
+  border-top-color: var(--primary-accent) !important;
+}
+
+[data-accent] .ring-\[\#FF5A1F\],
+[data-accent] .ring-\[\#ff5708\] {
+  --tw-ring-color: var(--primary-accent) !important;
+}
+
+[data-accent] .ring-\[\#FF5A1F\]\/20,
+[data-accent] .ring-\[\#ff5708\]\/20,
+[data-accent] .ring-\[\#FF5A1F\]\/30,
+[data-accent] .ring-\[\#ff5708\]\/30 {
+  --tw-ring-color: color-mix(in srgb, var(--primary-accent) 25%, transparent) !important;
+}
+
+[data-accent] .shadow-\[\#ff5708\]\/30,
+[data-accent] .shadow-\[\#ff5708\]\/20,
+[data-accent] .shadow-\[\#FF5A1F\]\/25,
+[data-accent] .shadow-\[\#FF5A1F\]\/20,
+[data-accent] .shadow-\[\#FF5A1F\]\/30 {
+  --tw-shadow-color: color-mix(in srgb, var(--primary-accent) 30%, transparent) !important;
+}
+
+[data-accent] .accent-\[\#FF5A1F\] {
+  accent-color: var(--primary-accent) !important;
+}
+
+[data-accent] .selection\:bg-\[\#FF5A1F\]::selection {
+  background-color: var(--primary-accent) !important;
+}
+
 
 /* ==========================================================
    CD-13 · TEMA DEL COMENSAL (ruta pública /menu)
