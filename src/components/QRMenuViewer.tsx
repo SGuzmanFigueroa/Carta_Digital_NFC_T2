@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MenuItem, OrderTicket, TableStatus } from '../types';
+import { kitchenAudio } from '../utils/audio';
 //import { ThreeDView } from './ThreeDView';
 import dynamic from 'next/dynamic';
 
@@ -114,6 +115,24 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   const [selectedDishDetails, setSelectedDishDetails] = useState<MenuItem | null>(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'Efectivo' | 'Tarjeta POS (Visa/MC)' | 'Yape / Plin'>('Tarjeta POS (Visa/MC)');
   const [waiterCalled, setWaiterCalled] = useState(false);
+  const observedOrderStatus = useRef<{ id: string; status: OrderTicket['status'] } | null>(null);
+
+  useEffect(() => {
+    if (!activeTicket) return;
+
+    const previousStatus = observedOrderStatus.current;
+    observedOrderStatus.current = { id: activeTicket.id, status: activeTicket.status };
+
+    if (
+      previousStatus?.id !== activeTicket.id ||
+      previousStatus.status === 'pase-listo' ||
+      activeTicket.status !== 'pase-listo'
+    ) {
+      return;
+    }
+
+    kitchenAudio.playReadyBell();
+  }, [activeTicket?.id, activeTicket?.status]);
 
   // Flechas de desplazamiento para la barra de categorías
   const catScrollRef = useRef<HTMLDivElement>(null);
@@ -366,7 +385,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
             promoSubtitle: offer.subtitle,
           };
         })
-        .filter((item): item is MenuItem => Boolean(item));
+        .filter((item): item is NonNullable<typeof item> => item !== null);
       if (mapped.length > 0) return mapped;
     }
     const matched = PROMO_DEAL_IDS.map((id) => menuItems.find((item) => item.id === id)).filter(
@@ -493,6 +512,8 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
 
   const handleSendOrder = () => {
     if (cart.length === 0) return;
+
+    kitchenAudio.prepareForPlayback();
 
     if (onSendOrderFromMenu) {
       onSendOrderFromMenu(selectedTable, cart, 2);
@@ -684,6 +705,17 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                 {activeTicket.status === 'entregado' && '🍽️ Servido en Mesa'}
               </span>
             </div>
+
+            {activeTicket.status === 'pase-listo' && (
+              <div
+                role="status"
+                aria-live="polite"
+                className="flex items-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-[12px] font-semibold text-emerald-700 dark:text-emerald-300"
+              >
+                <span className="material-symbols-outlined text-[18px]">notifications_active</span>
+                <span>Tu comanda está lista en el pase</span>
+              </div>
+            )}
 
             {/* Stepper Progress Bar */}
             <div className="grid grid-cols-4 gap-1.5 pt-0.5">

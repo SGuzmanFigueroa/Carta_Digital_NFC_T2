@@ -15,6 +15,7 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
   onCreateTicket
 }) => {
   const [catalog, setCatalog] = useState(CATALOG_DISHES);
+  const [isCatalogLoading, setIsCatalogLoading] = useState(true);
   const [availableTables, setAvailableTables] = useState<string[]>([
     'MESA 01', 'MESA 02', 'MESA 03', 'MESA 04', 'MESA 05', 'MESA 08', 'MESA 12', 'MESA 14', 'MESA 20', 'BARRA 02'
   ]);
@@ -27,16 +28,15 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
   const [waiter, setWaiter] = useState('Carlos M.');
   const [allergyAlert, setAllergyAlert] = useState('');
   const [notes, setNotes] = useState('');
-  const [selectedDishes, setSelectedDishes] = useState<{ [dishId: string]: number }>({
-    'cat-3': 1,
-    'cat-1': 1
-  });
+  const [selectedDishes, setSelectedDishes] = useState<{ [dishId: string]: number }>({});
 
   // Sync catalog, tables, and staff dynamically from Supabase
   useEffect(() => {
     fetchDishesFromDb().then((dbDishes) => {
       if (dbDishes && dbDishes.length > 0) {
-        const mapped = dbDishes.map((d) => ({
+        const mapped = dbDishes
+          .filter((dish) => dish && typeof dish.id === 'string' && typeof dish.name === 'string' && dish.name.trim())
+          .map((d) => ({
           id: d.id,
           name: d.name,
           category: d.category === 'fondos' ? 'Fuego & Wok' : d.category === 'entradas' ? 'Entradas Nikkei' : d.category === 'bebidas' ? 'Barra & Mixología' : 'Pastelería',
@@ -47,10 +47,13 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
           prepTime: d.prepTime || '12 min',
           allergens: d.dietary ? [d.dietary] : ['Ninguno reportado'],
           notes: d.description || ''
-        }));
+          }));
         setCatalog(mapped);
+        setSelectedDishes((selected) => Object.fromEntries(
+          Object.entries(selected).filter(([dishId]) => mapped.some((dish) => dish.id === dishId))
+        ));
       }
-    }).catch(console.warn);
+    }).catch(console.warn).finally(() => setIsCatalogLoading(false));
 
     fetchTablesFromDb().then((dbTables) => {
       if (dbTables && dbTables.length > 0) {
@@ -82,21 +85,33 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
 
   const calculateTotal = () => {
     return Object.entries(selectedDishes).reduce((sum, [dishId, qty]) => {
-      const dish = catalog.find((d) => d.id === dishId);
+      const dish = catalog.find((entry) => entry?.id === dishId);
       return sum + (dish ? dish.price * qty : 0);
     }, 0);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const dishEntries = Object.entries(selectedDishes);
-    if (dishEntries.length === 0) return;
+    if (isCatalogLoading) return;
+
+    const selectedCatalogDishes = Object.entries(selectedDishes).reduce<Array<{
+      dish: (typeof catalog)[number];
+      quantity: number;
+    }>>((selected, [dishId, quantity]) => {
+      const dish = catalog.find((entry) => entry?.id === dishId);
+      if (!dish || typeof dish.name !== 'string' || quantity <= 0) return selected;
+      selected.push({ dish, quantity });
+      return selected;
+    }, []);
+    if (selectedCatalogDishes.length === 0) {
+      setSelectedDishes({});
+      return;
+    }
 
     const newTicketId = `ticket-${Date.now().toString().slice(-4)}`;
     const randomOrderNum = Math.floor(Math.random() * 80) + 110;
 
-    const items: TicketItem[] = dishEntries.map(([dishId, qty], idx) => {
-      const dish = catalog.find((d) => d.id === dishId)!;
+    const items: TicketItem[] = selectedCatalogDishes.map(({ dish, quantity: qty }, idx) => {
       return {
         id: `item-${newTicketId}-${idx}`,
         name: `${qty}x ${dish.name}`,
@@ -235,12 +250,12 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
                 Platos de la Carta (Haz clic para sumar o restar)
               </label>
               <span className="text-[11px] font-mono-code text-[#ffb59c]">
-                {Object.keys(selectedDishes).length} platos seleccionados
+                {isCatalogLoading ? 'Cargando carta...' : `${Object.keys(selectedDishes).length} platos seleccionados`}
               </span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-60 overflow-y-auto pr-1">
-              {catalog.map((dish) => {
+              {catalog.filter((dish) => dish && typeof dish.name === 'string').map((dish) => {
                 const qty = selectedDishes[dish.id] || 0;
                 return (
                   <div
@@ -271,6 +286,7 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
                       {qty > 0 && (
                         <button
                           type="button"
+                          disabled={isCatalogLoading}
                           onClick={() => handleQtyChange(dish.id, -1)}
                           className="w-6 h-6 rounded bg-[#27272a] hover:bg-[#3f3f46] text-white flex items-center justify-center font-bold text-[14px]"
                         >
@@ -282,6 +298,7 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
                       </span>
                       <button
                         type="button"
+                        disabled={isCatalogLoading}
                         onClick={() => handleQtyChange(dish.id, 1)}
                         className="w-6 h-6 rounded bg-[#ff5708] hover:bg-orange-600 text-white flex items-center justify-center font-bold text-[14px]"
                       >
@@ -343,7 +360,7 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
             </button>
             <button
               onClick={handleSubmit}
-              disabled={Object.keys(selectedDishes).length === 0}
+              disabled={isCatalogLoading || Object.keys(selectedDishes).length === 0}
               className="px-6 py-2.5 rounded-lg bg-[#ff5708] hover:bg-orange-600 disabled:opacity-50 text-white font-bold text-[13px] flex items-center gap-2 shadow-lg shadow-[#ff5708]/30 transition-all active:scale-95"
             >
               <span className="material-symbols-outlined text-[18px]">send</span>
