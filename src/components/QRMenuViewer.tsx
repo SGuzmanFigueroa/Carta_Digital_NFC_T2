@@ -30,6 +30,8 @@ import { DishDetailModal } from './menu/DishDetailModal';
 import { PromoDealModal } from './menu/PromoDealModal';
 // CD-16 · Tira "Oferta Flash" de portada: rota sola entre las ofertas activas.
 import { PromoFlashTicker } from './menu/PromoFlashTicker';
+import { validateDinerGeofence } from '@/utils/geofence';
+import { GeofenceWarningModal } from './menu/GeofenceWarningModal';
 import { formatSoles } from '@/utils/promo';
 import { INITIAL_ACTIVE_PROMO_OFFERS } from '@/data/mockData';
 
@@ -155,6 +157,20 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   }
   const [lastOrder, setLastOrder] = useState<LastOrderRecord | null>(null);
   const [showWelcomeBack, setShowWelcomeBack] = useState(false);
+
+  // 🛡️ CD-19 · Estado de Validación de Geocerca GPS Antifraude
+  const [geofenceModalState, setGeofenceModalState] = useState<{
+    isOpen: boolean;
+    distance: number;
+    maxAllowed: number;
+    message: string;
+  }>({
+    isOpen: false,
+    distance: 0,
+    maxAllowed: 150,
+    message: '',
+  });
+  const [isVerifyingGeofence, setIsVerifyingGeofence] = useState(false);
 
   useEffect(() => {
     try {
@@ -491,8 +507,32 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     );
   };
 
-  const handleSendOrder = () => {
+  const handleSendOrder = async () => {
     if (cart.length === 0) return;
+
+    // 🛡️ CD-19 · Validación Antifraude por GPS y Geocerca
+    setIsVerifyingGeofence(true);
+    try {
+      const geoCheck = await validateDinerGeofence();
+      setIsVerifyingGeofence(false);
+
+      if (!geoCheck.allowed) {
+        setGeofenceModalState({
+          isOpen: true,
+          distance: geoCheck.distanceMeters,
+          maxAllowed: geoCheck.maxAllowedMeters,
+          message: geoCheck.message,
+        });
+        return;
+      }
+
+      if (geoCheck.reason === 'valid_inside_radius') {
+        onShowToast(`📍 Ubicación verificada en mesa (±${geoCheck.userCoords?.accuracy || 5}m)`, 'verified_user');
+      }
+    } catch (e) {
+      console.warn('Geofence check bypassed on error:', e);
+      setIsVerifyingGeofence(false);
+    }
 
     if (onSendOrderFromMenu) {
       onSendOrderFromMenu(selectedTable, cart, 2);
@@ -1707,6 +1747,20 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
         discountPercent={PROMO_DEAL_DISCOUNT}
         countdownSeconds={PROMO_DEAL_DURATION_SECONDS}
         onApply={handleApplyPromoDeal}
+      />
+
+      {/* 🛡️ CD-19 · MODAL DE ADVERTENCIA DE GEOCERCA GPS ANTIFRAUDE */}
+      <GeofenceWarningModal
+        isOpen={geofenceModalState.isOpen}
+        distanceMeters={geofenceModalState.distance}
+        maxAllowedMeters={geofenceModalState.maxAllowed}
+        message={geofenceModalState.message}
+        onRetry={handleSendOrder}
+        onClose={() => setGeofenceModalState((prev) => ({ ...prev, isOpen: false }))}
+        onCallWaiter={() => {
+          if (onCallWaiter) onCallWaiter('Solicitud de asistencia por verificación de mesa');
+          onShowToast('Mozo notificado para asistir tu mesa', 'room_service');
+        }}
       />
 
     </div>
