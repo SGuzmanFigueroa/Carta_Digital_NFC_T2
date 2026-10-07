@@ -811,6 +811,23 @@ export const ThreeDView: React.FC<ThreeDViewProps> = ({
       domEl.removeEventListener('touchstart', onPointerDown);
       window.removeEventListener('touchmove', onPointerMove);
       window.removeEventListener('touchend', onPointerUp);
+
+      // Optimización de memoria: Destruir geometrías y materiales de la GPU
+      scene.traverse((object) => {
+        if (object instanceof THREE.Mesh) {
+          if (object.geometry) {
+            object.geometry.dispose();
+          }
+          if (object.material) {
+            if (Array.isArray(object.material)) {
+              object.material.forEach((mat) => mat.dispose());
+            } else {
+              object.material.dispose();
+            }
+          }
+        }
+      });
+
       renderer.dispose();
     };
   }, [dishId, onInteract, enableCameraBg]);
@@ -818,13 +835,24 @@ export const ThreeDView: React.FC<ThreeDViewProps> = ({
   const setAngle = (angleName: 'iso' | 'top' | 'side') => {
     setCurrentAngle(angleName);
     autoRotateRef.current = false;
+
+    // Calculamos el ángulo frontal (0°) más cercano según las vueltas que haya dado el plato
+    const currentY = targetRotYRef.current;
+    const PI2 = Math.PI * 2;
+    const nearestFrontY = Math.round(currentY / PI2) * PI2;
+
     if (angleName === 'top') {
-      targetRotXRef.current = 1.15;
+      targetRotXRef.current = 1.15; // Vista Cénital (Desde arriba)
+      targetRotYRef.current = nearestFrontY; 
     } else if (angleName === 'side') {
-      targetRotXRef.current = 0.18;
+      targetRotXRef.current = 0.18; // Vista Lateral (Casi a ras de mesa)
+      targetRotYRef.current = nearestFrontY;
     } else if (angleName === 'iso') {
-      targetRotXRef.current = 0.42;
+      targetRotXRef.current = 0.42; // Vista 45° clásica
+      targetRotYRef.current = nearestFrontY;
     }
+
+    // Reanudamos la rotación automática después de 4.5 segundos
     setTimeout(() => {
       autoRotateRef.current = true;
     }, 4500);

@@ -978,7 +978,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
               <ThreeDView
                 dishId={getModelId(heroItem)}
                 heightClass="h-64 sm:h-80"
-                onInteract={() => onShowToast('Rotando Arroz Chaufa Wok 3D', '3d_rotation')}
+                onInteract={() => onShowToast(`Rotando ${heroItem.name}`, '3d_rotation')}
               />
             )}
           </div>
