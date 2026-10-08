@@ -102,6 +102,9 @@ class KitchenAudioSystem {
     try {
       this.initCtx();
       if (!this.ctx) return;
+      if (this.ctx.state === 'suspended') {
+        this.ctx.resume().catch(() => {});
+      }
       const now = this.ctx.currentTime;
       [880, 1174.66].forEach((frequency, index) => {
         if (!this.ctx) return;

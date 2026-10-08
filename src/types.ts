@@ -222,7 +222,7 @@ export interface SystemConfigState {
   paymentAlerts: boolean;
   lowStockAlerts: boolean;
   themeMode: 'obsidian' | 'midnight' | 'titanium' | 'light' | 'kds-high-contrast';
-  colorAccent: 'amber' | 'emerald' | 'cyan';
+  colorAccent: 'amber' | 'emerald' | 'cyan' | 'ruby' | 'champagne' | 'indigo' | 'terracotta' | 'lavender' | 'titanium' | string;
   density: 'compact' | 'touch';
   language: string;
   currency: string;

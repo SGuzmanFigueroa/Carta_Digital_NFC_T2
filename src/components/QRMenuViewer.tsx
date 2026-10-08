@@ -380,7 +380,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     };
   }, []);
 
-  const promoDeals = React.useMemo(() => {
+  const promoDeals = React.useMemo<MenuItem[]>(() => {
     const activeFromStore = activeStoredOffers.filter((o) => o.isActive !== false);
     if (activeFromStore.length > 0) {
       const mapped = activeFromStore
@@ -399,9 +399,9 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
             promoOfferId: offer.id,
             promoTitle: offer.title,
             promoSubtitle: offer.subtitle,
-          };
+          } as MenuItem;
         })
-        .filter((item): item is NonNullable<typeof item> => item !== null);
+        .filter((item): item is MenuItem => item !== null);
       if (mapped.length > 0) return mapped;
     }
     const matched = PROMO_DEAL_IDS.map((id) => menuItems.find((item) => item.id === id)).filter(
@@ -751,10 +751,12 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
               <div
                 role="status"
                 aria-live="polite"
-                className="flex items-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-[12px] font-semibold text-emerald-700 dark:text-emerald-300"
+                className="flex items-center gap-2.5 rounded-xl border border-emerald-500/50 bg-emerald-500/15 dark:bg-emerald-500/20 px-3.5 py-2.5 text-[12px] font-semibold text-emerald-800 dark:text-emerald-200 shadow-[0_0_15px_rgba(16,185,129,0.15)] animate-pulse"
               >
-                <span className="material-symbols-outlined text-[18px]">notifications_active</span>
-                <span>Tu comanda está lista en el pase</span>
+                <span className="material-symbols-outlined text-[20px] text-emerald-600 dark:text-emerald-400 shrink-0">notifications_active</span>
+                <span className="font-sans leading-tight">
+                  <strong className="font-bold">¡Tu comanda está lista en el pase!</strong> Ya sale a tu mesa.
+                </span>
               </div>
             )}
 

@@ -60,7 +60,8 @@ export async function loginStaffWithCredentials(
       return { success: false, error: 'Cuenta inactiva. Por favor contacta al administrador del restaurante.' };
     }
 
-    const isValidPass = (data.password && data.password === plainPassword) || (data.pin && data.pin === plainPassword);
+    const staffRecord = data as any;
+    const isValidPass = (staffRecord.password && staffRecord.password === plainPassword) || (data.pin && data.pin === plainPassword);
     if (!isValidPass) {
       return { success: false, error: 'Contraseña o credenciales incorrectas.' };
     }
@@ -69,7 +70,7 @@ export async function loginStaffWithCredentials(
       id: data.id,
       name: data.name,
       username: data.username,
-      email: data.email || `${data.username}@aureabistro.pe`,
+      email: (data as any).email || `${data.username}@aureabistro.pe`,
       role: (data.role?.toLowerCase().trim() as AuthUser['role']) || 'floor',
       roleTitle: data.role_title || 'Personal GastroPulse',
       pin: data.pin || '1234',

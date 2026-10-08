@@ -36,7 +36,7 @@ export async function submitComplaintToDb(
   const claimCode = generateClaimCode();
 
   try {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('complaint_book')
       .insert({
         claim_code: claimCode,
