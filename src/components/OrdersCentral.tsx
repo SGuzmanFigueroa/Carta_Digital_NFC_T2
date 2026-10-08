@@ -48,14 +48,17 @@ export const OrdersCentral: React.FC<OrdersCentralProps> = ({
   const paseListo = filteredOrders.filter((o) => o.status === 'pase-listo');
 
   // Contadores por partida / estación para feedback operacional en vivo
-  const countAll = orders.length;
-  const countParrilla = orders.filter((o) =>
+  const activeOrders = orders.filter((o) =>
+    o.status === 'por-validar' || o.status === 'en-cocina' || o.status === 'pase-listo'
+  );
+  const countAll = activeOrders.length;
+  const countParrilla = activeOrders.filter((o) =>
     o.items.some((i) => i.station?.toLowerCase().includes('parrilla') || o.stationTarget?.toLowerCase().includes('parrilla'))
   ).length;
-  const countWok = orders.filter((o) =>
+  const countWok = activeOrders.filter((o) =>
     o.items.some((i) => i.station?.toLowerCase().includes('wok') || o.stationTarget?.toLowerCase().includes('wok'))
   ).length;
-  const countBarra = orders.filter((o) =>
+  const countBarra = activeOrders.filter((o) =>
     o.items.some((i) => i.station?.toLowerCase().includes('bar') || o.stationTarget?.toLowerCase().includes('bar'))
   ).length;
 
@@ -115,7 +118,7 @@ export const OrdersCentral: React.FC<OrdersCentralProps> = ({
           <div className="flex items-center gap-2 bg-[#1c1b1d] px-3 py-1.5 rounded-lg border border-[#353437]/30 shadow-sm">
             <span className="w-2.5 h-2.5 rounded-full bg-[#ff5708] animate-ping" />
             <span className="font-label-code text-[12px] text-[#e5e1e4] tracking-wider uppercase font-bold">
-              En Vivo: {orders.length} Comandas Activas
+              En Vivo: {countAll} Comandas Activas
             </span>
           </div>
 

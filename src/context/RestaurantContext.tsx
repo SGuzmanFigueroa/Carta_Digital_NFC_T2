@@ -108,6 +108,71 @@ function isStaffManagementRoute(path?: string | null): boolean {
   );
 }
 
+function toKdsTicket(order: OrderTicket): Ticket | null {
+  const orderNumber = Number(order.id.replace(/^cmd-/, ''));
+  if (!order.id.startsWith('cmd-') || !Number.isFinite(orderNumber)) return null;
+
+  const mappedItems: TicketItem[] = order.items.map((item) => {
+    const stationName = item.station?.toLowerCase() || '';
+    let station: StationId = 'wok_saute';
+    let stationBadge = 'WOK & SAUTÉ';
+
+    if (stationName.includes('barra')) {
+      station = 'barra_mixologia';
+      stationBadge = 'BARRA';
+    } else if (stationName.includes('frío') || stationName.includes('frio') || stationName.includes('nikkei')) {
+      station = 'frio_nikkei';
+      stationBadge = 'FRÍO & NIKKEI';
+    } else if (stationName.includes('pastelería') || stationName.includes('pasteleria')) {
+      station = 'pasteleria';
+      stationBadge = 'PASTELERÍA';
+    } else if (stationName.includes('fuego') || stationName.includes('parrilla')) {
+      station = 'fuego_grill';
+      stationBadge = 'FUEGO & GRILL';
+    }
+
+    return {
+      id: item.id,
+      name: `${item.quantity}x ${item.name}`,
+      quantity: item.quantity,
+      station,
+      stationBadge,
+      status: order.status === 'pase-listo' ? 'listo' : 'pendiente',
+      cookingNotes: item.notes ? [item.notes] : ['Pase estándar'],
+      price: item.price,
+      photoUrl: '',
+      checked: order.status === 'pase-listo'
+    };
+  });
+
+  const stationFilterTags = Array.from(new Set(mappedItems.map((item) => item.station)));
+  const status: Ticket['status'] = order.status === 'en-cocina'
+    ? 'en_fuego'
+    : order.status === 'pase-listo'
+    ? 'lista_despachada'
+    : order.status === 'entregado'
+    ? 'archivada'
+    : 'ingresada';
+
+  return {
+    id: `ticket-${order.id}`,
+    orderNumber,
+    table: order.table,
+    zone: order.table.toLowerCase().includes('terraza') ? 'TERRAZA' : 'SALÓN PRINCIPAL',
+    serviceType: 'Carta Digital NFC',
+    elapsedSeconds: 0,
+    targetSeconds: 660,
+    serverOrRunner: order.waiter || 'AUTO-COMENSAL',
+    serverRole: order.origin === 'QR COMENSAL' ? 'PASE DIRECTO' : 'CAMARERO',
+    totalAmount: order.total,
+    status,
+    items: mappedItems,
+    timestamp: order.createdTime,
+    stationFilterTags: stationFilterTags.length > 0 ? stationFilterTags : ['wok_saute'],
+    isUrgent: Boolean(order.isCritical)
+  };
+}
+
 export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const pathname = usePathname();
   const currentPath = pathname || (typeof window !== 'undefined' ? window.location.pathname : '');
@@ -126,6 +191,44 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
   const [isTerminalLocked, setIsTerminalLocked] = useState<boolean>(false);
   const [quickUnlockPin, setQuickUnlockPin] = useState<string>('');
   const [quickUnlockError, setQuickUnlockError] = useState<string>('');
+
+  const syncDinerTicketStatus = useCallback((freshOrders: OrderTicket[]) => {
+    if (!dinerActiveTicket) return;
+
+    const matchingOrder = freshOrders.find((order) => order.id === dinerActiveTicket.id);
+    if (!matchingOrder || matchingOrder.status === dinerActiveTicket.status) return;
+
+    const updatedTicket = { ...dinerActiveTicket, status: matchingOrder.status };
+    setDinerActiveTicket(updatedTicket);
+    try {
+      localStorage.setItem(STORAGE_KEY_DINER, JSON.stringify(updatedTicket));
+    } catch (err) {
+      console.warn('Storage sync error:', err);
+    }
+  }, [dinerActiveTicket]);
+
+  const syncKdsTickets = useCallback((freshOrders: OrderTicket[]) => {
+    const incomingTickets = freshOrders
+      .map(toKdsTicket)
+      .filter((ticket): ticket is Ticket => ticket !== null);
+
+    setTickets((currentTickets) => {
+      const incomingByOrderNumber = new Map(incomingTickets.map((ticket) => [ticket.orderNumber, ticket]));
+      const mergedTickets = currentTickets.map((currentTicket) => {
+        const incomingTicket = incomingByOrderNumber.get(currentTicket.orderNumber);
+        if (!incomingTicket) return currentTicket;
+
+        incomingByOrderNumber.delete(currentTicket.orderNumber);
+        return {
+          ...incomingTicket,
+          id: currentTicket.id,
+          elapsedSeconds: currentTicket.elapsedSeconds
+        };
+      });
+
+      return [...incomingByOrderNumber.values(), ...mergedTickets];
+    });
+  }, []);
 
   const showToast = useCallback((message: string, icon = 'check_circle') => {
     setToast({ message, icon });
@@ -237,6 +340,8 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
     fetchOrdersFromDb().then((dbOrders) => {
       if (dbOrders && dbOrders.length > 0) {
         setOrders(dbOrders);
+        syncDinerTicketStatus(dbOrders);
+        syncKdsTickets(dbOrders);
       }
     }).catch(console.warn);
 
@@ -247,6 +352,16 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
         const freshOrders = await fetchOrdersFromDb();
         if (freshOrders && freshOrders.length > 0) {
           setOrders(freshOrders);
+          syncDinerTicketStatus(freshOrders);
+          syncKdsTickets(freshOrders);
+        }
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'order_items' }, async () => {
+        const freshOrders = await fetchOrdersFromDb();
+        if (freshOrders.length > 0) {
+          setOrders(freshOrders);
+          syncDinerTicketStatus(freshOrders);
+          syncKdsTickets(freshOrders);
         }
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'restaurant_tables' }, async () => {
@@ -267,7 +382,7 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [showToast, syncDinerTicketStatus, syncKdsTickets]);
 
   // Load persisted state & current user on mount
   useEffect(() => {
@@ -404,6 +519,7 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
         showToast('¡Aviso a Runners en mesa de pase central!', 'campaign');
       } else if (action === 'UPDATE_ORDERS' && Array.isArray(payload?.orders)) {
         setOrders(payload.orders);
+        syncDinerTicketStatus(payload.orders);
         if (Array.isArray(payload?.tickets)) setTickets(payload.tickets);
       }
     };
@@ -411,7 +527,7 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
     return () => {
       channel.close();
     };
-  }, [showToast]);
+  }, [showToast, syncDinerTicketStatus]);
 
   // Central timer tick every 1000ms for elapsed time
   useEffect(() => {
@@ -610,7 +726,6 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
         const combinedTotal = prevDiner.total + newDinerOrder.total;
         consolidatedDinerOrder = {
           ...newDinerOrder,
-          id: prevDiner.id,
           items: combinedItems,
           subtotal: combinedSubtotal,
           total: combinedTotal
@@ -648,10 +763,12 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
     (ticketId: string, itemId: string, explicitChecked?: boolean) => {
       let isTicketAllReady = false;
       let targetTable = '';
+      let targetOrderId = '';
 
       const updated = tickets.map((ticket) => {
         if (ticket.id !== ticketId) return ticket;
         targetTable = ticket.table;
+        targetOrderId = `cmd-${ticket.orderNumber}`;
         const updatedItems = ticket.items.map((item) => {
           if (item.id !== itemId) return item;
           const nextChecked = explicitChecked !== undefined ? explicitChecked : !item.checked;
@@ -675,6 +792,21 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
       kitchenAudio.playCheckItemSound();
       broadcastSync('UPDATE_TICKETS', { tickets: updated });
 
+      if (isTicketAllReady && targetOrderId) {
+        const matchingOrder = orders.find((order) => order.id === targetOrderId);
+        if (matchingOrder) {
+          const updatedOrders = orders.map((order) =>
+            order.id === matchingOrder.id ? { ...order, status: 'pase-listo' as const } : order
+          );
+          setOrders(updatedOrders);
+          persistState(updated, updatedOrders);
+          broadcastSync('UPDATE_ORDERS', { orders: updatedOrders, tickets: updated });
+          updateOrderStatusInDb(matchingOrder.id, 'pase-listo').catch((err) => {
+            console.warn('Error updating ready order status in Supabase:', err);
+          });
+        }
+      }
+
       // Persist item check in Supabase in background
       const checkedVal = explicitChecked !== undefined ? explicitChecked : true;
       updateOrderItemCheckInDb(itemId, checkedVal).catch((err) => {
@@ -685,26 +817,33 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
         showToast(`Todos los platos listos para ${targetTable}`, 'done_all');
       }
     },
-    [tickets, persistState, broadcastSync, showToast]
+    [tickets, orders, persistState, broadcastSync, showToast]
   );
 
   // 3. Start Prep
   const startTicketPrep = useCallback(
     (ticketId: string) => {
       let targetTable = '';
+      let targetOrderId = '';
       const updated = tickets.map((t) => {
         if (t.id === ticketId) {
           targetTable = t.table;
+          targetOrderId = `cmd-${t.orderNumber}`;
           return { ...t, status: 'en_fuego' as const };
         }
         return t;
       });
 
-      if (dinerActiveTicket && (dinerActiveTicket.table === targetTable || targetTable.includes(dinerActiveTicket.table))) {
+      if (dinerActiveTicket && dinerActiveTicket.id === targetOrderId) {
         const updatedDiner: OrderTicket = { ...dinerActiveTicket, status: 'en-cocina' };
         setDinerActiveTicket(updatedDiner);
-        persistState(updated, undefined, undefined, undefined, updatedDiner);
+        const updatedOrders = orders.map((order) =>
+          order.id === targetOrderId ? { ...order, status: 'en-cocina' as const } : order
+        );
+        setOrders(updatedOrders);
+        persistState(updated, updatedOrders, undefined, undefined, updatedDiner);
         broadcastSync('DINER_STATUS_UPDATE', { ticket: updatedDiner });
+        broadcastSync('UPDATE_ORDERS', { orders: updatedOrders, tickets: updated });
       } else {
         persistState(updated);
       }
@@ -712,9 +851,23 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
       setTickets(updated);
       kitchenAudio.playCheckItemSound();
       broadcastSync('UPDATE_TICKETS', { tickets: updated });
+
+      const matchingOrder = orders.find((order) => order.id === targetOrderId);
+      if (matchingOrder) {
+        const updatedOrders = orders.map((order) =>
+          order.id === targetOrderId ? { ...order, status: 'en-cocina' as const } : order
+        );
+        setOrders(updatedOrders);
+        persistState(updated, updatedOrders);
+        broadcastSync('UPDATE_ORDERS', { orders: updatedOrders, tickets: updated });
+        updateOrderStatusInDb(matchingOrder.id, 'en-cocina').catch((err) => {
+          console.warn('Error updating preparation status in Supabase:', err);
+        });
+      }
+
       showToast(`Comanda de ${targetTable || 'orden'} iniciada en fuego`, 'local_fire_department');
     },
-    [tickets, dinerActiveTicket, persistState, broadcastSync, showToast]
+    [tickets, orders, dinerActiveTicket, persistState, broadcastSync, showToast]
   );
 
   // 4. Dispatch Ticket to Pase
@@ -739,7 +892,7 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
 
       const cleanTable = ticketToDispatch.table;
       const updatedOrders = orders.map((o) => {
-        if (o.table.toUpperCase() === cleanTable.toUpperCase()) {
+        if (o.id === `cmd-${ticketToDispatch.orderNumber}`) {
           return { ...o, status: 'pase-listo' as const };
         }
         return o;
@@ -754,7 +907,7 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
       });
 
       let updatedDiner = dinerActiveTicket;
-      if (dinerActiveTicket && (dinerActiveTicket.table === cleanTable || cleanTable.includes(dinerActiveTicket.table))) {
+      if (dinerActiveTicket?.id === `cmd-${ticketToDispatch.orderNumber}`) {
         updatedDiner = { ...dinerActiveTicket, status: 'pase-listo' };
         setDinerActiveTicket(updatedDiner);
         broadcastSync('DINER_STATUS_UPDATE', { ticket: updatedDiner });
@@ -767,9 +920,10 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
       persistState(updatedTickets, updatedOrders, updatedTables, undefined, updatedDiner);
       broadcastSync('UPDATE_TICKETS', { tickets: updatedTickets });
       broadcastSync('UPDATE_TABLES', { tables: updatedTables });
+      broadcastSync('UPDATE_ORDERS', { orders: updatedOrders, tickets: updatedTickets });
 
       // Update matching order in Supabase
-      const matchingOrder = orders.find((o) => o.table.toUpperCase() === cleanTable.toUpperCase());
+      const matchingOrder = orders.find((o) => o.id === `cmd-${ticketToDispatch.orderNumber}`);
       if (matchingOrder) {
         updateOrderStatusInDb(matchingOrder.id, 'pase-listo').catch((err) => {
           console.warn('Error updating order to pase-listo in DB:', err);

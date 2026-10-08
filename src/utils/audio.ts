@@ -17,6 +17,10 @@ class KitchenAudioSystem {
     }
   }
 
+  public prepareForPlayback() {
+    this.initCtx();
+  }
+
   public playCheckItemSound() {
     if (!this.enabled) return;
     try {
@@ -90,6 +94,31 @@ class KitchenAudioSystem {
       osc.stop(now + 0.35);
     } catch {
       // safe ignore
+    }
+  }
+
+  public playReadyBell() {
+    if (!this.enabled) return;
+    try {
+      this.initCtx();
+      if (!this.ctx) return;
+      const now = this.ctx.currentTime;
+      [880, 1174.66].forEach((frequency, index) => {
+        if (!this.ctx) return;
+        const startAt = now + index * 0.09;
+        const oscillator = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(frequency, startAt);
+        gain.gain.setValueAtTime(0.07, startAt);
+        gain.gain.exponentialRampToValueAtTime(0.001, startAt + 0.24);
+        oscillator.connect(gain);
+        gain.connect(this.ctx.destination);
+        oscillator.start(startAt);
+        oscillator.stop(startAt + 0.24);
+      });
+    } catch {
+      // Audio autoplay policy fallback
     }
   }
 
