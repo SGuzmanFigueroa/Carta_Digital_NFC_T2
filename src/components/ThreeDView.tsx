@@ -17,13 +17,17 @@ export const ThreeDView: React.FC<ThreeDViewProps> = ({
 }) => {
   const mountRef = useRef<HTMLDivElement>(null);
   const [currentAngle, setCurrentAngle] = useState<'iso' | 'top' | 'side'>('iso');
-  const [fps, setFps] = useState(60);
   const [isLoadingModel, setIsLoadingModel] = useState(false);
   const targetRotXRef = useRef(0.42);
   const targetRotYRef = useRef(0);
   const autoRotateRef = useRef(true);
   const [isAutoRotating, setIsAutoRotating] = useState(true);
   const isAutoRotatingRef = useRef(true);
+  const onInteractRef = useRef(onInteract);
+
+  useEffect(() => {
+    onInteractRef.current = onInteract;
+  }, [onInteract]);
 
   useEffect(() => {
     isAutoRotatingRef.current = isAutoRotating;
@@ -419,7 +423,7 @@ export const ThreeDView: React.FC<ThreeDViewProps> = ({
       startY = clientY;
       prevX = clientX;
       prevY = clientY;
-      onInteract?.();
+      onInteractRef.current?.();
     };
 
     const onPointerMove = (e: MouseEvent | TouchEvent) => {
@@ -470,20 +474,9 @@ export const ThreeDView: React.FC<ThreeDViewProps> = ({
     // 🎬 ANIMATION LOOP
     // ==========================================
     let animationFrameId: number;
-    let lastTime = performance.now();
-    let frameCount = 0;
-
     const animate = () => {
       if (!isSubscribed) return;
       animationFrameId = requestAnimationFrame(animate);
-
-      frameCount++;
-      const now = performance.now();
-      if (now - lastTime >= 1000) {
-        setFps(Math.round((frameCount * 1000) / (now - lastTime)));
-        frameCount = 0;
-        lastTime = now;
-      }
 
       if (autoRotateRef.current) {
         targetRotYRef.current += 0.007;
@@ -550,7 +543,7 @@ export const ThreeDView: React.FC<ThreeDViewProps> = ({
 
       renderer.dispose();
     };
-  }, [dishId, onInteract, enableCameraBg]);
+  }, [dishId, enableCameraBg]);
 
   const setAngle = (angleName: 'iso' | 'top' | 'side') => {
     setCurrentAngle(angleName);

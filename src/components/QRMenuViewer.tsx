@@ -1626,8 +1626,9 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
             autoPlay
             playsInline
             muted
+            aria-hidden={!arCameraActive}
             onLoadedMetadata={() => videoRef.current?.play().catch(() => {})}
-            className="absolute inset-0 w-full h-full object-cover z-0"
+            className={`absolute inset-0 w-full h-full object-cover z-0 transition-opacity duration-200 ${arCameraActive ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
           />
 
           {/* Superficie de mesa simulada con iluminación cálida cuando no hay cámara activa */}
