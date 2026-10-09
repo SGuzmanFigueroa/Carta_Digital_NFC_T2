@@ -1,5 +1,5 @@
 // Service Worker for GastroPulse Offline-First Menu & KDS
-const CACHE_NAME = 'gastropulse-cache-v1';
+const CACHE_NAME = 'gastropulse-cache-v2-ar-native';
 const PRECACHE_URLS = [
   '/',
   '/menu',
