@@ -1626,15 +1626,14 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
             autoPlay
             playsInline
             muted
+            onLoadedMetadata={() => videoRef.current?.play().catch(() => {})}
             className="absolute inset-0 w-full h-full object-cover z-0"
           />
 
-          {/* Fallback surface texture if camera access is denied */}
+          {/* Superficie de mesa simulada con iluminación cálida cuando no hay cámara activa */}
           {!arCameraActive && (
-            <div className="absolute inset-0 z-0 bg-gradient-to-b from-[#111216] via-[#1a1c24] to-[#0e0f13] flex flex-col items-center justify-center">
-              <div className="w-80 h-80 rounded-full border border-dashed border-[#ff5708]/30 animate-pulse flex items-center justify-center">
-                <span className="text-[12px] font-mono-code text-[#ffb59c]">Superficie de Mesa Calibrada</span>
-              </div>
+            <div className="absolute inset-0 z-0 bg-gradient-to-b from-[#111216] via-[#161820] to-[#0c0d10] flex flex-col items-center justify-center pointer-events-none">
+              <div className="w-80 h-80 rounded-full bg-[#ff5708]/8 blur-3xl" />
             </div>
           )}
 
@@ -1663,10 +1662,8 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
           {/* Interactive 3D Dish Overlay directly in the camera view! */}
           <div className="relative z-10 flex-1 flex flex-col items-center justify-center pointer-events-auto">
             {/* Reticle Table Target Indicator */}
-            <div className="absolute w-64 h-64 border-2 border-dashed border-[#ff5708]/50 rounded-full pointer-events-none animate-pulse flex items-center justify-center">
-              <span className="text-[10px] font-mono-code text-[#ffb59c] bg-black/60 px-2 py-0.5 rounded-full">
-                {arDish.name} (Escala 1:1 • 28cm Ø)
-              </span>
+            <div className="absolute w-72 h-72 border border-dashed border-[#ff5708]/30 rounded-full pointer-events-none animate-pulse flex items-center justify-center">
+              <div className="w-60 h-60 rounded-full border border-white/10" />
             </div>
 
             <div style={{ transform: `scale(${arScale})` }} className="w-full transition-transform duration-200">

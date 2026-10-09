@@ -22,6 +22,20 @@ export const ThreeDView: React.FC<ThreeDViewProps> = ({
   const targetRotXRef = useRef(0.42);
   const targetRotYRef = useRef(0);
   const autoRotateRef = useRef(true);
+  const [isAutoRotating, setIsAutoRotating] = useState(true);
+  const isAutoRotatingRef = useRef(true);
+
+  useEffect(() => {
+    isAutoRotatingRef.current = isAutoRotating;
+  }, [isAutoRotating]);
+
+  const toggleAutoRotate = () => {
+    setIsAutoRotating((prev) => {
+      const next = !prev;
+      autoRotateRef.current = next;
+      return next;
+    });
+  };
   useEffect(() => {
     const container = mountRef.current;
     if (!container) return;
@@ -438,10 +452,10 @@ export const ThreeDView: React.FC<ThreeDViewProps> = ({
       isDragging = false;
       isTouchScroll = false;
       setTimeout(() => {
-        if (isSubscribed) {
+        if (isSubscribed && isAutoRotatingRef.current) {
           autoRotateRef.current = true;
         }
-      }, 4000);
+      }, 2500);
     };
 
     domEl.addEventListener('mousedown', onPointerDown);
@@ -570,7 +584,7 @@ export const ThreeDView: React.FC<ThreeDViewProps> = ({
 
       {/* Indicador de carga sutil para modelos GLB */}
       {isLoadingModel && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#131418]/65 backdrop-blur-xs z-20 pointer-events-none transition-opacity duration-300">
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 backdrop-blur-xs z-20 pointer-events-none transition-opacity duration-300">
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#1c1b1d]/90 border border-[#ff5708]/50 shadow-xl">
             <span className="w-3.5 h-3.5 border-2 border-[#ff5708] border-t-transparent rounded-full animate-spin" />
             <span className="text-[10px] font-mono-code font-bold text-[#ffb59c] tracking-wide animate-pulse">
@@ -584,62 +598,81 @@ export const ThreeDView: React.FC<ThreeDViewProps> = ({
         <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-[#1a1b20] to-transparent pointer-events-none" />
       )}
 
-      {/* Top Floating Badges */}
-      <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between pointer-events-none">
-        <div className="flex items-center gap-1.5">
-          <span className="px-2 py-0.5 rounded-full bg-[#ff5708] text-white font-mono-code text-[9px] sm:text-[10px] tracking-wide font-bold shadow-lg flex items-center gap-1">
-            <svg className="w-3 h-3 text-amber-200 fill-current" viewBox="0 0 24 24">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 14h-2v-2h2v2zm0-4h-2V7h2v5z"/>
+      
+
+      {/* Controles de Perspectiva y Giro (exclusivos del visor 3D, ocultos en Realidad Aumentada) */}
+      {!enableCameraBg && (
+        <div className="absolute bottom-2.5 left-2.5 right-2.5 flex items-center justify-between gap-1.5 pointer-events-auto z-10">
+          <div className="flex items-center gap-1 bg-[#121316]/95 backdrop-blur-md p-1 rounded-xl border border-[#2a2a2c] shadow-xl">
+            <button
+              type="button"
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-sans font-medium transition-all cursor-pointer ${
+                currentAngle === 'iso'
+                  ? 'bg-[#ff5708] text-white font-bold shadow-md shadow-[#ff5708]/30'
+                  : 'text-[#bcbbc5] hover:text-white hover:bg-white/5'
+              }`}
+              onClick={() => setAngle('iso')}
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
+              </svg>
+              <span>Diagonal</span>
+            </button>
+            <button
+              type="button"
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-sans font-medium transition-all cursor-pointer ${
+                currentAngle === 'top'
+                  ? 'bg-[#ff5708] text-white font-bold shadow-md shadow-[#ff5708]/30'
+                  : 'text-[#bcbbc5] hover:text-white hover:bg-white/5'
+              }`}
+              onClick={() => setAngle('top')}
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 13.5L12 21m0 0l-7.5-7.5M12 21V3" />
+              </svg>
+              <span>Desde arriba</span>
+            </button>
+            <button
+              type="button"
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-sans font-medium transition-all cursor-pointer ${
+                currentAngle === 'side'
+                  ? 'bg-[#ff5708] text-white font-bold shadow-md shadow-[#ff5708]/30'
+                  : 'text-[#bcbbc5] hover:text-white hover:bg-white/5'
+              }`}
+              onClick={() => setAngle('side')}
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.964-7.178z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              <span>De frente</span>
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={toggleAutoRotate}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl backdrop-blur-md border text-[10px] sm:text-[11px] font-sans font-medium transition-all cursor-pointer shadow-xl active:scale-95 ${
+              isAutoRotating
+                ? 'bg-[#ff5708]/20 border-[#ff5708]/60 text-[#ffb59c] hover:bg-[#ff5708]/30'
+                : 'bg-[#121316]/95 border-[#2a2a2c] text-[#a1a1aa] hover:text-white'
+            }`}
+            title={isAutoRotating ? 'Pausar giro automático' : 'Reanudar giro automático'}
+          >
+            <svg
+              className={`w-3.5 h-3.5 text-[#ff5708] transition-transform ${isAutoRotating ? 'animate-spin' : ''}`}
+              style={{ animationDuration: '4s' }}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
-            <span>VISOR 3D</span>
-          </span>
-        </div>
-
-        <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#1c1b1d]/90 backdrop-blur-md border border-[#ff5708]/40 text-[#ffb59c] text-[9px] sm:text-[10px] font-mono-code">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          <span>{fps} FPS</span>
-        </div>
-      </div>
-
-      {/* Camera Angle Controls */}
-      <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between gap-1 pointer-events-auto">
-        <div className="flex items-center gap-1 bg-[#121316]/90 backdrop-blur-md p-0.5 sm:p-1 rounded-lg border border-[#2a2a2c] shadow-lg">
-          <button
-            type="button"
-            className={`px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-mono-code transition-colors cursor-pointer ${
-              currentAngle === 'iso' ? 'bg-[#ff5708] text-white font-bold' : 'text-[#bcbbc5] hover:text-white'
-            }`}
-            onClick={() => setAngle('iso')}
-          >
-            45°
-          </button>
-          <button
-            type="button"
-            className={`px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-mono-code transition-colors cursor-pointer ${
-              currentAngle === 'top' ? 'bg-[#ff5708] text-white font-bold' : 'text-[#bcbbc5] hover:text-white'
-            }`}
-            onClick={() => setAngle('top')}
-          >
-            Cénital
-          </button>
-          <button
-            type="button"
-            className={`px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-mono-code transition-colors cursor-pointer ${
-              currentAngle === 'side' ? 'bg-[#ff5708] text-white font-bold' : 'text-[#bcbbc5] hover:text-white'
-            }`}
-            onClick={() => setAngle('side')}
-          >
-            Lateral
+            <span>{isAutoRotating ? 'Girando' : 'Pausado'}</span>
           </button>
         </div>
-
-        <div className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-[#121316]/90 backdrop-blur-md border border-[#2a2a2c] text-[#bcbbc5] text-[9px] sm:text-[10px] font-mono-code shadow-lg">
-          <svg className="w-3 h-3 text-[#ff5708]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          <span className="hidden xs:inline">Arrastra para </span>Rotar
-        </div>
-      </div>
+      )}
     </div>
   );
 };
