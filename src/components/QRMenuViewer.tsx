@@ -973,26 +973,19 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
         {/* ⭐ HERO FEATURED DISH (DUAL VIEW: 📸 FOTO HD / 🧊 3D 360°) */}
         {/* ========================================================================= */}
         <section className="bg-white dark:bg-[#15161c] rounded-2xl overflow-hidden border border-[#ff5708]/35 shadow-[0_4px_30px_rgba(255,87,8,0.15)] transition-colors duration-300">
-          <div className="px-3.5 py-2.5 bg-[#f8fafc] dark:bg-[#121318] border-b border-[#e2e8f0] dark:border-[#24252e] flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-[#ff5708]"></span>
-              <span className="text-[11px] font-mono-code font-bold text-[#c2410c] dark:text-[#ffb59c] uppercase tracking-wider">
-                PLATO INSIGNIA DE AUTOR
-              </span>
-            </div>
-
-            <div className="flex items-center bg-[#f1f5f9] dark:bg-[#1e1f28] p-0.5 rounded-lg border border-[#cbd5e1] dark:border-[#353642]">
+          <div className="px-3.5 py-2 bg-[#f8fafc]/90 dark:bg-[#121318]/90 border-b border-[#e2e8f0] dark:border-[#24252e] flex items-center justify-end">
+            <div className="inline-flex items-center bg-[#e2e8f0]/80 dark:bg-[#1c1d24] p-0.5 rounded-xl border border-[#cbd5e1] dark:border-[#2a2b36] shadow-inner">
               <button
                 type="button"
                 onClick={() => setHeroViewMode('photo')}
                 aria-pressed={heroViewMode === 'photo'}
-                className={`px-2.5 py-2 min-h-[44px] rounded-md text-[11px] font-medium transition-colors flex items-center gap-1 cursor-pointer ${
+                className={`px-3 py-1 rounded-lg text-[11px] font-sans font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
                   heroViewMode === 'photo'
-                    ? 'bg-[#ff5708] text-[#2b0b00] font-bold shadow'
-                    : 'text-[#475569] hover:text-[#0f172a] dark:text-[#a1a1aa] dark:hover:text-white'
+                    ? 'bg-[#ff5708] text-white font-bold shadow-md shadow-[#ff5708]/30 scale-[1.02]'
+                    : 'text-[#64748b] hover:text-[#0f172a] dark:text-[#a1a1aa] dark:hover:text-white'
                 }`}
               >
-                <span className="material-symbols-outlined text-[13px]">image</span>
+                <span className="material-symbols-outlined text-[14px]">image</span>
                 <span>Foto HD</span>
               </button>
               <button
@@ -1002,13 +995,13 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                   onShowToast('Cargando plato en visor 3D interactivo', 'view_in_ar');
                 }}
                 aria-pressed={heroViewMode === '3d'}
-                className={`px-2.5 py-2 min-h-[44px] rounded-md text-[11px] font-medium transition-colors flex items-center gap-1 cursor-pointer ${
+                className={`px-3 py-1 rounded-lg text-[11px] font-sans font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
                   heroViewMode === '3d'
-                    ? 'bg-[#ff5708] text-[#2b0b00] font-bold shadow'
-                    : 'text-[#475569] hover:text-[#0f172a] dark:text-[#a1a1aa] dark:hover:text-white'
+                    ? 'bg-[#ff5708] text-white font-bold shadow-md shadow-[#ff5708]/30 scale-[1.02]'
+                    : 'text-[#64748b] hover:text-[#0f172a] dark:text-[#a1a1aa] dark:hover:text-white'
                 }`}
               >
-                <span className="material-symbols-outlined text-[13px]">view_in_ar</span>
+                <span className="material-symbols-outlined text-[14px]">view_in_ar</span>
                 <span>3D 360°</span>
               </button>
             </div>
@@ -1031,16 +1024,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                 </button>
                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-white dark:from-[#15161c] via-transparent to-black/40" />
 
-                <div className="pointer-events-none absolute top-3 left-3 flex items-center gap-1.5">
-                  <span className="px-2.5 py-0.5 rounded-full bg-[#ff5708] text-[#2b0b00] font-mono-code text-[10px] font-bold shadow-lg">
-                    {heroItem.badge}
-                  </span>
-                  <span className="px-2.5 py-0.5 rounded-full bg-black/70 backdrop-blur-md text-[#a1c9ff] font-mono-code text-[10px] border border-[#a1c9ff]/30">
-                    {heroItem.tag}
-                  </span>
-                </div>
-
-                <button
+                                <button
                   type="button"
                   onClick={() => setHeroViewMode('3d')}
                   className="absolute bottom-3 right-3 px-3 py-1.5 rounded-full bg-black/80 backdrop-blur-md border border-[#ff5708]/50 text-[#ffb59c] hover:text-white text-[11px] font-mono-code font-semibold flex items-center gap-1.5 shadow-xl hover:scale-105 transition-all cursor-pointer"
