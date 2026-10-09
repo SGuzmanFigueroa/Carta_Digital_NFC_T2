@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 const MODEL_VIEWER_SCRIPT_ID = 'google-model-viewer-runtime';
 const MODEL_VIEWER_SRC = 'https://cdn.jsdelivr.net/npm/@google/model-viewer@4.3.1/dist/model-viewer.min.js';
@@ -19,6 +19,7 @@ export const NativeARModelViewer: React.FC<NativeARModelViewerProps> = ({
   const [isReady, setIsReady] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
   const [androidSceneViewerUrl, setAndroidSceneViewerUrl] = useState<string | null>(null);
+  const modelViewerRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -60,6 +61,24 @@ export const NativeARModelViewer: React.FC<NativeARModelViewerProps> = ({
     document.head.appendChild(script);
   }, [modelSrc, title]);
 
+  useEffect(() => {
+    if (!isReady) return;
+
+    const modelViewer = modelViewerRef.current;
+    if (!modelViewer) return;
+
+    modelViewer.setAttribute('src', modelSrc);
+    modelViewer.setAttribute('alt', `Modelo 3D de ${title}`);
+    modelViewer.setAttribute('ar', '');
+    modelViewer.setAttribute('ar-modes', 'scene-viewer webxr quick-look');
+    modelViewer.setAttribute('camera-controls', '');
+    modelViewer.setAttribute('auto-rotate', '');
+    modelViewer.setAttribute('shadow-intensity', '0.75');
+    modelViewer.setAttribute('exposure', '1.2');
+    modelViewer.setAttribute('loading', 'eager');
+    modelViewer.setAttribute('reveal', 'auto');
+    modelViewer.setAttribute('touch-action', 'pan-y');
+  }, [isReady, modelSrc, title]);
   const modelViewerProps = useMemo(
     () => ({
       src: modelSrc,
@@ -73,6 +92,7 @@ export const NativeARModelViewer: React.FC<NativeARModelViewerProps> = ({
       loading: 'eager',
       reveal: 'auto',
       'touch-action': 'pan-y',
+      ref: modelViewerRef as React.Ref<HTMLElement>,
       style: {
         width: '100%',
         height: '100%',

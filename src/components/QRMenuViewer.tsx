@@ -282,7 +282,8 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   }, []);
 
   const startArCamera = React.useCallback(async () => {
-    setArCameraMessage('Solicitando acceso a la cámara...');
+    setArCameraAttempted(true);
+    setArCameraMessage('Solicitando acceso a la cámara web...');
     setArCameraHelp(null);
     setIsArCameraRequesting(true);
 
@@ -292,9 +293,9 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     }
 
     const setBlockedCameraMessage = () => {
-      setArCameraMessage('La cámara está bloqueada para esta página.');
-      setArCameraHelp('En Chrome móvil: toca el candado o el ícono de ajustes junto a la URL, entra a Permisos, cambia Cámara a Permitir, recarga la carta y vuelve a tocar Activar cámara.');
-      onShowToast('Activa la cámara en permisos del navegador', 'info');
+      setArCameraMessage('La cámara web está bloqueada, pero el plato 3D sigue disponible.');
+      setArCameraHelp('No es necesario cambiar configuraciones para ver el plato: usa el visor 3D de esta pantalla o abre AR nativo en Android cuando aparezca disponible.');
+      onShowToast('Puedes seguir con el visor 3D sin cámara', 'info');
     };
 
     const isLocalhost = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
@@ -1714,7 +1715,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                   </button>
 
                   <NativeARModelViewer
-                    modelSrc={`/models/${getModelId(arDish)}.glb`}
+                    modelSrc={`/models-ar/${getModelId(arDish)}.glb`}
                     title={arDish.name}
                     diameterCm={Math.round(arScale * 28)}
                   />
@@ -1883,3 +1884,4 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     </div>
   );
 };
+
