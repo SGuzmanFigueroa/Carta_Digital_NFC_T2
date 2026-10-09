@@ -663,7 +663,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
 
   const heroItem = menuItems[0]; // Arroz Chaufa Wok de Autor
   // Extrae el ID del modelo desde la URL de la imagen (ej: /images/smoked-old-fashioned.jpg -> smoked-old-fashioned)
-  const getModelId = (dish: MenuItem) => dish.image?.split('/').pop()?.replace('.jpg', '') || dish.id;
+  const getModelId = (dish: MenuItem) => dish.id;
   return (
     <div className="w-full min-h-screen bg-[#f4f5f7] text-[#0f172a] dark:bg-[#0b0c0e] dark:text-[#e5e1e4] pb-44 sm:pb-36 selection:bg-[#ff5708] selection:text-white transition-colors duration-300">
       {/* ========================================================================= */}
