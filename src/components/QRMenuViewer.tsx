@@ -164,6 +164,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   // Real Camera AR Modal
   const [isArModalOpen, setIsArModalOpen] = useState(false);
   const [arCameraActive, setArCameraActive] = useState(false);
+  const [arCameraMessage, setArCameraMessage] = useState<string | null>(null);
   const [arScale, setArScale] = useState(1.0);
   const [arDish, setArDish] = useState<MenuItem>(menuItems[0]); // default to Chaufa or current
 
@@ -254,60 +255,79 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       }
     }
   }, []);
+  const stopArCamera = React.useCallback(() => {
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach((t) => t.stop());
+      mediaStreamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setArCameraActive(false);
+  }, []);
 
-    // Handle Real Camera stream for AR Visor
-  useEffect(() => {
-    if (!isArModalOpen) {
-      if (mediaStreamRef.current) {
-        mediaStreamRef.current.getTracks().forEach((t) => t.stop());
-        mediaStreamRef.current = null;
-      }
-      setArCameraActive(false);
+  const startArCamera = React.useCallback(async () => {
+    setArCameraMessage(null);
+
+    if (typeof window === 'undefined') return;
+
+    const isLocalhost = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
+    if (!window.isSecureContext && !isLocalhost) {
+      stopArCamera();
+      setArCameraMessage('Para activar la cámara real, abre la carta con HTTPS. En modo local por IP el navegador bloquea la cámara.');
       return;
     }
 
-    let isMounted = true;
-    const startCamera = async () => {
-      try {
-        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-              facingMode: { ideal: 'environment' },
-              width: { ideal: 1280 },
-              height: { ideal: 720 }
-            },
-            audio: false
-          });
+    if (!navigator.mediaDevices?.getUserMedia) {
+      stopArCamera();
+      setArCameraMessage('Este navegador no permite acceder a la cámara desde esta página.');
+      return;
+    }
 
-          if (isMounted) {
-            mediaStreamRef.current = stream;
-            if (videoRef.current) {
-              videoRef.current.srcObject = stream;
-              videoRef.current.play();
-            }
-            setArCameraActive(true);
-            onShowToast('Cámara AR activada: Apunta a tu mesa', 'view_in_ar');
-          }
-        } else {
-          setArCameraActive(false);
-        }
-      } catch (err) {
-        console.warn('Camera access error or denied:', err);
-        setArCameraActive(false);
-        onShowToast('Modo AR Simulado activo (permiso de cámara no concedido)', 'info');
+    try {
+      stopArCamera();
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
+        audio: false
+      });
+
+      mediaStreamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play().catch(() => undefined);
       }
-    };
+      setArCameraActive(true);
+      setArCameraMessage(null);
+      onShowToast('Cámara AR activada: apunta hacia la mesa', 'view_in_ar');
+    } catch (err) {
+      console.warn('Camera access error or denied:', err);
+      stopArCamera();
+      const errorName = err instanceof DOMException ? err.name : '';
+      setArCameraMessage(
+        errorName === 'NotAllowedError'
+          ? 'Permiso de cámara bloqueado. Actívalo en el navegador y vuelve a intentar.'
+          : 'No se pudo activar la cámara. Puedes seguir viendo el plato en modo simulado.'
+      );
+    }
+  }, [onShowToast, stopArCamera]);
 
-    startCamera();
+  useEffect(() => {
+    if (!isArModalOpen) {
+      stopArCamera();
+      setArCameraMessage(null);
+      return;
+    }
+
+    startArCamera();
 
     return () => {
-      isMounted = false;
-      if (mediaStreamRef.current) {
-        mediaStreamRef.current.getTracks().forEach((t) => t.stop());
-        mediaStreamRef.current = null;
-      }
+      stopArCamera();
     };
-  }, [isArModalOpen]);
+  }, [isArModalOpen, startArCamera, stopArCamera]);
 
   const normalizeStr = (str: string) =>
     str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
@@ -1622,6 +1642,23 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
             </div>
           )}
 
+          {!arCameraActive && arCameraMessage && (
+            <div className="absolute left-4 right-4 bottom-36 z-30 rounded-2xl border border-[#ff5708]/45 bg-black/75 backdrop-blur-md p-3 text-white shadow-2xl sm:left-1/2 sm:right-auto sm:w-[420px] sm:-translate-x-1/2">
+              <div className="flex items-start gap-2.5">
+                <span className="material-symbols-outlined text-[#ff5708] text-[20px] shrink-0">info</span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[12px] font-semibold leading-snug text-white">{arCameraMessage}</p>
+                  <button
+                    type="button"
+                    onClick={startArCamera}
+                    className="mt-2 min-h-[36px] rounded-lg bg-[#ff5708] px-3 py-1.5 text-[12px] font-bold text-[#2b0b00] shadow-lg active:scale-95"
+                  >
+                    Activar cámara
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           {/* Top Bar Overlay */}
           <div className="relative z-20 px-4 pt-safe pt-4 flex items-center justify-between bg-gradient-to-b from-black/80 to-transparent pb-6">
             <div className="flex items-center gap-2">
@@ -1630,7 +1667,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                 <span className="text-[13px] font-bold text-white leading-tight">Visor AR en Mesa</span>
                 <span className="text-[10px] font-mono-code text-emerald-400 flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
-                  <span>{arCameraActive ? 'Cámara Trasera Activa' : 'Sensor Simulado'}</span>
+                  <span>{arCameraActive ? 'Cámara activa' : 'Cámara no activa'}</span>
                 </span>
               </div>
             </div>
