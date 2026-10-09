@@ -388,14 +388,17 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   }, [attachArCameraStream, handleCameraError, requestArCameraStream, stopArCamera]);
 
   useEffect(() => {
-    if (!isArModalOpen) {
-      stopArCamera();
-      setArCameraMessage(null);
-      setArCameraHelp(null);
-      setArCameraAttempted(false);
-      setIsArCameraRequesting(false);
-      return;
-    }
+    if (isArModalOpen) return;
+
+    stopArCamera();
+    setArCameraMessage(null);
+    setArCameraHelp(null);
+    setArCameraAttempted(false);
+    setIsArCameraRequesting(false);
+  }, [isArModalOpen, stopArCamera]);
+
+  useEffect(() => {
+    if (!isArModalOpen) return;
 
     if (pendingArStreamRef.current && videoRef.current) {
       const stream = pendingArStreamRef.current;
@@ -405,20 +408,14 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       setArCameraActive(true);
       setArCameraMessage(null);
       setArCameraHelp(null);
-      return () => {
-        stopArCamera();
-      };
+      return;
     }
 
     if (!arCameraActive && !isArCameraRequesting && !arCameraMessage) {
       setArCameraMessage('Toca Activar cámara para ver el plato en tu mesa.');
       setArCameraHelp('El navegador puede pedir permiso de cámara una sola vez.');
     }
-
-    return () => {
-      stopArCamera();
-    };
-  }, [arCameraActive, arCameraMessage, isArCameraRequesting, isArModalOpen, stopArCamera]);
+  }, [arCameraActive, arCameraMessage, isArCameraRequesting, isArModalOpen]);
 
   const openArViewer = React.useCallback(async (dish: MenuItem) => {
     setArDish(dish);
@@ -1924,6 +1921,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     </div>
   );
 };
+
 
 
 
