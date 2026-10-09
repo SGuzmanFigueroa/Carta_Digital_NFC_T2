@@ -139,6 +139,7 @@ export interface MenuItem {
   rating: number;
   reviewsCount: number;
   allergens?: string[];
+  dietaryPreferences?: DietaryPreference[];
   badge?: string;
   tag?: string;
   dietary?: string;
@@ -148,6 +149,8 @@ export interface MenuItem {
   popularityShare?: number;
   ordersCount?: number;
 }
+
+export type DietaryPreference = 'vegetarian' | 'gluten-free' | 'dairy-free' | 'spicy';
 
 export interface StaffMember {
   id: string;
