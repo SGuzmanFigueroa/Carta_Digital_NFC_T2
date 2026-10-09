@@ -220,6 +220,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   };
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
+  const pendingArStreamRef = useRef<MediaStream | null>(null);
 
   const [cart, setCart] = useState<{ item: MenuItem; quantity: number; notes?: string }[]>([
     {
@@ -264,11 +265,110 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       mediaStreamRef.current.getTracks().forEach((t) => t.stop());
       mediaStreamRef.current = null;
     }
+    if (pendingArStreamRef.current) {
+      pendingArStreamRef.current.getTracks().forEach((t) => t.stop());
+      pendingArStreamRef.current = null;
+    }
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
     setArCameraActive(false);
   }, []);
+
+  const requestArCameraStream = React.useCallback(async () => {
+    if (typeof window === 'undefined') {
+      throw new DOMException('Browser window is not available', 'NotFoundError');
+    }
+
+    const isLocalhost = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
+    if (!window.isSecureContext && !isLocalhost) {
+      throw new DOMException('Camera requires HTTPS', 'SecurityError');
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      throw new DOMException('Camera API is not available', 'NotFoundError');
+    }
+
+    const cameraAttempts: MediaStreamConstraints[] = [
+      {
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
+        audio: false
+      },
+      {
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
+        audio: false
+      },
+      {
+        video: true,
+        audio: false
+      }
+    ];
+
+    let lastCameraError: unknown = null;
+
+    for (const constraints of cameraAttempts) {
+      try {
+        return await navigator.mediaDevices.getUserMedia(constraints);
+      } catch (err) {
+        lastCameraError = err;
+        const errorName = err instanceof DOMException ? err.name : '';
+        if (errorName === 'NotAllowedError' || errorName === 'SecurityError') {
+          throw err;
+        }
+      }
+    }
+
+    throw lastCameraError ?? new DOMException('No camera stream available', 'NotFoundError');
+  }, []);
+
+  const showBlockedCameraMessage = React.useCallback(() => {
+    setArCameraMessage('No se pudo activar la cámara.');
+    setArCameraHelp('Chrome denegó el acceso. Toca Reintentar cámara y, si aparece el permiso, selecciona Permitir.');
+    onShowToast('La cámara no se activó; puedes reintentar', 'info');
+  }, [onShowToast]);
+
+  const attachArCameraStream = React.useCallback(async (stream: MediaStream) => {
+    pendingArStreamRef.current = stream;
+    mediaStreamRef.current = stream;
+
+    if (videoRef.current) {
+      videoRef.current.srcObject = stream;
+      await videoRef.current.play().catch(() => undefined);
+      pendingArStreamRef.current = null;
+    }
+
+    setArCameraActive(true);
+    setArCameraMessage(null);
+    setArCameraHelp(null);
+    onShowToast('Cámara AR activada: apunta hacia la mesa', 'view_in_ar');
+  }, [onShowToast]);
+
+  const handleCameraError = React.useCallback((err: unknown) => {
+    console.warn('Camera access error or denied:', err);
+    stopArCamera();
+    const errorName = err instanceof DOMException ? err.name : '';
+
+    if (errorName === 'NotAllowedError' || errorName === 'SecurityError') {
+      showBlockedCameraMessage();
+      return;
+    }
+
+    if (errorName === 'NotFoundError' || errorName === 'OverconstrainedError') {
+      setArCameraMessage('No se encontró una cámara disponible.');
+      setArCameraHelp('Cierra Zoom, Meet, OBS u otra app que esté usando la cámara y vuelve a intentar.');
+      return;
+    }
+
+    setArCameraMessage('No se pudo activar la cámara.');
+    setArCameraHelp('Cierra otras apps que usen la cámara y vuelve a intentar.');
+  }, [showBlockedCameraMessage, stopArCamera]);
 
   const startArCamera = React.useCallback(async () => {
     setArCameraAttempted(true);
@@ -276,102 +376,16 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     setArCameraHelp(null);
     setIsArCameraRequesting(true);
 
-    if (typeof window === 'undefined') {
-      setIsArCameraRequesting(false);
-      return;
-    }
-
-    const setBlockedCameraMessage = () => {
-      setArCameraMessage('No se pudo activar la cámara.');
-      setArCameraHelp('Toca Reintentar cámara. Si el navegador muestra el permiso, selecciona Permitir para ver el plato sobre la mesa.');
-      onShowToast('La cámara no se activó; puedes reintentar', 'info');
-    };
-
-    const isLocalhost = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
-    if (!window.isSecureContext && !isLocalhost) {
-      stopArCamera();
-      setArCameraMessage('La cámara real necesita HTTPS para funcionar en el celular.');
-      setArCameraHelp('Abre la carta desde la URL publicada con HTTPS. Si usas una IP local con http://, Chrome bloquea la cámara por seguridad.');
-      setIsArCameraRequesting(false);
-      return;
-    }
-
-    if (!navigator.mediaDevices?.getUserMedia) {
-      stopArCamera();
-      setArCameraMessage('Este navegador no permite acceder a la cámara desde esta página.');
-      setArCameraHelp('Prueba con Chrome actualizado y abre la carta desde una URL HTTPS.');
-      setIsArCameraRequesting(false);
-      return;
-    }
-
     try {
       stopArCamera();
-
-      const cameraAttempts: MediaStreamConstraints[] = [
-        {
-          video: {
-            facingMode: { ideal: 'environment' },
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
-          },
-          audio: false
-        },
-        {
-          video: {
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
-          },
-          audio: false
-        },
-        {
-          video: true,
-          audio: false
-        }
-      ];
-
-      let stream: MediaStream | null = null;
-      let lastCameraError: unknown = null;
-
-      for (const constraints of cameraAttempts) {
-        try {
-          stream = await navigator.mediaDevices.getUserMedia(constraints);
-          break;
-        } catch (err) {
-          lastCameraError = err;
-          const errorName = err instanceof DOMException ? err.name : '';
-          if (errorName === 'NotAllowedError' || errorName === 'SecurityError') {
-            throw err;
-          }
-        }
-      }
-
-      if (!stream) {
-        throw lastCameraError ?? new DOMException('No camera stream available', 'NotFoundError');
-      }
-
-      mediaStreamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play().catch(() => undefined);
-      }
-      setArCameraActive(true);
-      setArCameraMessage(null);
-      setArCameraHelp(null);
-      onShowToast('Cámara AR activada: apunta hacia la mesa', 'view_in_ar');
+      const stream = await requestArCameraStream();
+      await attachArCameraStream(stream);
     } catch (err) {
-      console.warn('Camera access error or denied:', err);
-      stopArCamera();
-      const errorName = err instanceof DOMException ? err.name : '';
-      if (errorName === 'NotAllowedError' || errorName === 'SecurityError') {
-        setBlockedCameraMessage();
-      } else {
-        setArCameraMessage('No se pudo activar la cámara. Puedes seguir viendo el plato en modo simulado.');
-        setArCameraHelp('Cierra otras apps que usen la cámara y vuelve a intentar.');
-      }
+      handleCameraError(err);
     } finally {
       setIsArCameraRequesting(false);
     }
-  }, [onShowToast, stopArCamera]);
+  }, [attachArCameraStream, handleCameraError, requestArCameraStream, stopArCamera]);
 
   useEffect(() => {
     if (!isArModalOpen) {
@@ -383,27 +397,47 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       return;
     }
 
-    stopArCamera();
-    setArCameraAttempted(false);
-    setIsArCameraRequesting(false);
-    setArCameraMessage('Activando cámara AR...');
-    setArCameraHelp('Si el navegador muestra el permiso de cámara, toca Permitir para ver el plato sobre la mesa.');
+    if (pendingArStreamRef.current && videoRef.current) {
+      const stream = pendingArStreamRef.current;
+      videoRef.current.srcObject = stream;
+      videoRef.current.play().catch(() => undefined);
+      pendingArStreamRef.current = null;
+      setArCameraActive(true);
+      setArCameraMessage(null);
+      setArCameraHelp(null);
+      return () => {
+        stopArCamera();
+      };
+    }
 
-    const timer = window.setTimeout(() => {
-      void startArCamera();
-    }, 180);
+    if (!arCameraActive && !isArCameraRequesting && !arCameraMessage) {
+      setArCameraMessage('Toca Activar cámara para ver el plato en tu mesa.');
+      setArCameraHelp('El navegador puede pedir permiso de cámara una sola vez.');
+    }
 
     return () => {
-      window.clearTimeout(timer);
       stopArCamera();
     };
-  }, [isArModalOpen, startArCamera, stopArCamera]);
+  }, [arCameraActive, arCameraMessage, isArCameraRequesting, isArModalOpen, stopArCamera]);
 
-  const openArViewer = React.useCallback((dish: MenuItem) => {
+  const openArViewer = React.useCallback(async (dish: MenuItem) => {
     setArDish(dish);
     setIsArModalOpen(true);
-  }, []);
+    setArCameraAttempted(true);
+    setArCameraMessage('Solicitando permiso de cámara...');
+    setArCameraHelp(null);
+    setIsArCameraRequesting(true);
 
+    try {
+      stopArCamera();
+      const stream = await requestArCameraStream();
+      await attachArCameraStream(stream);
+    } catch (err) {
+      handleCameraError(err);
+    } finally {
+      setIsArCameraRequesting(false);
+    }
+  }, [attachArCameraStream, handleCameraError, requestArCameraStream, stopArCamera]);
   const normalizeStr = (str: string) =>
     str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
 
@@ -1890,6 +1924,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     </div>
   );
 };
+
 
 
 
