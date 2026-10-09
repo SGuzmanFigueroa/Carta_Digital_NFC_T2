@@ -21,17 +21,6 @@ const ThreeDView = dynamic(
   }
 );
 
-const NativeARModelViewer = dynamic(
-  () => import('./NativeARModelViewer').then((mod) => mod.NativeARModelViewer),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="mt-2 rounded-xl border border-[#ff5708]/30 bg-black/40 px-3 py-2 text-[11px] font-semibold text-[#ffb59c]">
-        Cargando AR nativo...
-      </div>
-    )
-  }
-);
 import { ARTableViewer } from './ARTableViewer';
 // CD-13 · Componentes del tema Claro/Oscuro y navegación inferior del comensal.
 import { ThemeToggle } from './menu/ThemeToggle';
@@ -283,7 +272,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
 
   const startArCamera = React.useCallback(async () => {
     setArCameraAttempted(true);
-    setArCameraMessage('Solicitando acceso a la cámara web...');
+    setArCameraMessage('Solicitando permiso de cámara...');
     setArCameraHelp(null);
     setIsArCameraRequesting(true);
 
@@ -293,9 +282,9 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     }
 
     const setBlockedCameraMessage = () => {
-      setArCameraMessage('La cámara web está bloqueada, pero el plato 3D sigue disponible.');
-      setArCameraHelp('No es necesario cambiar configuraciones para ver el plato: usa el visor 3D de esta pantalla o abre AR nativo en Android cuando aparezca disponible.');
-      onShowToast('Puedes seguir con el visor 3D sin cámara', 'info');
+      setArCameraMessage('No se pudo activar la cámara.');
+      setArCameraHelp('Toca Reintentar cámara. Si el navegador muestra el permiso, selecciona Permitir para ver el plato sobre la mesa.');
+      onShowToast('La cámara no se activó; puedes reintentar', 'info');
     };
 
     const isLocalhost = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
@@ -377,13 +366,23 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     stopArCamera();
     setArCameraAttempted(false);
     setIsArCameraRequesting(false);
-    setArCameraMessage('AR listo sin permisos: mira el plato en 3D o abre AR nativo en Android.');
-    setArCameraHelp('La cámara web del navegador es opcional. El cliente no necesita entrar a configuraciones para usar el visor principal.');
+    setArCameraMessage('Activando cámara AR...');
+    setArCameraHelp('Si el navegador muestra el permiso de cámara, toca Permitir para ver el plato sobre la mesa.');
+
+    const timer = window.setTimeout(() => {
+      void startArCamera();
+    }, 180);
 
     return () => {
+      window.clearTimeout(timer);
       stopArCamera();
     };
-  }, [isArModalOpen, stopArCamera]);
+  }, [isArModalOpen, startArCamera, stopArCamera]);
+
+  const openArViewer = React.useCallback((dish: MenuItem) => {
+    setArDish(dish);
+    setIsArModalOpen(true);
+  }, []);
 
   const normalizeStr = (str: string) =>
     str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
@@ -1176,10 +1175,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setArDish(heroItem);
-                  setIsArModalOpen(true);
-                }}
+                onClick={() => openArViewer(heroItem)}
                 className="h-11 px-3.5 rounded-xl bg-[#f1f5f9] hover:bg-[#e2e8f0] text-[#334155] hover:text-[#0f172a] dark:bg-[#1e1f28] dark:hover:bg-[#282935] dark:text-[#e5e1e4] text-[13px] font-medium flex items-center justify-center gap-1.5 border border-[#cbd5e1] dark:border-[#353642] transition-colors cursor-pointer shrink-0 whitespace-nowrap active:scale-95"
                 title="Proyectar plato con cámara en tu mesa"
               >
@@ -1314,10 +1310,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                       {dish.has3D && (
                         <button
                           type="button"
-                          onClick={() => {
-                            setArDish(dish);
-                            setIsArModalOpen(true);
-                          }}
+                          onClick={() => openArViewer(dish)}
                           className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl bg-[#f1f5f9] hover:bg-[#e2e8f0] text-[#1d4ed8] border border-[#cbd5e1] dark:bg-[#1e1f28] dark:hover:bg-[#282935] dark:text-[#a1c9ff] dark:border-[#353642] transition-colors cursor-pointer"
                           title="Proyectar con cámara AR"
                         >
@@ -1648,9 +1641,8 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
               <button
                 type="button"
                 onClick={() => {
-                  setArDish(selectedDishForModal);
+                  openArViewer(selectedDishForModal);
                   setSelectedDishForModal(null);
-                  setIsArModalOpen(true);
                 }}
                 className="px-3.5 py-2.5 min-h-[44px] rounded-xl bg-[#f1f5f9] hover:bg-[#e2e8f0] text-[#1d4ed8] border border-[#cbd5e1] dark:bg-[#1e1f28] dark:hover:bg-[#282935] dark:text-[#a1c9ff] dark:border-[#353642] text-[12px] flex items-center gap-1.5 cursor-pointer"
                 title="Proyectar con cámara en tu mesa"
@@ -1699,26 +1691,20 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
           )}
 
           {!arCameraActive && arCameraMessage && (
-            <div className="absolute left-4 right-4 bottom-36 z-30 rounded-2xl border border-[#ff5708]/45 bg-black/75 backdrop-blur-md p-3 text-white shadow-2xl sm:left-1/2 sm:right-auto sm:w-[420px] sm:-translate-x-1/2">
+            <div className="absolute left-4 right-4 bottom-36 z-30 rounded-2xl border border-[#ff5708]/45 bg-black/80 backdrop-blur-md p-4 text-white shadow-2xl sm:left-1/2 sm:right-auto sm:w-[380px] sm:-translate-x-1/2">
               <div className="flex items-start gap-2.5">
-                <span className="material-symbols-outlined text-[#ff5708] text-[20px] shrink-0">info</span>
+                <span className="material-symbols-outlined text-[#ff5708] text-[22px] shrink-0">photo_camera</span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[12px] font-semibold leading-snug text-white">{arCameraMessage}</p>
-                  {arCameraHelp && <p className="mt-1 text-[11px] leading-snug text-white/75">{arCameraHelp}</p>}
+                  <p className="text-[13px] font-bold leading-snug text-white">{arCameraMessage}</p>
+                  {arCameraHelp && <p className="mt-1.5 text-[11px] leading-snug text-white/75">{arCameraHelp}</p>}
                   <button
                     type="button"
                     onClick={startArCamera}
                     disabled={isArCameraRequesting}
-                    className="mt-2 min-h-[36px] rounded-lg bg-[#ff5708] px-3 py-1.5 text-[12px] font-bold text-[#2b0b00] shadow-lg active:scale-95 disabled:cursor-wait disabled:opacity-70"
+                    className="mt-3 min-h-[42px] rounded-xl bg-[#ff5708] px-4 py-2 text-[13px] font-black text-[#2b0b00] shadow-lg active:scale-95 disabled:cursor-wait disabled:opacity-70"
                   >
-                    {isArCameraRequesting ? 'Solicitando...' : arCameraAttempted ? 'Reintentar cámara web' : 'Usar cámara web'}
+                    {isArCameraRequesting ? 'Activando cámara...' : arCameraAttempted ? 'Reintentar cámara' : 'Activar cámara'}
                   </button>
-
-                  <NativeARModelViewer
-                    modelSrc={`/models-ar/${getModelId(arDish)}.glb`}
-                    title={arDish.name}
-                    diameterCm={Math.round(arScale * 28)}
-                  />
                 </div>
               </div>
             </div>
@@ -1731,7 +1717,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                 <span className="text-[13px] font-bold text-white leading-tight">Visor AR en Mesa</span>
                 <span className="text-[10px] font-mono-code text-emerald-400 flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
-                  <span>{arCameraActive ? 'Cámara activa' : 'AR nativo listo'}</span>
+                  <span>{arCameraActive ? 'Cámara activa' : isArCameraRequesting ? 'Activando cámara' : 'Esperando cámara'}</span>
                 </span>
               </div>
             </div>
@@ -1884,4 +1870,6 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     </div>
   );
 };
+
+
 
