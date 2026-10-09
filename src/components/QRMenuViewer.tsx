@@ -165,6 +165,8 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   const [isArModalOpen, setIsArModalOpen] = useState(false);
   const [arCameraActive, setArCameraActive] = useState(false);
   const [arCameraMessage, setArCameraMessage] = useState<string | null>(null);
+  const [arCameraHelp, setArCameraHelp] = useState<string | null>(null);
+  const [isArCameraRequesting, setIsArCameraRequesting] = useState(false);
   const [arScale, setArScale] = useState(1.0);
   const [arDish, setArDish] = useState<MenuItem>(menuItems[0]); // default to Chaufa or current
 
@@ -267,24 +269,53 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   }, []);
 
   const startArCamera = React.useCallback(async () => {
-    setArCameraMessage(null);
+    setArCameraMessage('Solicitando acceso a la cámara...');
+    setArCameraHelp(null);
+    setIsArCameraRequesting(true);
 
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined') {
+      setIsArCameraRequesting(false);
+      return;
+    }
+
+    const setBlockedCameraMessage = () => {
+      setArCameraMessage('La cámara está bloqueada para esta página.');
+      setArCameraHelp('En Chrome móvil: toca el candado o el ícono de ajustes junto a la URL, entra a Permisos, cambia Cámara a Permitir, recarga la carta y vuelve a tocar Activar cámara.');
+      onShowToast('Activa la cámara en permisos del navegador', 'info');
+    };
 
     const isLocalhost = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
     if (!window.isSecureContext && !isLocalhost) {
       stopArCamera();
-      setArCameraMessage('Para activar la cámara real, abre la carta con HTTPS. En modo local por IP el navegador bloquea la cámara.');
+      setArCameraMessage('La cámara real necesita HTTPS para funcionar en el celular.');
+      setArCameraHelp('Abre la carta desde la URL publicada con HTTPS. Si usas una IP local con http://, Chrome bloquea la cámara por seguridad.');
+      setIsArCameraRequesting(false);
       return;
     }
 
     if (!navigator.mediaDevices?.getUserMedia) {
       stopArCamera();
       setArCameraMessage('Este navegador no permite acceder a la cámara desde esta página.');
+      setArCameraHelp('Prueba con Chrome actualizado y abre la carta desde una URL HTTPS.');
+      setIsArCameraRequesting(false);
       return;
     }
 
     try {
+      const permissionApi = navigator.permissions?.query;
+      if (permissionApi) {
+        try {
+          const permissionStatus = await permissionApi.call(navigator.permissions, { name: 'camera' as PermissionName });
+          if (permissionStatus.state === 'denied') {
+            stopArCamera();
+            setBlockedCameraMessage();
+            return;
+          }
+        } catch {
+          // Algunos navegadores no soportan consultar permisos de cámara; se intenta con getUserMedia.
+        }
+      }
+
       stopArCamera();
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
@@ -302,16 +333,20 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       }
       setArCameraActive(true);
       setArCameraMessage(null);
+      setArCameraHelp(null);
       onShowToast('Cámara AR activada: apunta hacia la mesa', 'view_in_ar');
     } catch (err) {
       console.warn('Camera access error or denied:', err);
       stopArCamera();
       const errorName = err instanceof DOMException ? err.name : '';
-      setArCameraMessage(
-        errorName === 'NotAllowedError'
-          ? 'Permiso de cámara bloqueado. Actívalo en el navegador y vuelve a intentar.'
-          : 'No se pudo activar la cámara. Puedes seguir viendo el plato en modo simulado.'
-      );
+      if (errorName === 'NotAllowedError' || errorName === 'SecurityError') {
+        setBlockedCameraMessage();
+      } else {
+        setArCameraMessage('No se pudo activar la cámara. Puedes seguir viendo el plato en modo simulado.');
+        setArCameraHelp('Cierra otras apps que usen la cámara y vuelve a intentar.');
+      }
+    } finally {
+      setIsArCameraRequesting(false);
     }
   }, [onShowToast, stopArCamera]);
 
@@ -1648,12 +1683,14 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                 <span className="material-symbols-outlined text-[#ff5708] text-[20px] shrink-0">info</span>
                 <div className="min-w-0 flex-1">
                   <p className="text-[12px] font-semibold leading-snug text-white">{arCameraMessage}</p>
+                  {arCameraHelp && <p className="mt-1 text-[11px] leading-snug text-white/75">{arCameraHelp}</p>}
                   <button
                     type="button"
                     onClick={startArCamera}
-                    className="mt-2 min-h-[36px] rounded-lg bg-[#ff5708] px-3 py-1.5 text-[12px] font-bold text-[#2b0b00] shadow-lg active:scale-95"
+                    disabled={isArCameraRequesting}
+                    className="mt-2 min-h-[36px] rounded-lg bg-[#ff5708] px-3 py-1.5 text-[12px] font-bold text-[#2b0b00] shadow-lg active:scale-95 disabled:cursor-wait disabled:opacity-70"
                   >
-                    Activar cámara
+                    {isArCameraRequesting ? 'Solicitando...' : 'Reintentar cámara'}
                   </button>
                 </div>
               </div>
