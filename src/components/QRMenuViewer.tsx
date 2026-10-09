@@ -22,6 +22,7 @@ const ThreeDView = dynamic(
 );
 
 import { ARTableViewer } from './ARTableViewer';
+import { DishARViewer } from './DishARViewer';
 // CD-13 · Componentes del tema Claro/Oscuro y navegación inferior del comensal.
 import { ThemeToggle } from './menu/ThemeToggle';
 import { MenuBottomNav } from './menu/MenuBottomNav';
@@ -170,6 +171,8 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   const [isArCameraRequesting, setIsArCameraRequesting] = useState(false);
   const [arCameraAttempted, setArCameraAttempted] = useState(false);
   const [arScale, setArScale] = useState(1.0);
+  const [arTrackingStatus, setArTrackingStatus] = useState('Esperando cámara');
+  const [isArDishAnchored, setIsArDishAnchored] = useState(false);
   const [arDish, setArDish] = useState<MenuItem>(menuItems[0]); // default to Chaufa or current
 
   // Re-order / Welcome Back feature for returning diners
@@ -395,6 +398,8 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     setArCameraHelp(null);
     setArCameraAttempted(false);
     setIsArCameraRequesting(false);
+    setArTrackingStatus('Esperando cámara');
+    setIsArDishAnchored(false);
   }, [isArModalOpen, stopArCamera]);
 
   useEffect(() => {
@@ -419,6 +424,8 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
 
   const openArViewer = React.useCallback(async (dish: MenuItem) => {
     setArDish(dish);
+    setArTrackingStatus('Solicitando cámara');
+    setIsArDishAnchored(false);
     setIsArModalOpen(true);
     setArCameraAttempted(true);
     setArCameraMessage('Solicitando permiso de cámara...');
@@ -1768,7 +1775,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                 <span className="text-[13px] font-bold text-white leading-tight">Visor AR en Mesa</span>
                 <span className="text-[10px] font-mono-code text-emerald-400 flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
-                  <span>{arCameraActive ? 'Cámara activa' : isArCameraRequesting ? 'Activando cámara' : 'Esperando cámara'}</span>
+                  <span>{arCameraActive ? arTrackingStatus : isArCameraRequesting ? 'Activando cámara' : 'Esperando cámara'}</span>
                 </span>
               </div>
             </div>
@@ -1782,28 +1789,23 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
             </button>
           </div>
 
-          {/* Interactive 3D Dish Overlay directly in the camera view! */}
-          <div className="relative z-10 flex-1 flex flex-col items-center justify-center pointer-events-auto">
-            {/* Reticle Table Target Indicator */}
-            <div className="absolute w-72 h-72 border border-dashed border-[#ff5708]/30 rounded-full pointer-events-none animate-pulse flex items-center justify-center">
-              <div className="w-60 h-60 rounded-full border border-white/10" />
-            </div>
-
-            <div style={{ transform: `scale(${arScale})` }} className="w-full transition-transform duration-200">
-              <ThreeDView
-                dishId={getModelId(arDish)}
-                enableCameraBg={true}
-                heightClass="h-72 sm:h-96"
-                onInteract={() => onShowToast('Moviendo plato en tu mesa', 'view_in_ar')}
-              />
-            </div>
+          {/* AR surface detector + anchored transparent 3D dish layer */}
+          <div className="absolute inset-0 z-10 pointer-events-auto">
+            <DishARViewer
+              dishId={getModelId(arDish)}
+              scale={arScale}
+              isCameraActive={arCameraActive}
+              onStatusChange={setArTrackingStatus}
+              onAnchorChange={setIsArDishAnchored}
+              onShowToast={onShowToast}
+            />
           </div>
 
           {/* Bottom Floating AR Controls */}
           <div className="relative z-20 px-4 pb-safe pb-5 bg-gradient-to-t from-black/90 via-black/60 to-transparent pt-4 space-y-3">
             {/* Scale controls */}
             <div className="flex items-center justify-between bg-black/70 backdrop-blur-md px-3 py-2 rounded-xl border border-white/15 text-[11px] font-mono-code">
-              <span className="text-[#a1a1aa]">Escala Real en Mesa:</span>
+              <span className="text-[#a1a1aa]">{isArDishAnchored ? 'Plato fijado en mesa:' : 'Escala Real en Mesa:'}</span>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
@@ -1921,6 +1923,8 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     </div>
   );
 };
+
+
 
 
 
