@@ -18,11 +18,10 @@ export const ThreeDView: React.FC<ThreeDViewProps> = ({
   const mountRef = useRef<HTMLDivElement>(null);
   const [currentAngle, setCurrentAngle] = useState<'iso' | 'top' | 'side'>('iso');
   const [fps, setFps] = useState(60);
+  const [isLoadingModel, setIsLoadingModel] = useState(false);
   const targetRotXRef = useRef(0.42);
   const targetRotYRef = useRef(0);
   const autoRotateRef = useRef(true);
-
-  console.log('>>> DISH ID RECIBIDO:', dishId);
   useEffect(() => {
     const container = mountRef.current;
     if (!container) return;
@@ -103,13 +102,28 @@ export const ThreeDView: React.FC<ThreeDViewProps> = ({
       dishId === 'pulpo-brasa' ||
       dishId === 'wagyu-a5'
     ) {
-      console.log('✅ ENTRANDO AL BLOQUE GLB PARA:', dishId);
-
+      setIsLoadingModel(true);
       const loader = new GLTFLoader();
       
       loader.load(
         `/models/${dishId}.glb`,
         (gltf) => {
+          if (!isSubscribed) {
+            gltf.scene.traverse((child) => {
+              if ((child as THREE.Mesh).isMesh) {
+                const mesh = child as THREE.Mesh;
+                mesh.geometry?.dispose();
+                if (Array.isArray(mesh.material)) {
+                  mesh.material.forEach((mat) => mat.dispose());
+                } else if (mesh.material) {
+                  mesh.material.dispose();
+                }
+              }
+            });
+            return;
+          }
+
+          setIsLoadingModel(false);
           const model = gltf.scene;
 
           model.traverse((child) => {
@@ -136,8 +150,6 @@ export const ThreeDView: React.FC<ThreeDViewProps> = ({
           const box = new THREE.Box3().setFromObject(model);
           const size = box.getSize(new THREE.Vector3());
           const maxDim = Math.max(size.x, size.y, size.z);
-
-          console.log(`📏 Tamaño original de ${dishId}:`, size, 'MaxDim:', maxDim);
           
           const targetSize = targetSizes[dishId] ?? 2.8;
           
@@ -159,6 +171,9 @@ export const ThreeDView: React.FC<ThreeDViewProps> = ({
         },
         undefined,
         (error) => {
+          if (isSubscribed) {
+            setIsLoadingModel(false);
+          }
           console.error(`Error al cargar el modelo 3D de ${dishId}:`, error);
         }
       );
@@ -552,6 +567,18 @@ export const ThreeDView: React.FC<ThreeDViewProps> = ({
   return (
     <div className={`relative w-full ${heightClass} ${enableCameraBg ? 'bg-transparent' : 'bg-[#131418]'} overflow-hidden select-none touch-pan-y`}>
       <div ref={mountRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
+
+      {/* Indicador de carga sutil para modelos GLB */}
+      {isLoadingModel && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#131418]/65 backdrop-blur-xs z-20 pointer-events-none transition-opacity duration-300">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#1c1b1d]/90 border border-[#ff5708]/50 shadow-xl">
+            <span className="w-3.5 h-3.5 border-2 border-[#ff5708] border-t-transparent rounded-full animate-spin" />
+            <span className="text-[10px] font-mono-code font-bold text-[#ffb59c] tracking-wide animate-pulse">
+              Cargando modelo 3D...
+            </span>
+          </div>
+        </div>
+      )}
 
       {!enableCameraBg && (
         <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-[#1a1b20] to-transparent pointer-events-none" />
