@@ -20,6 +20,18 @@ const ThreeDView = dynamic(
     )
   }
 );
+
+const NativeARModelViewer = dynamic(
+  () => import('./NativeARModelViewer').then((mod) => mod.NativeARModelViewer),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="mt-2 rounded-xl border border-[#ff5708]/30 bg-black/40 px-3 py-2 text-[11px] font-semibold text-[#ffb59c]">
+        Cargando AR nativo...
+      </div>
+    )
+  }
+);
 import { ARTableViewer } from './ARTableViewer';
 // CD-13 · Componentes del tema Claro/Oscuro y navegación inferior del comensal.
 import { ThemeToggle } from './menu/ThemeToggle';
@@ -1692,6 +1704,12 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                   >
                     {isArCameraRequesting ? 'Solicitando...' : 'Reintentar cámara'}
                   </button>
+
+                  <NativeARModelViewer
+                    modelSrc={`/models/${getModelId(arDish)}.glb`}
+                    title={arDish.name}
+                    diameterCm={Math.round(arScale * 28)}
+                  />
                 </div>
               </div>
             </div>
@@ -1831,7 +1849,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       {/* ⚡ CD-16 · POP-UP PROMOCIONAL "OFERTA FLASH" (PLATOS REALES + DESCUENTO)   */}
       {/* ========================================================================= */}
       <PromoDealModal
-        isOpen={isPromoModalOpen}
+        isOpen={isPromoModalOpen && !isArModalOpen && !selectedDishForModal}
         onClose={() => setIsPromoModalOpen(false)}
         deals={promoDeals}
         initialDealId={promoInitialDealId}
