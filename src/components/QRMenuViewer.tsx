@@ -305,29 +305,49 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     }
 
     try {
-      const permissionApi = navigator.permissions?.query;
-      if (permissionApi) {
+      stopArCamera();
+
+      const cameraAttempts: MediaStreamConstraints[] = [
+        {
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          },
+          audio: false
+        },
+        {
+          video: {
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          },
+          audio: false
+        },
+        {
+          video: true,
+          audio: false
+        }
+      ];
+
+      let stream: MediaStream | null = null;
+      let lastCameraError: unknown = null;
+
+      for (const constraints of cameraAttempts) {
         try {
-          const permissionStatus = await permissionApi.call(navigator.permissions, { name: 'camera' as PermissionName });
-          if (permissionStatus.state === 'denied') {
-            stopArCamera();
-            setBlockedCameraMessage();
-            return;
+          stream = await navigator.mediaDevices.getUserMedia(constraints);
+          break;
+        } catch (err) {
+          lastCameraError = err;
+          const errorName = err instanceof DOMException ? err.name : '';
+          if (errorName === 'NotAllowedError' || errorName === 'SecurityError') {
+            throw err;
           }
-        } catch {
-          // Algunos navegadores no soportan consultar permisos de cámara; se intenta con getUserMedia.
         }
       }
 
-      stopArCamera();
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: 'environment' },
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        },
-        audio: false
-      });
+      if (!stream) {
+        throw lastCameraError ?? new DOMException('No camera stream available', 'NotFoundError');
+      }
 
       mediaStreamRef.current = stream;
       if (videoRef.current) {
@@ -1870,6 +1890,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     </div>
   );
 };
+
 
 
 
