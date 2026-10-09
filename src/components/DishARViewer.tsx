@@ -119,7 +119,7 @@ export const DishARViewer: React.FC<DishARViewerProps> = ({
     container.appendChild(renderer.domElement);
 
     const root = new THREE.Group();
-    root.position.set(0, -0.62, -1.45);
+    root.position.set(0, -0.68, -2.05);
     scene.add(root);
 
     const dishGroup = new THREE.Group();
@@ -216,7 +216,7 @@ export const DishARViewer: React.FC<DishARViewerProps> = ({
 
       root.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.12);
       root.position.x += (((anchored ? -deviceTiltX * 0.18 : 0) - root.position.x) * 0.045);
-      root.position.z += (((anchored ? -1.45 + deviceTiltY * 0.16 : -1.45) - root.position.z) * 0.045);
+      root.position.z += (((anchored ? -2.05 + deviceTiltY * 0.18 : -2.05) - root.position.z) * 0.045);
 
       if (!anchored) {
         anchorRing.rotation.z += 0.01;
