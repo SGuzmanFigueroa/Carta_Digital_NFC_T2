@@ -219,11 +219,11 @@ export const DishARViewer: React.FC<DishARViewerProps> = ({
       root.position.z += (((anchored ? -0.95 + deviceTiltY * 0.16 : -0.95) - root.position.z) * 0.045);
 
       if (!anchored) {
-        dishGroup.rotation.y += 0.006;
         anchorRing.rotation.z += 0.01;
         anchorRing.visible = isCameraActive;
-        dishGroup.visible = isCameraActive;
+        dishGroup.visible = false;
       } else {
+        dishGroup.visible = true;
         dishGroup.rotation.y *= 0.98;
         anchorRing.visible = true;
       }
@@ -289,7 +289,7 @@ export const DishARViewer: React.FC<DishARViewerProps> = ({
           <div className="max-w-[280px] rounded-2xl border border-[#ff5708]/45 bg-black/72 px-4 py-3 text-center text-white shadow-2xl backdrop-blur-md">
             <p className="text-[12px] font-black leading-snug">{statusText}</p>
             <p className="mt-1 text-[10px] leading-snug text-white/65">
-              {modelReady ? 'El visor está preparado para reemplazar este GLB por modelos RealityScan.' : 'Cargando plato 3D...'}
+              {modelReady ? 'Toca una superficie plana para colocar el plato.' : 'Cargando plato 3D...'}
             </p>
           </div>
         </div>
