@@ -151,7 +151,7 @@ export const DishARViewer: React.FC<DishARViewerProps> = ({
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.24;
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
     renderer.domElement.className = 'h-full w-full';
 
     while (container.firstChild) container.removeChild(container.firstChild);

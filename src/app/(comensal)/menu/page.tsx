@@ -25,14 +25,16 @@ export default function MenuPage() {
     callWaiter
   } = useRestaurant();
 
-  const [menuItems, setMenuItems] = useState<MenuItem[]>(() => {
-    const cached = getCachedMenuItems();
-    return cached && cached.length > 0 ? cached : INITIAL_MENU_ITEMS;
-  });
+  const [menuItems, setMenuItems] = useState<MenuItem[]>(INITIAL_MENU_ITEMS);
   const [isOnline, setIsOnline] = useState<boolean>(true);
 
   useEffect(() => {
     setIsOnline(isDeviceOnline());
+
+    const cachedMenu = getCachedMenuItems();
+    if (cachedMenu && cachedMenu.length > 0) {
+      setMenuItems(cachedMenu);
+    }
 
     // Setup background offline synchronization
     const cleanupSync = setupOfflineSync(

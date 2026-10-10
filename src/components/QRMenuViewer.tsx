@@ -484,15 +484,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   // ==========================================================================
   // 🎯 CD-16 · OFERTA FLASH: platos reales + estado del pop-up promocional
   // ==========================================================================
-  const [activeStoredOffers, setActiveStoredOffers] = useState<any[]>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const raw = localStorage.getItem('gastropulse_active_promo_offers');
-        if (raw) return JSON.parse(raw);
-      } catch (e) {}
-    }
-    return INITIAL_ACTIVE_PROMO_OFFERS;
-  });
+  const [activeStoredOffers, setActiveStoredOffers] = useState<any[]>(INITIAL_ACTIVE_PROMO_OFFERS);
 
   useEffect(() => {
     const handler = () => {
@@ -505,6 +497,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
         }
       } catch (e) {}
     };
+    handler();
     window.addEventListener('gastropulse_promo_offers_changed', handler);
     window.addEventListener('storage', handler);
     return () => {
