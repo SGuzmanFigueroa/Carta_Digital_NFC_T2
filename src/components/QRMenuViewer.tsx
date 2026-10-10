@@ -29,6 +29,8 @@ import { MenuBottomNav } from './menu/MenuBottomNav';
 import { PaymentModal } from './menu/PaymentModal';
 import { ComplaintBookModal } from './menu/ComplaintBookModal';
 import { DishDetailModal } from './menu/DishDetailModal';
+import { PairingSuggestion } from './menu/PairingSuggestion';
+import { resolvePairingItem } from '@/features/menu/pairing';
 // CD-16 · Pop-up promocional "Oferta Flash" con platos reales del menú.
 import { PromoDealModal } from './menu/PromoDealModal';
 // CD-16 · Tira "Oferta Flash" de portada: rota sola entre las ofertas activas.
@@ -479,6 +481,13 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       return [...prev, { item, quantity: 1 }];
     });
     onShowToast(`Agregado: ${item.name}`, 'add_shopping_cart');
+  };
+
+  const handleAddPairing = (pairing: string, sourceItemId: string) => {
+    const pairingItem = resolvePairingItem(pairing, menuItems, sourceItemId);
+    if (!pairingItem) return;
+
+    handleAddToCart(pairingItem);
   };
 
   // ==========================================================================
@@ -1209,16 +1218,16 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                 {heroItem.rating} ({heroItem.reviewsCount} reseñas)
               </span>
 
-              <span className="inline-flex items-center gap-1 text-[#1d4ed8] bg-[#eff6ff] dark:bg-[#1a1b22] px-2.5 py-1 rounded-lg border border-[#a1c9ff]/40 dark:border-[#a1c9ff]/20 dark:text-[#a1c9ff]">
-                <span className="material-symbols-outlined text-[14px]">wine_bar</span>
-                {heroItem.pairing}
-              </span>
-
               <span className="inline-flex items-center gap-1 text-emerald-700 bg-[#ecfdf5] dark:bg-[#1a1b22] px-2.5 py-1 rounded-lg border border-emerald-500/20 dark:text-emerald-400">
                 <span className="material-symbols-outlined text-[14px]">eco</span>
                 {heroItem.dietary}
               </span>
             </div>
+
+            <PairingSuggestion
+              item={heroItem}
+              onAddPairing={(pairing) => handleAddPairing(pairing, heroItem.id)}
+            />
 
             {/* Main Action Buttons */}
             <div className="pt-2 flex items-center gap-2">
@@ -1395,6 +1404,9 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
         <DishDetailModal
           item={selectedDishDetails}
           onClose={() => setSelectedDishDetails(null)}
+          onAddPairing={(pairing) => {
+            if (selectedDishDetails) handleAddPairing(pairing, selectedDishDetails.id);
+          }}
         />
 
         {/* ========================================================================= */}
@@ -1923,9 +1935,6 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     </div>
   );
 };
-
-
-
 
 
 
