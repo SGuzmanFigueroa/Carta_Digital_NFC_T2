@@ -76,6 +76,18 @@ const PROMO_DEAL_SEEN_KEY = 'gastropulse_promo_seen';
  */
 const IS_DEV = process.env.NODE_ENV !== 'production';
 
+const normalizeSearchText = (value: unknown): string =>
+  typeof value === 'string'
+    ? value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim()
+    : '';
+
+const getSearchableValues = (value: unknown): string[] => {
+  const values = Array.isArray(value) ? value : [value];
+  return values
+    .filter((entry): entry is string => typeof entry === 'string')
+    .map(normalizeSearchText);
+};
+
 interface QRMenuViewerProps {
   menuItems: MenuItem[];
   onAddNewOrder: (newTicket: OrderTicket) => void;
@@ -442,28 +454,32 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       setIsArCameraRequesting(false);
     }
   }, [attachArCameraStream, handleCameraError, requestArCameraStream, stopArCamera]);
-  const normalizeStr = (str: string) =>
-    str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+  const filteredItems = React.useMemo(() => {
+    const query = normalizeSearchText(searchQuery);
+    const selectedCategoryNormalized = normalizeSearchText(selectedCategory);
 
-  const filteredItems = menuItems.filter((item) => {
-    const itemCat = normalizeStr(item.category || '');
-    const selCat = normalizeStr(selectedCategory);
-    const matchesCat =
-      selectedCategory === 'todos' ||
-      itemCat === selCat ||
-      itemCat.startsWith(selCat) ||
-      selCat.startsWith(itemCat);
+    return menuItems.filter((item) => {
+      const itemCategory = normalizeSearchText(item.category);
+      const matchesCategory =
+        selectedCategory === 'todos' ||
+        itemCategory === selectedCategoryNormalized ||
+        itemCategory.startsWith(selectedCategoryNormalized) ||
+        selectedCategoryNormalized.startsWith(itemCategory);
 
-    const query = normalizeStr(searchQuery);
-    const matchesSearch =
-      !query ||
-      normalizeStr(item.name).includes(query) ||
-      normalizeStr(item.description).includes(query) ||
-      (item.tag && normalizeStr(item.tag).includes(query)) ||
-      (item.category && normalizeStr(item.category).includes(query));
+      if (!matchesCategory || !query) return matchesCategory;
 
-    return matchesCat && matchesSearch;
-  });
+      const searchableValues = [
+        ...getSearchableValues(item.name),
+        ...getSearchableValues(item.description),
+        ...getSearchableValues(item.ingredients),
+        ...getSearchableValues(item.tags),
+        ...getSearchableValues(item.tag),
+        ...getSearchableValues(item.category)
+      ];
+
+      return searchableValues.some((value) => value.includes(query));
+    });
+  }, [menuItems, searchQuery, selectedCategory]);
 
   const cartTotal = cart.reduce((acc, curr) => acc + curr.item.price * curr.quantity, 0);
   const cartItemsCount = cart.reduce((acc, curr) => acc + curr.quantity, 0);
@@ -1263,7 +1279,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
               <span>Nuestra Carta de Especialidades</span>
             </h3>
             <span className="font-mono-code text-[11px] text-[#64748b] dark:text-[#71717a]">
-              {filteredItems.length} opciones
+              {filteredItems.length} {filteredItems.length === 1 ? 'plato encontrado' : 'platos encontrados'}
             </span>
           </div>
 
@@ -1923,7 +1939,6 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     </div>
   );
 };
-
 
 
 

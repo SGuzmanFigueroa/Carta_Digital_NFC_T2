@@ -139,8 +139,10 @@ export interface MenuItem {
   rating: number;
   reviewsCount: number;
   allergens?: string[];
+  ingredients?: string[] | string;
   badge?: string;
   tag?: string;
+  tags?: string[] | string;
   dietary?: string;
   pairing?: string;
   has3D?: boolean;
