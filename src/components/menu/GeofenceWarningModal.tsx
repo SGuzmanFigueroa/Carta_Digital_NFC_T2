@@ -1,6 +1,7 @@
-﻿'use client';
+'use client';
 
 import React from 'react';
+import { useLanguage } from '@/hooks/useLanguage';
 
 interface GeofenceWarningModalProps {
   isOpen: boolean;
@@ -13,6 +14,12 @@ interface GeofenceWarningModalProps {
   isLight?: boolean;
 }
 
+/**
+ * GastroPulse OS · CD-19 & CD-31
+ * Aviso de geo-cerca GPS antifraude. Todos los textos fijos se resuelven con el
+ * diccionario del comensal (ES/EN) y el mensaje dinámico llega ya localizado
+ * desde la carta (`QRMenuViewer`), que conoce el motivo real del rechazo.
+ */
 export const GeofenceWarningModal: React.FC<GeofenceWarningModalProps> = ({
   isOpen,
   distanceMeters,
@@ -23,6 +30,9 @@ export const GeofenceWarningModal: React.FC<GeofenceWarningModalProps> = ({
   onCallWaiter,
   isLight = false,
 }) => {
+  // CD-31 · Idioma de la carta (el hook se invoca SIEMPRE, antes de cualquier salida).
+  const { t } = useLanguage();
+
   if (!isOpen) return null;
 
   return (
@@ -41,10 +51,10 @@ export const GeofenceWarningModal: React.FC<GeofenceWarningModalProps> = ({
           </div>
           <div>
             <h3 className={`text-lg font-bold ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>
-              Verificación de Ubicación en Mesa
+              {t('geofence.modalTitle')}
             </h3>
             <p className={`text-xs ${isLight ? 'text-[#64748b]' : 'text-gray-400'}`}>
-              Seguridad Antifraude del Restaurante
+              {t('geofence.modalSubtitle')}
             </p>
           </div>
         </div>
@@ -58,14 +68,14 @@ export const GeofenceWarningModal: React.FC<GeofenceWarningModalProps> = ({
           </p>
           {distanceMeters > 0 && (
             <div className="flex items-center justify-between pt-1 border-t border-amber-200/50 dark:border-amber-500/20 font-mono text-[11px]">
-              <span>Distancia detectada: <strong>{distanceMeters} m</strong></span>
-              <span>Límite de mesa: <strong>{maxAllowedMeters} m</strong></span>
+              <span>{t('geofence.distance')} <strong>{distanceMeters} m</strong></span>
+              <span>{t('geofence.limit')} <strong>{maxAllowedMeters} m</strong></span>
             </div>
           )}
         </div>
 
         <p className={`text-xs leading-relaxed ${isLight ? 'text-[#64748b]' : 'text-gray-400'}`}>
-          Para garantizar la frescura de tus platos y evitar órdenes involuntarias, los pedidos por QR requieren que te encuentres en el establecimiento.
+          {t('geofence.body')}
         </p>
 
         {/* Acciones */}
@@ -78,7 +88,7 @@ export const GeofenceWarningModal: React.FC<GeofenceWarningModalProps> = ({
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
-            Reintentar Ubicación
+            {t('geofence.retry')}
           </button>
 
           {onCallWaiter && (
@@ -92,7 +102,7 @@ export const GeofenceWarningModal: React.FC<GeofenceWarningModalProps> = ({
                 isLight ? 'bg-white border-[#cbd5e1] text-[#0f172a] hover:bg-slate-50' : 'bg-[#27272a] border-[#3f3f46] text-white hover:bg-[#3f3f46]'
               }`}
             >
-              Llamar al Mozo
+              {t('geofence.callWaiter')}
             </button>
           )}
 
@@ -103,7 +113,7 @@ export const GeofenceWarningModal: React.FC<GeofenceWarningModalProps> = ({
               isLight ? 'text-slate-500 hover:text-slate-800' : 'text-gray-400 hover:text-white'
             }`}
           >
-            Cerrar
+            {t('geofence.close')}
           </button>
         </div>
       </div>

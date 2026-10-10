@@ -6,6 +6,7 @@ import { AlertTriangle, X, Wine } from 'lucide-react';
 import Image from 'next/image';
 import { createPortal } from 'react-dom';
 import { MenuItem } from '@/types';
+import { useLanguage } from '@/hooks/useLanguage';
 
 interface DishDetailModalProps {
   item: MenuItem | null;
@@ -13,6 +14,8 @@ interface DishDetailModalProps {
 }
 
 export function DishDetailModal({ item, onClose }: DishDetailModalProps) {
+  // CD-31 · Ficha del plato (ES/EN) según el idioma activo de la carta.
+  const { t } = useLanguage();
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const onCloseRef = useRef(onClose);
 
@@ -69,7 +72,7 @@ export function DishDetailModal({ item, onClose }: DishDetailModalProps) {
                 type="button"
                 ref={closeButtonRef}
                 onClick={onClose}
-                aria-label="Cerrar ficha del plato"
+                aria-label={t('dish.closeDetail')}
                 className="absolute right-3 top-3 z-10 flex h-11 w-11 items-center justify-center rounded-full border border-white/70 bg-black/45 text-white backdrop-blur-md transition hover:bg-black/70 dark:border-white/20"
               >
                 <X size={20} />
@@ -98,7 +101,7 @@ export function DishDetailModal({ item, onClose }: DishDetailModalProps) {
               <div className="max-h-[calc(92vh-14rem)] space-y-5 overflow-y-auto p-5 sm:max-h-[calc(92vh-18rem)] sm:p-7">
                 <section>
                   <h3 className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-gray-500 dark:text-white/50">
-                    Descripción
+                    {t('dish.description')}
                   </h3>
                   <p id="dish-detail-description" className="text-sm leading-7 text-gray-700 dark:text-white/80">
                     {item.description}
@@ -110,7 +113,7 @@ export function DishDetailModal({ item, onClose }: DishDetailModalProps) {
                     id="dish-allergens-title"
                     className="mb-2.5 text-xs font-bold uppercase tracking-[0.18em] text-gray-500 dark:text-white/50"
                   >
-                    Alérgenos
+                    {t('dish.allergens')}
                   </h3>
                   {item.allergens && item.allergens.length > 0 ? (
                     <div className="flex flex-wrap gap-2">
@@ -126,7 +129,7 @@ export function DishDetailModal({ item, onClose }: DishDetailModalProps) {
                   ) : (
                     <p className="flex items-center gap-2 rounded-xl border border-amber-300/70 bg-amber-50/90 px-3 py-2.5 text-xs leading-relaxed text-amber-900 dark:border-amber-300/15 dark:bg-amber-400/5 dark:text-amber-100/80">
                       <AlertTriangle size={16} className="shrink-0" aria-hidden="true" />
-                      Información de alérgenos no disponible para este plato.
+                      {t('dish.allergensEmpty')}
                     </p>
                   )}
                 </section>
@@ -136,7 +139,7 @@ export function DishDetailModal({ item, onClose }: DishDetailModalProps) {
                     <div className="mb-2 flex items-center gap-2 text-orange-800 dark:text-[#ffb59c]">
                       <Wine size={18} />
                       <h3 className="text-xs font-bold uppercase tracking-[0.18em]">
-                        Maridaje recomendado
+                        {t('dish.pairing')}
                       </h3>
                     </div>
                     <p className="text-sm font-semibold text-gray-900 dark:text-white sm:text-base">

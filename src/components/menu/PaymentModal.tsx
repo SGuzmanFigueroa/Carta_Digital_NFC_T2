@@ -3,6 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import { submitCustomerReview } from '@/services/reviewService';
 import { getPaymentConfig, PaymentGatewayConfig } from '@/services/paymentConfigService';
+import { useLanguage } from '@/hooks/useLanguage';
+// CD-31 · Rótulo de mesa visible (ES/EN) sin alterar el valor guardado en la reseña.
+import { localizeTableLabel } from '@/i18n/tableLabel';
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -26,6 +29,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   onRequestTableAccount,
   onShowToast
 }) => {
+  // CD-31 · Idioma de la carta: pasarela de pago y reseña post-pago (ES/EN).
+  const { t, language } = useLanguage();
   const [step, setStep] = useState<ModalStep>('payment');
   const [paymentConfig, setPaymentConfig] = useState<PaymentGatewayConfig>(() => getPaymentConfig());
 
@@ -103,25 +108,25 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     return [
       paymentConfig.acceptYape ? {
         id: 'yape' as PaymentMethod,
-        label: 'Yape QR',
+        label: t('pay.methodYape'),
         icon: 'qr_code',
         activeColor: 'bg-[#742284] text-white shadow-md'
       } : null,
       paymentConfig.acceptPlin ? {
         id: 'plin' as PaymentMethod,
-        label: 'Plin QR',
+        label: t('pay.methodPlin'),
         icon: 'qr_code',
         activeColor: 'bg-[#0077b6] text-white shadow-md'
       } : null,
       paymentConfig.acceptPos ? {
         id: 'tarjeta' as PaymentMethod,
-        label: 'Tarjeta',
+        label: t('pay.methodCard'),
         icon: 'credit_card',
         activeColor: 'bg-[#ff5708] text-[#2b0b00] shadow-md'
       } : null,
       paymentConfig.acceptCash ? {
         id: 'efectivo' as PaymentMethod,
-        label: 'Efectivo',
+        label: t('pay.methodCash'),
         icon: 'payments',
         activeColor: 'bg-[#10b981] text-[#064e3b] shadow-md'
       } : null,
@@ -131,7 +136,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       icon: string;
       activeColor: string;
     }>;
-  }, [paymentConfig]);
+  }, [paymentConfig, t]);
 
   // Si el método seleccionado actualmente fue deshabilitado en configuración, cambiar automáticamente al primero activo
   useEffect(() => {
@@ -148,7 +153,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const handleCopyPhone = () => {
     if (navigator.clipboard) {
       navigator.clipboard.writeText(phoneAccount.replace(/\s/g, ''));
-      onShowToast('Número copiado al portapapeles: 987654321', 'content_copy');
+      onShowToast(t('pay.copyToast'), 'content_copy');
     }
   };
 
@@ -158,7 +163,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       const reader = new FileReader();
       reader.onload = (uploadEvent) => {
         setVoucherFile(uploadEvent.target?.result as string);
-        onShowToast('Comprobante adjuntado correctamente', 'attach_file');
+        onShowToast(t('pay.voucherAttached'), 'attach_file');
       };
       reader.readAsDataURL(file);
     }
@@ -168,16 +173,16 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     setVoucherFile('voucher_simulado.png');
     const randomOp = String(Math.floor(100000 + Math.random() * 900000));
     setOpCode(randomOp);
-    onShowToast(`Voucher simulado con código bancario OP-${randomOp}`, 'verified');
+    onShowToast(t('pay.voucherSimulated', { code: randomOp }), 'verified');
   };
 
   const handleConfirmPayment = () => {
     if ((selectedMethod === 'yape' || selectedMethod === 'plin') && !isDigitalPaymentValid) {
-      onShowToast('Ingresa los 6 u 8 dígitos del código de operación o adjunta el voucher', 'warning');
+      onShowToast(t('pay.errorDigits'), 'warning');
       return;
     }
     if (selectedMethod === 'efectivo' && isCashInsufficient) {
-      onShowToast('El importe con el que pagarás debe cubrir el total de la cuenta', 'warning');
+      onShowToast(t('pay.errorCash'), 'warning');
       return;
     }
 
@@ -209,11 +214,15 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         }
       }
 
-      onShowToast(`Pago con ${methodLabel} registrado. ¡Gracias!`, 'check_circle');
+      // El aviso usa la etiqueta VISIBLE (idioma de la carta); el payload que viaja
+      // al panel del garzón (`methodLabel`) se mantiene en español.
+      const displayMethodLabel =
+        availableMethods.find((method) => method.id === selectedMethod)?.label ?? methodLabel;
+      onShowToast(t('pay.paid', { method: displayMethodLabel }), 'check_circle');
       setStep('feedback');
     } catch (err) {
       console.error('Error confirming payment:', err);
-      onShowToast('No se pudo confirmar el pago. Reintente.', 'error');
+      onShowToast(t('pay.errorConfirm'), 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -221,12 +230,12 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
   const getRatingLabel = (stars: number) => {
     switch (stars) {
-      case 1: return 'Necesita mejorar 😕';
-      case 2: return 'Regular 😐';
-      case 3: return 'Bueno 🙂';
-      case 4: return '¡Muy bueno! 😊';
-      case 5: return '¡Extraordinario! 🤩';
-      default: return 'Excelente';
+      case 1: return t('pay.rating1');
+      case 2: return t('pay.rating2');
+      case 3: return t('pay.rating3');
+      case 4: return t('pay.rating4');
+      case 5: return t('pay.rating5');
+      default: return t('pay.rating5');
     }
   };
 
@@ -247,7 +256,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         voucherUploaded: Boolean(voucherFile)
       });
 
-      onShowToast('¡Gracias por tus comentarios y propina!', 'sentiment_very_satisfied');
+      onShowToast(t('pay.reviewThanks'), 'sentiment_very_satisfied');
       setStep('completed');
     } catch (err) {
       console.warn('Error saving review:', err);
@@ -272,10 +281,13 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 <span className="material-symbols-outlined text-[28px] text-[#ff5708] shrink-0">qr_code_2</span>
                 <div>
                   <h3 className="text-[17px] font-bold text-[#0f172a] dark:text-white leading-tight">
-                    Pedir la Cuenta y Pagar
+                    {t('pay.title')}
                   </h3>
                   <span className="text-[11px] font-mono-code text-[#c2410c] dark:text-[#ffb59c] font-semibold">
-                    {tableNumber} • Total: S/ {totalAmount.toFixed(2)}
+                    {t('pay.tableTotal', {
+                      table: localizeTableLabel(tableNumber, language),
+                      amount: `S/ ${totalAmount.toFixed(2)}`
+                    })}
                   </span>
                 </div>
               </div>
@@ -318,7 +330,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               </div>
             ) : (
               <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-[12px] text-center font-medium">
-                Los cobros digitales están temporalmente pausados. El garzón se acercará a tu mesa para coordinar el cobro.
+                {t('pay.paused')}
               </div>
             )}
 
@@ -328,7 +340,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 <div className="flex items-center justify-center gap-2">
                   <span className={`w-2 h-2 rounded-full ${selectedMethod === 'yape' ? 'bg-[#742284]' : 'bg-[#0077b6]'}`} />
                   <span className="text-[12px] font-bold uppercase tracking-wider text-[#0f172a] dark:text-white">
-                    {selectedMethod === 'yape' ? 'Paga con Yape' : 'Paga con Plin'}
+                    {selectedMethod === 'yape' ? t('pay.payWithYape') : t('pay.payWithPlin')}
                   </span>
                 </div>
 
@@ -338,22 +350,22 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     <div className="flex flex-col items-center">
                       <img
                         src={paymentConfig.yapeQrImage}
-                        alt="QR Oficial Yape"
+                        alt={t('pay.qrAltYape')}
                         className="w-40 h-40 object-contain rounded-xl shadow-sm"
                       />
                       <span className="mt-1 text-[10px] font-bold text-[#742284] bg-[#742284]/10 px-2 py-0.5 rounded-full">
-                        QR Oficial del Restaurante
+                        {t('pay.officialQr')}
                       </span>
                     </div>
                   ) : selectedMethod === 'plin' && paymentConfig.plinQrImage ? (
                     <div className="flex flex-col items-center">
                       <img
                         src={paymentConfig.plinQrImage}
-                        alt="QR Oficial Plin"
+                        alt={t('pay.qrAltPlin')}
                         className="w-40 h-40 object-contain rounded-xl shadow-sm"
                       />
                       <span className="mt-1 text-[10px] font-bold text-[#0077b6] bg-[#0077b6]/10 px-2 py-0.5 rounded-full">
-                        QR Oficial del Restaurante
+                        {t('pay.officialQr')}
                       </span>
                     </div>
                   ) : (
@@ -407,7 +419,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   )}
 
                   <div className="mt-1 text-[11px] font-mono-code font-bold text-[#0f172a]">
-                    Total a pagar: S/ {totalAmount.toFixed(2)}
+                    {t('pay.totalToPay', { amount: `S/ ${totalAmount.toFixed(2)}` })}
                   </div>
                 </div>
 
@@ -427,20 +439,20 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     className="px-3 py-1.5 min-h-[44px] rounded-lg bg-[#f1f5f9] dark:bg-[#20212b] hover:bg-[#e2e8f0] text-[#0f172a] dark:text-white border border-[#cbd5e1] dark:border-[#353642] text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
                   >
                     <span className="material-symbols-outlined text-[16px]">content_copy</span>
-                    <span>Copiar</span>
+                    <span>{t('pay.copy')}</span>
                   </button>
                 </div>
 
                 {/* Subida de Captura / Código de Operación */}
                 <div className="space-y-2 text-left pt-1">
                   <label className="text-[12px] font-semibold text-[#0f172a] dark:text-white flex items-center justify-between">
-                    <span>Código de Operación o Voucher:</span>
+                    <span>{t('pay.opLabel')}</span>
                     <button
                       type="button"
                       onClick={handleSimulateVoucher}
                       className="text-[10px] text-[#ff5708] hover:underline cursor-pointer"
                     >
-                      Autocompletar de prueba
+                      {t('pay.autofill')}
                     </button>
                   </label>
 
@@ -451,7 +463,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                       maxLength={8}
                       value={opCode}
                       onChange={(e) => setOpCode(e.target.value.replace(/[^0-9]/g, '').slice(0, 8))}
-                      placeholder="Ej. 481920 (6 u 8 dígitos numéricos)"
+                      placeholder={t('pay.opPlaceholder')}
                       className={`w-full bg-white dark:bg-[#121318] text-[#0f172a] dark:text-white px-3 py-2 min-h-[44px] rounded-xl text-[13px] border focus:outline-none transition-colors ${
                         cleanOpDigits.length > 0 && !isOpCodeValid && !isVoucherUploaded
                           ? 'border-amber-500 focus:border-amber-500'
@@ -466,21 +478,21 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                       {isOpCodeValid ? (
                         <span className="text-emerald-500 font-semibold flex items-center gap-1">
                           <span className="material-symbols-outlined text-[14px]">check_circle</span>
-                          Código de operación válido (${cleanOpDigits.length} dígitos)
+                          {t('pay.opValid', { count: cleanOpDigits.length })}
                         </span>
                       ) : isVoucherUploaded ? (
                         <span className="text-emerald-500 font-semibold flex items-center gap-1">
                           <span className="material-symbols-outlined text-[14px]">verified</span>
-                          Captura de comprobante adjuntada correctamente
+                          {t('pay.voucherOk')}
                         </span>
                       ) : cleanOpDigits.length > 0 ? (
                         <span className="text-amber-500 font-semibold flex items-center gap-1">
                           <span className="material-symbols-outlined text-[14px]">info</span>
-                          Faltan dígitos: se requieren entre 6 y 8 números (llevas ${cleanOpDigits.length})
+                          {t('pay.opMissingDigits', { count: cleanOpDigits.length })}
                         </span>
                       ) : (
                         <span className="text-[#64748b] dark:text-[#94a3b8]">
-                          Digita los 6 u 8 números del comprobante o adjunta la foto del voucher.
+                          {t('pay.opHint')}
                         </span>
                       )}
                     </div>
@@ -490,7 +502,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   <div className="flex items-center gap-2">
                     <label className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 min-h-[44px] rounded-xl bg-white dark:bg-[#121318] border border-dashed border-[#cbd5e1] dark:border-[#353642] text-[12px] text-[#475569] dark:text-[#a1a1aa] hover:border-[#ff5708] cursor-pointer transition-colors">
                       <span className="material-symbols-outlined text-[18px] text-[#ff5708]">upload_file</span>
-                      <span className="truncate">{voucherFile ? '✓ Voucher adjuntado' : 'Subir captura de pago'}</span>
+                      <span className="truncate">{voucherFile ? t('pay.uploaded') : t('pay.uploadCta')}</span>
                       <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
                     </label>
 
@@ -505,7 +517,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                           type="button"
                           onClick={() => setVoucherFile(null)}
                           className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl bg-red-500/10 text-red-500 border border-red-500/20 cursor-pointer"
-                          title="Quitar comprobante"
+                          title={t('pay.removeVoucher')}
                         >
                           <span className="material-symbols-outlined text-[18px]">delete</span>
                         </button>
@@ -523,10 +535,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   <span className="material-symbols-outlined text-[36px]">point_of_sale</span>
                 </div>
                 <h4 className="text-[14px] font-bold text-[#0f172a] dark:text-white">
-                  Cobro con POS Inalámbrico en Mesa
+                  {t('pay.posTitle')}
                 </h4>
                 <p className="text-[12px] text-[#475569] dark:text-[#a1a1aa] leading-relaxed">
-                  Aceptamos Visa, Mastercard, Diners y Amex. Al confirmar, el garzón asignado a {tableNumber} se acercará con el terminal inalámbrico.
+                  {t('pay.posBody', { table: localizeTableLabel(tableNumber, language) })}
                 </p>
               </div>
             )}
@@ -536,7 +548,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               <div className="p-4 rounded-2xl bg-[#f8fafc] dark:bg-[#1a1b22] border border-[#e2e8f0] dark:border-[#2a2b36] space-y-3.5 text-left">
                 <div className="text-[13px] font-bold text-[#0f172a] dark:text-white flex items-center gap-1.5">
                   <span className="material-symbols-outlined text-emerald-500">payments</span>
-                  <span>¿Con qué billete o importe vas a pagar?</span>
+                  <span>{t('pay.cashTitle')}</span>
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -549,7 +561,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                         : 'bg-white dark:bg-[#121318] text-[#475569] dark:text-[#a1a1aa] border-[#cbd5e1] dark:border-[#353642]'
                     }`}
                   >
-                    Monto Exacto
+                    {t('pay.cashExact')}
                     <span className="block text-[10px] font-normal opacity-90">S/ {totalAmount.toFixed(2)}</span>
                   </button>
 
@@ -562,9 +574,9 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                         : 'bg-white dark:bg-[#121318] text-[#475569] dark:text-[#a1a1aa] border-[#cbd5e1] dark:border-[#353642]'
                     }`}
                   >
-                    Billete S/ 50
+                    {t('pay.cashBill50')}
                     <span className="block text-[10px] font-normal opacity-90">
-                      {totalAmount <= 50 ? `Vuelto: S/ ${(50 - totalAmount).toFixed(2)}` : 'Insuficiente'}
+                      {totalAmount <= 50 ? t('pay.cashChange', { amount: `S/ ${(50 - totalAmount).toFixed(2)}` }) : t('pay.cashInsufficient')}
                     </span>
                   </button>
 
@@ -577,9 +589,9 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                         : 'bg-white dark:bg-[#121318] text-[#475569] dark:text-[#a1a1aa] border-[#cbd5e1] dark:border-[#353642]'
                     }`}
                   >
-                    Billete S/ 100
+                    {t('pay.cashBill100')}
                     <span className="block text-[10px] font-normal opacity-90">
-                      {totalAmount <= 100 ? `Vuelto: S/ ${(100 - totalAmount).toFixed(2)}` : 'Insuficiente'}
+                      {totalAmount <= 100 ? t('pay.cashChange', { amount: `S/ ${(100 - totalAmount).toFixed(2)}` }) : t('pay.cashInsufficient')}
                     </span>
                   </button>
 
@@ -592,9 +604,9 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                         : 'bg-white dark:bg-[#121318] text-[#475569] dark:text-[#a1a1aa] border-[#cbd5e1] dark:border-[#353642]'
                     }`}
                   >
-                    Billete S/ 200
+                    {t('pay.cashBill200')}
                     <span className="block text-[10px] font-normal opacity-90">
-                      {totalAmount <= 200 ? `Vuelto: S/ ${(200 - totalAmount).toFixed(2)}` : 'Insuficiente'}
+                      {totalAmount <= 200 ? t('pay.cashChange', { amount: `S/ ${(200 - totalAmount).toFixed(2)}` }) : t('pay.cashInsufficient')}
                     </span>
                   </button>
                 </div>
@@ -602,7 +614,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 {/* Opción de Importe Personalizado */}
                 <div className="pt-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-[11px] text-[#475569] dark:text-[#a1a1aa] whitespace-nowrap">Otro billete/monto:</span>
+                    <span className="text-[11px] text-[#475569] dark:text-[#a1a1aa] whitespace-nowrap">{t('pay.cashCustom')}</span>
                     <div className="relative flex-1">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[12px] font-bold text-[#64748b]">S/</span>
                       <input
@@ -627,21 +639,25 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     <div className="flex items-center justify-between">
                       <span className="text-[12px] font-bold flex items-center gap-1.5">
                         <span className="material-symbols-outlined text-[18px] text-emerald-500">point_of_sale</span>
-                        Vuelto que te traerá el garzón:
+                        {t('pay.cashChangeTitle')}
                       </span>
                       <span className="text-[18px] font-mono-code font-black text-emerald-600 dark:text-emerald-400">
                         S/ {cashChange.toFixed(2)}
                       </span>
                     </div>
                     <div className="text-[11px] text-[#475569] dark:text-[#a1a1aa] flex justify-between border-t border-emerald-500/20 pt-1">
-                      <span>Total: S/ {totalAmount.toFixed(2)}</span>
-                      <span>Pagas con: S/ {numericCashGiven.toFixed(2)}</span>
+                      <span>{t('pay.cashTotal', { amount: `S/ ${totalAmount.toFixed(2)}` })}</span>
+                      <span>{t('pay.cashGiven', { amount: `S/ ${numericCashGiven.toFixed(2)}` })}</span>
                     </div>
                   </div>
                 ) : (
                   <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 text-[12px] font-semibold flex items-center gap-2 animate-fadeIn">
                     <span className="material-symbols-outlined text-amber-500 text-[20px]">warning</span>
-                    <span>El billete indicado (S/ {numericCashGiven.toFixed(2)}) no cubre el total de la comanda (S/ {totalAmount.toFixed(2)}). Te faltan S/ {(totalAmount - numericCashGiven).toFixed(2)}.</span>
+                    <span>{t('pay.cashShort', {
+                      given: `S/ ${numericCashGiven.toFixed(2)}`,
+                      total: `S/ ${totalAmount.toFixed(2)}`,
+                      missing: `S/ ${(totalAmount - numericCashGiven).toFixed(2)}`
+                    })}</span>
                   </div>
                 )}
               </div>
@@ -662,12 +678,12 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               <span className="material-symbols-outlined text-[20px]">check_circle</span>
               <span>
                 {isSubmitting
-                  ? 'Confirmando Pago...'
+                  ? t('pay.confirming')
                   : ((selectedMethod === 'yape' || selectedMethod === 'plin') && !isDigitalPaymentValid)
-                  ? 'Ingresa código OP o adjunta voucher'
+                  ? t('pay.needOp')
                   : (selectedMethod === 'efectivo' && isCashInsufficient)
-                  ? 'Selecciona billete suficiente'
-                  : `Confirmar Pago Realizado • S/ ${totalAmount.toFixed(2)}`}
+                  ? t('pay.needCash')
+                  : t('pay.confirm', { amount: `S/ ${totalAmount.toFixed(2)}` })}
               </span>
             </button>
           </div>
@@ -685,13 +701,13 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
             <div>
               <span className="text-[11px] font-mono-code text-[#c2410c] dark:text-[#ffb59c] font-bold uppercase tracking-wider">
-                ¡PAGO CONFIRMADO CON ÉXITO!
+                {t('pay.doneKicker')}
               </span>
               <h3 className="text-[18px] font-bold text-[#0f172a] dark:text-white mt-0.5">
-                ¿Qué tal estuvo tu experiencia en Áurea Bistro?
+                {t('pay.feedbackQuestion')}
               </h3>
               <p className="text-[12px] text-[#475569] dark:text-[#a1a1aa] mt-0.5">
-                {tableNumber} • Tus comentarios nos ayudan a seguir perfeccionando cada plato.
+                {t('pay.feedbackSubtitle', { table: localizeTableLabel(tableNumber, language) })}
               </p>
             </div>
 
@@ -732,7 +748,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               <div className="flex items-center justify-between">
                 <label className="text-[12px] font-semibold text-[#0f172a] dark:text-white flex items-center gap-1">
                   <span className="material-symbols-outlined text-[16px] text-amber-500">volunteer_activism</span>
-                  <span>Propina para el equipo de cocina y sala (opcional):</span>
+                  <span>{t('pay.tipLabel')}</span>
                 </label>
                 {effectiveTip > 0 && (
                   <span className="text-[11px] font-mono-code font-bold text-emerald-600 dark:text-emerald-400">
@@ -743,7 +759,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
               <div className="grid grid-cols-4 gap-1.5">
                 {[
-                  { label: 'Sin propina', val: 0 },
+                  { label: t('pay.tipNone'), val: 0 },
                   { label: 'S/ 3.00', val: 3 },
                   { label: 'S/ 5.00', val: 5 },
                   { label: 'S/ 10.00', val: 10 }
@@ -770,13 +786,13 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             {/* ✍️ Caja de Comentarios / Felicitaciones */}
             <div className="text-left space-y-1.5">
               <label className="text-[12px] font-semibold text-[#0f172a] dark:text-white">
-                Comentarios o felicitaciones al Chef:
+                                {t('pay.commentsLabel')}
               </label>
               <textarea
                 value={comments}
                 onChange={(e) => setComments(e.target.value)}
                 rows={3}
-                placeholder="El Arroz Chaufa Wok estuvo insuperable y el maridaje perfecto..."
+                placeholder={t('pay.commentsPlaceholder')}
                 className="w-full bg-white dark:bg-[#1a1b22] text-[#0f172a] dark:text-white p-3 rounded-xl text-[13px] border border-[#cbd5e1] dark:border-[#353642] focus:outline-none focus:border-[#ff5708] resize-none"
               />
             </div>
@@ -790,7 +806,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               className="w-full py-3 min-h-[44px] rounded-xl bg-[#ff5708] hover:bg-[#ff6924] text-[#2b0b00] font-bold text-[14px] flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(255,87,8,0.35)] transition-all cursor-pointer active:scale-98 disabled:opacity-50"
             >
               <span className="material-symbols-outlined text-[20px]">send</span>
-              <span>{isSubmitting ? 'Guardando Reseña...' : 'Enviar Calificación y Finalizar'}</span>
+              <span>{isSubmitting ? t('pay.savingReview') : t('pay.submitReview')}</span>
             </button>
           </div>
         )}
@@ -806,10 +822,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
             <div className="space-y-1">
               <h3 className="text-[20px] font-bold text-[#0f172a] dark:text-white">
-                ¡Muchas Gracias por tu Visita!
+                {t('pay.thanksTitle')}
               </h3>
               <p className="text-[13px] text-[#475569] dark:text-[#a1a1aa] max-w-sm mx-auto leading-relaxed">
-                Tu comanda de {tableNumber} ha sido completada. Ha sido un honor atenderte hoy en Áurea Bistro.
+                {t('pay.thanksBody', { table: localizeTableLabel(tableNumber, language) })}
               </p>
             </div>
 
@@ -819,7 +835,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               onClick={onClose}
               className="px-6 py-2.5 min-h-[44px] rounded-xl bg-[#ff5708] text-[#2b0b00] font-bold text-[13px] shadow hover:bg-[#ff6924] transition-all cursor-pointer"
             >
-              Cerrar y Volver a la Carta
+              {t('pay.closeBack')}
             </button>
           </div>
         )}

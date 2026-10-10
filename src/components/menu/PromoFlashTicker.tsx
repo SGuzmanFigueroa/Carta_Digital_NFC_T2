@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { MenuItem } from '@/types';
 import { calculatePromoPricing, formatSoles } from '@/utils/promo';
+import { useLanguage } from '@/hooks/useLanguage';
 
 /**
  * CD-16 · Tira horizontal "Oferta Flash" de la pantalla principal (autoplay).
@@ -75,6 +76,8 @@ export const PromoFlashTicker = React.memo(function PromoFlashTicker({
   isPaused = false,
   onOpenDeal
 }: PromoFlashTickerProps) {
+  /** CD-31 · Idioma de la carta (ES/EN): la tira se re-pinta al cambiarlo. */
+  const { t } = useLanguage();
   /** Índice de la oferta visible AHORA en la tira. */
   const [activeIndex, setActiveIndex] = useState(0);
   /** Interacción en curso (hover real, foco de teclado o dedo apoyado). */
@@ -250,13 +253,13 @@ export const PromoFlashTicker = React.memo(function PromoFlashTicker({
   }, [deal, effectiveDiscount]);
 
   const bannerHeader = useMemo(() => {
-    if (!deal) return `Oferta Flash · -${Math.round(discountPercent)}% del día`;
+    if (!deal) return t('promo.tickerLabel', { percent: Math.round(discountPercent) });
     const badge = (deal as any)?.promoBadge;
     if (badge && !badge.includes('%')) {
-      return `Oferta Flash · ${badge}`;
+      return t('promo.tickerBadge', { badge });
     }
-    return `Oferta Flash · -${Math.round(effectiveDiscount)}% del día`;
-  }, [deal, discountPercent, effectiveDiscount]);
+    return t('promo.tickerLabel', { percent: Math.round(effectiveDiscount) });
+  }, [deal, discountPercent, effectiveDiscount, t]);
 
   /** Toca/click: abre el detalle de la oferta que se está viendo en la tira. */
   const handleOpenDeal = useCallback(() => {
@@ -345,7 +348,7 @@ export const PromoFlashTicker = React.memo(function PromoFlashTicker({
         className="promo-deal-ticker transition-all duration-500 ease-out will-change-transform flex flex-col min-w-0 flex-1"
       >
         <span className="font-mono-code text-[10px] font-bold uppercase tracking-wider text-[#c2410c] dark:text-[#ffb59c]">
-          Oferta Flash · -{Math.round(discountPercent)}% del día
+          {t('promo.tickerLabel', { percent: Math.round(discountPercent) })}
         </span>
         <span className="text-[13px] font-semibold text-[#0f172a] dark:text-white truncate">
           {deal.name}
@@ -356,7 +359,7 @@ export const PromoFlashTicker = React.memo(function PromoFlashTicker({
             {formatSoles(pricing.originalPrice)}
           </span>
           <span className="text-emerald-700 dark:text-emerald-400 font-bold">
-            Ahorras {formatSoles(pricing.savings)}
+            {t('promo.savingsInline', { amount: formatSoles(pricing.savings) })}
           </span>
         </span>
       </span>
