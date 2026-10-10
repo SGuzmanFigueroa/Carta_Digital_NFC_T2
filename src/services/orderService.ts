@@ -1,6 +1,7 @@
 import { queuePendingOrder } from './offlineSyncService';
 ﻿import { supabase } from '@/lib/supabase';
 import { OrderTicket, OrderItem, MenuItem } from '@/types';
+import { isTemporaryPairingItem } from '@/features/menu/pairing';
 import { updateTableStateInDb } from './tableService';
 
 export async function fetchOrdersFromDb(): Promise<OrderTicket[]> {
@@ -121,7 +122,12 @@ export async function createOrderInDb(
     // 2. Insert order items
     const itemsToInsert = cartItems.map((c) => ({
       order_id: orderId,
-      dish_id: c.item.id && !c.item.id.startsWith('cat-') ? c.item.id : null,
+      dish_id:
+        c.item.id &&
+        !c.item.id.startsWith('cat-') &&
+        !isTemporaryPairingItem(c.item)
+          ? c.item.id
+          : null,
       name: c.item.name,
       quantity: c.quantity,
       price: c.item.price,

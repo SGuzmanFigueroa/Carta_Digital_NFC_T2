@@ -2,17 +2,23 @@
 
 import { useEffect, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { AlertTriangle, X, Wine } from 'lucide-react';
+import { AlertTriangle, X } from 'lucide-react';
 import Image from 'next/image';
 import { createPortal } from 'react-dom';
 import { MenuItem } from '@/types';
+import { PairingSuggestion } from './PairingSuggestion';
 
 interface DishDetailModalProps {
   item: MenuItem | null;
   onClose: () => void;
+  onAddPairing: (pairing: string) => void;
 }
 
-export function DishDetailModal({ item, onClose }: DishDetailModalProps) {
+export function DishDetailModal({
+  item,
+  onClose,
+  onAddPairing
+}: DishDetailModalProps) {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const onCloseRef = useRef(onClose);
 
@@ -131,19 +137,10 @@ export function DishDetailModal({ item, onClose }: DishDetailModalProps) {
                   )}
                 </section>
 
-                {item.pairing && (
-                  <section className="rounded-2xl border border-orange-200 bg-gradient-to-br from-orange-50 to-amber-50/70 p-4 sm:p-5 dark:border-[#ffb59c]/20 dark:from-[#ff5708]/15 dark:to-[#ffb59c]/5">
-                    <div className="mb-2 flex items-center gap-2 text-orange-800 dark:text-[#ffb59c]">
-                      <Wine size={18} />
-                      <h3 className="text-xs font-bold uppercase tracking-[0.18em]">
-                        Maridaje recomendado
-                      </h3>
-                    </div>
-                    <p className="text-sm font-semibold text-gray-900 dark:text-white sm:text-base">
-                      {item.pairing}
-                    </p>
-                  </section>
-                )}
+                <PairingSuggestion
+                  item={item}
+                  onAddPairing={onAddPairing}
+                />
               </div>
             </motion.section>
           </motion.div>
