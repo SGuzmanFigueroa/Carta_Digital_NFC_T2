@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MenuItem, OrderTicket, TableStatus } from '../types';
+import { MenuItem, OrderRound, OrderTicket, TableStatus } from '../types';
 import { kitchenAudio } from '../utils/audio';
 //import { ThreeDView } from './ThreeDView';
 import dynamic from 'next/dynamic';
@@ -33,6 +33,7 @@ import { DishDetailModal } from './menu/DishDetailModal';
 import { PromoDealModal } from './menu/PromoDealModal';
 // CD-16 · Tira "Oferta Flash" de portada: rota sola entre las ofertas activas.
 import { PromoFlashTicker } from './menu/PromoFlashTicker';
+import { OrderHistoryModal } from './menu/OrderHistoryModal';
 import { validateDinerGeofence } from '@/utils/geofence';
 import { GeofenceWarningModal } from './menu/GeofenceWarningModal';
 import { formatSoles } from '@/utils/promo';
@@ -78,17 +79,31 @@ const PROMO_DEAL_SEEN_KEY = 'gastropulse_promo_seen';
  */
 const IS_DEV = process.env.NODE_ENV !== 'production';
 
+type MenuCartItem = { item: MenuItem; quantity: number; notes?: string };
+
+function normalizeTable(table: string): string {
+  return table.replace(/\D/g, '') || table.trim().toUpperCase();
+}
+
 interface QRMenuViewerProps {
   menuItems: MenuItem[];
   onAddNewOrder: (newTicket: OrderTicket) => void;
   onShowToast: (msg: string, icon?: string) => void;
   activeTicket?: OrderTicket | null;
+  orderHistory?: OrderTicket[];
+  tableOrderRounds?: OrderRound[];
   tables?: TableStatus[];
   onSendOrderFromMenu?: (
     table: string,
     items: Array<{ item: MenuItem; quantity: number; notes?: string }>,
     pax?: number
   ) => OrderTicket;
+  onRecordTableOrderRound?: (
+    table: string,
+    items: Array<{ item: MenuItem; quantity: number }>,
+    createdAt: Date,
+    orderId: string
+  ) => void;
   onRequestTableAccount?: (paymentMethod: string) => Promise<boolean> | void;
   onCallWaiter?: (reason?: string) => Promise<boolean> | void;
   onDishCreated?: (dish: MenuItem) => void;
@@ -100,8 +115,11 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   onAddNewOrder,
   onShowToast,
   activeTicket,
+  orderHistory = [],
+  tableOrderRounds = [],
   tables,
   onSendOrderFromMenu,
+  onRecordTableOrderRound,
   onRequestTableAccount,
   onCallWaiter,
   onDishCreated,
@@ -113,7 +131,9 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   const [heroViewMode, setHeroViewMode] = useState<'photo' | '3d'>('photo');
   const [isTableModalOpen, setIsTableModalOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isOrderHistoryOpen, setIsOrderHistoryOpen] = useState(false);
   const [selectedTable, setSelectedTable] = useState('MESA 04');
+  const [cartsByTable, setCartsByTable] = useState<Record<string, MenuCartItem[]>>({});
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isComplaintModalOpen, setIsComplaintModalOpen] = useState(false);
   const [isPromoModalOpen, setIsPromoModalOpen] = useState(false);
@@ -123,23 +143,6 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'Efectivo' | 'Tarjeta POS (Visa/MC)' | 'Yape / Plin'>('Tarjeta POS (Visa/MC)');
   const [waiterCalled, setWaiterCalled] = useState(false);
   const observedOrderStatus = useRef<{ id: string; status: OrderTicket['status'] } | null>(null);
-
-  useEffect(() => {
-    if (!activeTicket) return;
-
-    const previousStatus = observedOrderStatus.current;
-    observedOrderStatus.current = { id: activeTicket.id, status: activeTicket.status };
-
-    if (
-      previousStatus?.id !== activeTicket.id ||
-      previousStatus.status === 'pase-listo' ||
-      activeTicket.status !== 'pase-listo'
-    ) {
-      return;
-    }
-
-    kitchenAudio.playReadyBell();
-  }, [activeTicket?.id, activeTicket?.status]);
 
   // Flechas de desplazamiento para la barra de categorías
   const catScrollRef = useRef<HTMLDivElement>(null);
@@ -219,7 +222,11 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
 
   const handleRepeatLastOrder = () => {
     if (!lastOrder || !lastOrder.items) return;
-    setCart(lastOrder.items);
+    setSelectedTable(lastOrder.table);
+    setCartsByTable((previous) => ({
+      ...previous,
+      [normalizeTable(lastOrder.table)]: lastOrder.items
+    }));
     setShowWelcomeBack(false);
     setIsCartOpen(true);
     onShowToast('¡Comanda favorita cargada en tu pedido! 🎉', 'receipt_long');
@@ -228,17 +235,15 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const pendingArStreamRef = useRef<MediaStream | null>(null);
 
-  const [cart, setCart] = useState<{ item: MenuItem; quantity: number; notes?: string }[]>([
-    {
-      item: menuItems[0], // Chaufa Wok
-      quantity: 1,
-      notes: 'Poco picante'
-    },
-    {
-      item: menuItems[1] || menuItems[0], // Wagyu
-      quantity: 1
-    }
-  ]);
+  const selectedTableKey = normalizeTable(selectedTable);
+  const cart = cartsByTable[selectedTableKey] || [];
+  const setCart: React.Dispatch<React.SetStateAction<MenuCartItem[]>> = (action) => {
+    setCartsByTable((previous) => {
+      const currentCart = previous[selectedTableKey] || [];
+      const nextCart = typeof action === 'function' ? action(currentCart) : action;
+      return { ...previous, [selectedTableKey]: nextCart };
+    });
+  };
 
   // Sincronizar automáticamente la mesa desde el QR escaneado (?mesa=4, ?table=04, ?m=2)
   useEffect(() => {
@@ -515,6 +520,55 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   const cartTotal = cart.reduce((acc, curr) => acc + curr.item.price * curr.quantity, 0);
   const cartItemsCount = cart.reduce((acc, curr) => acc + curr.quantity, 0);
 
+  const orderRounds: OrderRound[] = tableOrderRounds
+    .filter((round) => normalizeTable(round.table) === selectedTableKey)
+    .sort((left, right) => left.createdAt.localeCompare(right.createdAt))
+    .map((round) => {
+      const roundTicket = orderHistory.find((order) => order.id === round.orderId);
+      const status = roundTicket?.status === 'en-cocina'
+        ? 'En preparación'
+        : roundTicket?.status === 'pase-listo'
+          ? 'Listo en pase'
+          : roundTicket?.status === 'entregado'
+            ? 'Entregado'
+            : 'Recibido';
+
+      return {
+        ...round,
+        items: round.items.map((item) => ({ ...item, status }))
+      };
+    });
+  const latestRound = orderRounds[orderRounds.length - 1];
+  const activeTableTicket = latestRound
+    ? orderHistory.find((order) => order.id === latestRound.orderId)
+      || (activeTicket?.id === latestRound.orderId ? activeTicket : null)
+    : null;
+  const consumptionDishCount = orderRounds.reduce(
+    (count, round) => count + round.items.reduce((roundCount, item) => roundCount + item.quantity, 0),
+    0
+  );
+  const consumptionTotal = orderRounds.reduce(
+    (total, round) => total + round.items.reduce((roundTotal, item) => roundTotal + item.price * item.quantity, 0),
+    0
+  );
+
+  useEffect(() => {
+    if (!activeTableTicket) return;
+
+    const previousStatus = observedOrderStatus.current;
+    observedOrderStatus.current = { id: activeTableTicket.id, status: activeTableTicket.status };
+
+    if (
+      previousStatus?.id !== activeTableTicket.id ||
+      previousStatus.status === 'pase-listo' ||
+      activeTableTicket.status !== 'pase-listo'
+    ) {
+      return;
+    }
+
+    kitchenAudio.playReadyBell();
+  }, [activeTableTicket?.id, activeTableTicket?.status]);
+
   const handleAddToCart = (item: MenuItem) => {
     setCart((prev) => {
       const existing = prev.find((c) => c.item.id === item.id);
@@ -701,6 +755,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
 
   const handleSendOrder = async () => {
     if (cart.length === 0) return;
+    const submittedAt = new Date();
 
     // CD-12 · Inicializar contexto de audio para campana KDS
     kitchenAudio.prepareForPlayback();
@@ -729,8 +784,9 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       setIsVerifyingGeofence(false);
     }
 
+    let submittedOrder: OrderTicket;
     if (onSendOrderFromMenu) {
-      onSendOrderFromMenu(selectedTable, cart, 2);
+      submittedOrder = onSendOrderFromMenu(selectedTable, cart, 2);
     } else {
       const newTicket: OrderTicket = {
         id: `cmd-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -757,7 +813,15 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
         total: cartTotal
       };
       onAddNewOrder(newTicket);
+      submittedOrder = newTicket;
     }
+
+    onRecordTableOrderRound?.(
+      selectedTable,
+      cart.map(({ item, quantity }) => ({ item, quantity })),
+      submittedAt,
+      submittedOrder.id
+    );
 
     try {
       localStorage.setItem(
@@ -899,7 +963,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       {/* ========================================================================= */}
       {/* ⏳ LIVE OPERATIONAL ORDER STATUS TRACKER */}
       {/* ========================================================================= */}
-      {activeTicket && (
+      {orderRounds.length > 0 && (
         <div className="max-w-4xl mx-auto px-3.5 sm:px-6 pt-3.5">
           <div className="bg-gradient-to-r from-white via-[#fff7ed] to-white dark:from-[#181920] dark:via-[#20212b] dark:to-[#181920] border border-[#ff5708]/50 rounded-2xl p-3.5 shadow-[0_0_25px_-5px_rgba(255,87,8,0.25)] flex flex-col gap-2.5">
             <div className="flex items-center justify-between gap-2">
@@ -909,18 +973,18 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                   <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#ff5708]"></span>
                 </span>
                 <span className="font-mono-code text-[11px] sm:text-[12px] text-[#c2410c] dark:text-[#ffb59c] font-bold uppercase truncate">
-                  Comanda #{activeTicket.id.replace('ticket-', '').replace('cmd-', '')} • {activeTicket.table}
+                  Comanda #{latestRound.orderId.replace('ticket-', '').replace('cmd-', '')} • {selectedTable}
                 </span>
               </div>
               <span className="px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-mono-code font-bold uppercase bg-[#ff5708]/15 text-[#c2410c] border border-[#ff5708]/40 dark:bg-[#ff5708]/20 dark:text-[#ffb59c] shrink-0">
-                {activeTicket.status === 'por-validar' && '⏳ Recibido'}
-                {activeTicket.status === 'en-cocina' && '🔥 En Cocina'}
-                {activeTicket.status === 'pase-listo' && '✨ Listo en Pase'}
-                {activeTicket.status === 'entregado' && '🍽️ Servido en Mesa'}
+                {activeTableTicket?.status === 'en-cocina' && '🔥 En Cocina'}
+                {activeTableTicket?.status === 'pase-listo' && '✨ Listo en Pase'}
+                {activeTableTicket?.status === 'entregado' && '🍽️ Servido en Mesa'}
+                {(!activeTableTicket || activeTableTicket.status === 'por-validar') && '⏳ Recibido'}
               </span>
             </div>
 
-            {activeTicket.status === 'pase-listo' && (
+            {activeTableTicket?.status === 'pase-listo' && (
               <div
                 role="status"
                 aria-live="polite"
@@ -938,21 +1002,21 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
               <div className="h-1.5 rounded-full bg-[#ff5708] shadow-[0_0_8px_#ff5708]" />
               <div
                 className={`h-1.5 rounded-full transition-all ${
-                  ['en-cocina', 'pase-listo', 'entregado'].includes(activeTicket.status)
+                  ['en-cocina', 'pase-listo', 'entregado'].includes(activeTableTicket?.status || '')
                     ? 'bg-[#ff5708] shadow-[0_0_8px_#ff5708]'
                     : 'bg-[#cbd5e1] dark:bg-[#2e2f38]'
                 }`}
               />
               <div
                 className={`h-1.5 rounded-full transition-all ${
-                  ['pase-listo', 'entregado'].includes(activeTicket.status)
+                  ['pase-listo', 'entregado'].includes(activeTableTicket?.status || '')
                     ? 'bg-[#ff5708] shadow-[0_0_8px_#ff5708]'
                     : 'bg-[#cbd5e1] dark:bg-[#2e2f38]'
                 }`}
               />
               <div
                 className={`h-1.5 rounded-full transition-all ${
-                  activeTicket.status === 'entregado'
+                  activeTableTicket?.status === 'entregado'
                     ? 'bg-emerald-400 shadow-[0_0_8px_#34d399]'
                     : 'bg-[#cbd5e1] dark:bg-[#2e2f38]'
                 }`}
@@ -960,9 +1024,18 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
             </div>
 
             <div className="flex items-center justify-between text-[11px] text-[#475569] dark:text-[#a1a1aa] font-mono-code pt-1 border-t border-[#e2e8f0] dark:border-[#24252e]">
-              <span>{activeTicket.items.length} platos en marcha</span>
+              <span>{consumptionDishCount} platos en marcha</span>
               <div className="flex items-center gap-2">
-                <span className="text-[#0f172a] dark:text-white font-bold">Total: S/ {activeTicket.total.toFixed(2)}</span>
+                <button
+                  type="button"
+                  onClick={() => setIsOrderHistoryOpen(true)}
+                  className="px-2.5 py-1 min-h-[36px] rounded-lg border border-[#cbd5e1] bg-white/70 font-bold text-[11px] text-[#334155] transition-colors hover:bg-white dark:border-[#3a3b46] dark:bg-[#24252e] dark:text-white dark:hover:bg-[#2d2e3a]"
+                  title="Consultar el historial de consumo de la mesa"
+                >
+                  <span className="material-symbols-outlined mr-1 align-middle text-[15px]">receipt_long</span>
+                  <span>Consumo de Mesa</span>
+                </button>
+                <span className="text-[#0f172a] dark:text-white font-bold">Total: S/ {consumptionTotal.toFixed(2)}</span>
                 <button
                   type="button"
                   onClick={() => setIsPaymentModalOpen(true)}
@@ -981,7 +1054,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       {/* ========================================================================= */}
       {/* ✨ RE-ORDER / WELCOME BACK VIP BANNER */}
       {/* ========================================================================= */}
-      {showWelcomeBack && lastOrder && !activeTicket && (
+      {showWelcomeBack && lastOrder && !activeTableTicket && (
         <div className="max-w-4xl mx-auto px-3.5 sm:px-6 pt-3.5 animate-fadeIn">
           <div className="bg-gradient-to-r from-white via-[#fff7ed] to-white dark:from-[#171821] dark:via-[#22212c] dark:to-[#171821] border border-[#ff5708]/30 dark:border-[#ff5708]/40 rounded-2xl p-4 shadow-[0_4px_25px_rgba(255,87,8,0.12)] flex flex-col gap-3 relative overflow-hidden">
             {/* Subtle glow background */}
@@ -1513,6 +1586,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
               <button
                 type="button"
                 onClick={() => setIsCartOpen(true)}
+                title="Ver y editar los platos pendientes del pedido"
                 className="px-2.5 sm:px-3 py-2 min-h-[44px] rounded-xl bg-[#f1f5f9] hover:bg-[#e2e8f0] text-[#0f172a] border border-[#cbd5e1] dark:bg-[#24252e] dark:hover:bg-[#2d2e3a] dark:text-white dark:border-transparent text-[11px] sm:text-[12px] font-medium transition-colors cursor-pointer"
               >
                 Ver Pedido
@@ -1568,6 +1642,12 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                   type="button"
                   onClick={() => {
                     setSelectedTable(tableNum);
+                    try {
+                      sessionStorage.setItem('gastropulse_active_table', tableNum);
+                      localStorage.setItem('gastropulse_active_table', tableNum);
+                    } catch (error) {
+                      console.warn('Could not save selected table:', error);
+                    }
                     setIsTableModalOpen(false);
                     onShowToast(`Mesa configurada: ${tableNum}`, 'check_circle');
                   }}
@@ -1930,17 +2010,19 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
         const currentTbl = (tables || []).find((t) => t.number === cleanTblNum || selectedTable.includes(t.number));
         const tblAmount = Number(currentTbl?.amount || 0);
         const consolidatedTotalAmount: number =
-          tblAmount > 0
+          orderRounds.length > 0
+            ? consumptionTotal
+            : tblAmount > 0
             ? tblAmount
-            : Number(activeTicket?.total || (cartTotal > 0 ? cartTotal : 86.00));
+            : cartTotal;
 
         return (
           <PaymentModal
             isOpen={isPaymentModalOpen}
             onClose={() => setIsPaymentModalOpen(false)}
-            tableNumber={activeTicket?.table || selectedTable}
+            tableNumber={selectedTable}
             totalAmount={consolidatedTotalAmount}
-            orderId={activeTicket?.id}
+            orderId={activeTableTicket?.id}
             onRequestTableAccount={onRequestTableAccount}
             onShowToast={onShowToast}
           />
@@ -1953,6 +2035,13 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
         onClose={() => setIsComplaintModalOpen(false)}
         currentTable={selectedTable}
         onShowToast={onShowToast}
+      />
+
+      <OrderHistoryModal
+        isOpen={isOrderHistoryOpen}
+        onClose={() => setIsOrderHistoryOpen(false)}
+        tableNumber={selectedTable}
+        rounds={orderRounds}
       />
 
       {/* ========================================================================= */}
@@ -1985,8 +2074,3 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     </div>
   );
 };
-
-
-
-
-

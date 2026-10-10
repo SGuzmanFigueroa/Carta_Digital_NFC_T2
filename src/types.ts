@@ -112,6 +112,25 @@ export interface OrderTicket {
   runnerAssigned?: string;
 }
 
+export type KitchenDishStatus = 'Recibido' | 'En preparación' | 'Listo en pase' | 'Entregado';
+
+export interface OrderRoundItem {
+  id: string;
+  name: string;
+  quantity: number;
+  price: number;
+  status: KitchenDishStatus;
+}
+
+export interface OrderRound {
+  id: string;
+  orderId: string;
+  table: string;
+  createdAt: string;
+  time: string;
+  items: OrderRoundItem[];
+}
+
 export interface TableStatus {
   id: string;
   number: string;
