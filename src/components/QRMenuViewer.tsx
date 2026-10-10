@@ -37,6 +37,8 @@ import { validateDinerGeofence } from '@/utils/geofence';
 import { GeofenceWarningModal } from './menu/GeofenceWarningModal';
 import { formatSoles } from '@/utils/promo';
 import { INITIAL_ACTIVE_PROMO_OFFERS } from '@/data/mockData';
+import { DietaryFilters, DIETARY_FILTERS, getDietaryPreferences } from './menu/DietaryFilters';
+import type { DietaryPreference } from '../types';
 
 // =============================================================================
 // 🎯 CD-16 · CONFIGURACIÓN DE LA OFERTA FLASH (POP-UP PROMOCIONAL DEL COMENSAL)
@@ -107,6 +109,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('todos');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedDietaryFilters, setSelectedDietaryFilters] = useState<DietaryPreference[]>([]);
   const [heroViewMode, setHeroViewMode] = useState<'photo' | '3d'>('photo');
   const [isTableModalOpen, setIsTableModalOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -494,8 +497,20 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       (item.tag && normalizeStr(item.tag).includes(query)) ||
       (item.category && normalizeStr(item.category).includes(query));
 
-    return matchesCat && matchesSearch;
+    const matchesDietaryPreferences = selectedDietaryFilters.every((filter) =>
+      getDietaryPreferences(item).includes(filter)
+    );
+
+    return matchesCat && matchesSearch && matchesDietaryPreferences;
   });
+
+  const toggleDietaryFilter = (filter: DietaryPreference) => {
+    setSelectedDietaryFilters((current) =>
+      current.includes(filter)
+        ? current.filter((selected) => selected !== filter)
+        : [...current, filter]
+    );
+  };
 
   const cartTotal = cart.reduce((acc, curr) => acc + curr.item.price * curr.quantity, 0);
   const cartItemsCount = cart.reduce((acc, curr) => acc + curr.quantity, 0);
@@ -1292,6 +1307,11 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
             </span>
           </div>
 
+          <DietaryFilters
+            selectedFilters={selectedDietaryFilters}
+            onToggle={toggleDietaryFilter}
+          />
+
           {filteredItems.length === 0 ? (
             <div className="bg-white dark:bg-[#15161c] rounded-2xl border border-[#e2e8f0] dark:border-[#24252e] p-8 text-center space-y-3 my-4">
               <div className="w-12 h-12 rounded-full bg-[#f1f5f9] dark:bg-[#1e1f28] border border-[#ff5708]/30 text-[#ff5708] flex items-center justify-center mx-auto">
@@ -1299,13 +1319,14 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
               </div>
               <h4 className="text-[#0f172a] dark:text-white font-bold text-[16px]">No se encontraron platos</h4>
               <p className="text-[#475569] dark:text-[#a1a1aa] text-[13px] max-w-sm mx-auto">
-                No encontramos ningún resultado para "{searchQuery}". Prueba con otro ingrediente o limpia los filtros.
+                No encontramos ningún resultado para "{selectedDietaryFilters.length > 0 ? selectedDietaryFilters.map((selectedFilter) => DIETARY_FILTERS.find((filter) => filter.value === selectedFilter)?.label).join(', ') : searchQuery}". Prueba con otro ingrediente o limpia los filtros.
               </p>
               <button
                 type="button"
                 onClick={() => {
                   setSearchQuery('');
                   setSelectedCategory('todos');
+                  setSelectedDietaryFilters([]);
                 }}
                 className="px-4 py-2 min-h-[44px] rounded-xl bg-[#ff5708] text-[#2b0b00] font-bold text-[12px] transition-all hover:bg-[#e04800] cursor-pointer"
               >
@@ -1380,6 +1401,22 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                     <p className="text-[12px] text-[#475569] dark:text-[#a1a1aa] line-clamp-2 leading-relaxed">
                       {dish.description}
                     </p>
+                    {getDietaryPreferences(dish).length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {DIETARY_FILTERS.filter((filter) =>
+                          getDietaryPreferences(dish).includes(filter.value)
+                        ).map((filter) => (
+                          <span
+                            key={filter.value}
+                            title={filter.label}
+                            className="inline-flex items-center gap-1 rounded-full border border-[#e2e8f0] bg-[#f8fafc]/90 px-2 py-0.5 text-[10px] font-medium text-[#475569] backdrop-blur-md dark:border-white/10 dark:bg-white/[0.06] dark:text-[#c4c4ce]"
+                          >
+                            <span aria-hidden="true">{filter.icon}</span>
+                            {filter.label}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   <div className="pt-2 flex items-center justify-between border-t border-[#e2e8f0] dark:border-[#24252e]">
@@ -1948,9 +1985,6 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     </div>
   );
 };
-
-
-
 
 
 
