@@ -27,6 +27,7 @@ import { DishARViewer } from './DishARViewer';
 import { ThemeToggle } from './menu/ThemeToggle';
 import { MenuBottomNav } from './menu/MenuBottomNav';
 import { PaymentModal } from './menu/PaymentModal';
+import { SplitBillModal } from './menu/SplitBillModal';
 import { ComplaintBookModal } from './menu/ComplaintBookModal';
 import { DishDetailModal } from './menu/DishDetailModal';
 // CD-16 · Pop-up promocional "Oferta Flash" con platos reales del menú.
@@ -133,8 +134,10 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isOrderHistoryOpen, setIsOrderHistoryOpen] = useState(false);
   const [selectedTable, setSelectedTable] = useState('MESA 04');
-  const [cartsByTable, setCartsByTable] = useState<Record<string, MenuCartItem[]>>({});
+  const [isSplitBillModalOpen, setIsSplitBillModalOpen] = useState(false);
+
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState<number | null>(null);
   const [isComplaintModalOpen, setIsComplaintModalOpen] = useState(false);
   const [isPromoModalOpen, setIsPromoModalOpen] = useState(false);
   /** Oferta con la que debe abrir el pop-up (la que se veía en la tira flash). */
@@ -850,6 +853,18 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     onShowToast(`Cuenta solicitada (${selectedPaymentMethod}). Garzón en camino con el comprobante.`, 'receipt_long');
   };
 
+  const handleOpenSplitBill = () => {
+    setIsPaymentModalOpen(false);
+    setPaymentAmount(null);
+    setIsSplitBillModalOpen(true);
+  };
+
+  const handleConfirmSplitBill = (amount: number) => {
+    setIsSplitBillModalOpen(false);
+    setPaymentAmount(amount);
+    setIsPaymentModalOpen(true);
+  };
+
   const handleTriggerCallWaiter = async () => {
     setWaiterCalled(true);
     if (onCallWaiter) {
@@ -1038,7 +1053,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                 <span className="text-[#0f172a] dark:text-white font-bold">Total: S/ {consumptionTotal.toFixed(2)}</span>
                 <button
                   type="button"
-                  onClick={() => setIsPaymentModalOpen(true)}
+                  onClick={handleOpenSplitBill}
                   className="px-2.5 py-1 min-h-[36px] rounded-lg bg-[#ff5708] hover:bg-[#ff6924] text-[#2b0b00] font-bold text-[11px] flex items-center gap-1 shadow cursor-pointer transition-all active:scale-95"
                   title="Pedir la cuenta y pagar con Yape o Plin QR"
                 >
@@ -1784,7 +1799,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                 type="button"
                 onClick={() => {
                   setIsCartOpen(false);
-                  setIsPaymentModalOpen(true);
+                  handleOpenSplitBill();
                 }}
                 className="w-full py-2.5 min-h-[44px] rounded-xl border border-[#ff5708]/40 bg-[#ff5708]/10 text-[#c2410c] dark:text-[#ffb59c] hover:bg-[#ff5708]/20 font-bold text-[12px] flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
               >
@@ -1999,7 +2014,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
         onFocusSearch={handleFocusSearch}
         onOpenCart={() => setIsCartOpen(true)}
         onCallWaiter={handleTriggerCallWaiter}
-        onOpenPayment={() => setIsPaymentModalOpen(true)}
+        onOpenPayment={handleOpenSplitBill}
       />
 
       {/* ========================================================================= */}
@@ -2014,18 +2029,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
             ? consumptionTotal
             : tblAmount > 0
             ? tblAmount
-            : cartTotal;
 
-        return (
-          <PaymentModal
-            isOpen={isPaymentModalOpen}
-            onClose={() => setIsPaymentModalOpen(false)}
-            tableNumber={selectedTable}
-            totalAmount={consolidatedTotalAmount}
-            orderId={activeTableTicket?.id}
-            onRequestTableAccount={onRequestTableAccount}
-            onShowToast={onShowToast}
-          />
         );
       })()}
 
