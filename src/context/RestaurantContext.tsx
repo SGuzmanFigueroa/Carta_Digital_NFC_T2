@@ -1,8 +1,8 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
-import { Ticket, OrderTicket, TableStatus, Runner, MenuItem, StationId, TicketItem, AuthUser } from '../types';
+import { Ticket, OrderTicket, TableStatus, Runner, MenuItem, StationId, TicketItem, AuthUser, WaiterCall } from '../types';
 import { INITIAL_TICKETS, INITIAL_RUNNERS } from '../data/initialData';
 import { INITIAL_ORDERS, INITIAL_TABLES, INITIAL_MENU_ITEMS } from '../data/mockData';
 import { kitchenAudio } from '../utils/audio';
@@ -17,6 +17,14 @@ import {
   settleOrdersForTableInDb,
   updateOrderItemCheckInDb
 } from '@/services/orderService';
+// CD-28 · Llamados de mesa persistentes (KDS + Salón vía postgres_changes).
+import {
+  fetchWaiterCallsFromDb,
+  createWaiterCall,
+  attendWaiterCallInDb,
+  normalizeWaiterCallReason,
+  parseWaiterCallRow
+} from '@/services/waiterCallService';
 import { loginStaffWithPin } from '@/services/authService';
 import {
   sanitizeText,
@@ -37,6 +45,7 @@ interface RestaurantContextType {
   orders: OrderTicket[];
   setOrders: React.Dispatch<React.SetStateAction<OrderTicket[]>>;
   tables: TableStatus[];
+  waiterCalls: WaiterCall[];
   runners: Runner[];
   setRunners: React.Dispatch<React.SetStateAction<Runner[]>>;
   totalShiftRevenue: number;
@@ -71,11 +80,91 @@ interface RestaurantContextType {
   logSecurityEvent: (entry: Omit<AuditLogEntry, 'id' | 'timestamp' | 'isoDate'>) => AuditLogEntry;
   updateOrderStatus: (orderId: string, newStatus: OrderTicket['status']) => Promise<void>;
   addOrderNote: (orderId: string, note: string) => void;
-  requestTableAccount: (paymentMethod?: string) => Promise<boolean>;
-  callWaiter: (reason?: string) => Promise<boolean>;
+  /** CD-28 · `table` = mesa real del comensal (selector / QR); si se omite se usa la de su comanda. */
+  requestTableAccount: (paymentMethod?: string, table?: string) => Promise<boolean>;
+  /** CD-28 · `table` = mesa real del comensal (selector / QR); si se omite se usa la de su comanda. */
+  callWaiter: (reason?: string, table?: string) => Promise<boolean>;
+  attendWaiterCall: (callId: string) => Promise<void>;
 }
 
 const RestaurantContext = createContext<RestaurantContextType | undefined>(undefined);
+
+/**
+ * CD-28 · REALTIME · Secuencia de instancias de canal (higiene defensiva).
+ *
+ * `RealtimeClient.channel(topic)` DEVUELVE la instancia existente si el topic ya
+ * está en uso (documentado en realtime-js: "If a channel with the same topic already
+ * exists it will be returned instead of creating a duplicate connection"). Si esa
+ * instancia ya estaba suscrita, `channel.on()` LANZA:
+ *   "cannot add `postgres_changes` callbacks for <topic> after `subscribe()`."
+ * y el useEffect muere a mitad de camino → cero listeners → frontend "sordo" hasta un F5.
+ * Con un topic único por montaje ese reuse es imposible.
+ *
+ * OJO: esto es necesario pero NO era la causa raíz del bug CD-28. La causa raíz real
+ * está documentada antes del useEffect de realtime (una tabla SIN Realtime envenena
+ * todas las suscripciones del canal).
+ */
+let realtimeChannelSeq = 0;
+
+/** Sello de tiempo corto (HH:MM:SS.mmm) para los logs de diagnóstico de realtime. */
+function realtimeStamp(): string {
+  return new Date().toISOString().slice(11, 23);
+}
+
+/** Payload del evento `system` que emite el servidor de Realtime (no está tipado en el SDK). */
+type RealtimeSystemPayload = {
+  extension?: string;
+  message?: string;
+  status?: string;
+  channel?: string;
+};
+
+/** Canal de Supabase tal como lo expone el SDK, sin importar tipos internos del paquete. */
+type SupabaseRealtimeChannel = Parameters<typeof supabase.removeChannel>[0];
+
+/**
+ * MONITOREO EXTREMO (CD-28) · El evento `system` del servidor de Realtime.
+ *
+ * Es el ÚNICO sitio donde el servidor comunica que ha rechazado el `postgres_changes`
+ * de un canal (p. ej. "Unable to subscribe to changes with given parameters…" cuando
+ * una tabla no tiene Realtime habilitado). El callback de `.subscribe()` recibe
+ * 'SUBSCRIBED' igualmente, así que sin este listener el canal queda CIEGO SIN NINGÚN
+ * ERROR VISIBLE: exactamente el fallo que motivó el ticket.
+ */
+function instrumentRealtimeChannel(
+  channel: SupabaseRealtimeChannel,
+  scope: string,
+  topic: string
+): void {
+  interface ChannelWithSystemHook {
+    on: (
+      type: string,
+      filter: Record<string, unknown>,
+      callback: (payload: RealtimeSystemPayload) => void
+    ) => unknown;
+  }
+
+  (channel as unknown as ChannelWithSystemHook).on('system', {}, (payload) => {
+    if (!payload || payload.status === 'ok') return;
+    console.warn(
+      `[realtime:${scope}] ${realtimeStamp()} ERROR DEL SERVIDOR en ${topic}: ${payload.message ?? 'sin detalle'}`
+    );
+    console.warn(
+      `[realtime:${scope}] ${realtimeStamp()} Acción: habilita Realtime para la tabla citada → ` +
+      `ALTER PUBLICATION supabase_realtime ADD TABLE public.<tabla>;`
+    );
+  });
+}
+
+/** Traza cada transición de estado del canal: SUBSCRIBED / CHANNEL_ERROR / TIMED_OUT / CLOSED. */
+function describeRealtimeStatus(scope: string, topic: string, status: string, error?: Error): void {
+  const head = `[realtime:${scope}] ${realtimeStamp()} ${status} ${topic}`;
+  if (status === 'SUBSCRIBED') {
+    console.info(`${head} · canal operativo`);
+    return;
+  }
+  console.warn(`${head} · ${error?.message ?? 'el canal dejó de entregar eventos'}`);
+}
 
 const STORAGE_KEY_TICKETS = 'gastropulse_kds_tickets_v1';
 const STORAGE_KEY_ORDERS = 'gastropulse_orders_v1';
@@ -180,6 +269,8 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
   const [tickets, setTickets] = useState<Ticket[]>(INITIAL_TICKETS);
   const [orders, setOrders] = useState<OrderTicket[]>(INITIAL_ORDERS);
   const [tables, setTables] = useState<TableStatus[]>(INITIAL_TABLES);
+  // CD-28 · Llamados de mesa abiertos (los consume el KDS y el panel de Salón).
+  const [waiterCalls, setWaiterCalls] = useState<WaiterCall[]>([]);
   const [runners, setRunners] = useState<Runner[]>(INITIAL_RUNNERS);
   const [totalShiftRevenue, setTotalShiftRevenue] = useState<number>(4215.00);
   const [kitchenPaused, setKitchenPaused] = useState<boolean>(false);
@@ -234,6 +325,20 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
     setToast({ message, icon });
     setTimeout(() => setToast(null), 3500);
   }, []);
+
+  // ===========================================================================
+  // CD-28 · FIX N1 (realtime inestable) · Callbacks de realtime en un REF
+  // ===========================================================================
+  // Los listeners (Supabase y BroadcastChannel) necesitan `showToast`,
+  // `syncDinerTicketStatus` y `syncKdsTickets`. OJO: `syncDinerTicketStatus`
+  // depende de [dinerActiveTicket], por lo que CAMBIA de identidad cada vez que
+  // cambia la comanda del comensal. Tenerlo en las deps del useEffect obligaba a
+  // destruir y recrear el canal Supabase en bucle (y con el mismo topic => throw).
+  // Con el ref, los efectos dependen de [] y además nunca sufren stale closure.
+  const realtimeCallbacksRef = useRef({ showToast, syncDinerTicketStatus, syncKdsTickets });
+  useEffect(() => {
+    realtimeCallbacksRef.current = { showToast, syncDinerTicketStatus, syncKdsTickets };
+  }, [showToast, syncDinerTicketStatus, syncKdsTickets]);
 
   const toggleAudio = useCallback(() => {
     setAudioEnabled((prev) => {
@@ -329,60 +434,196 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
   }, []);
 
   // Supabase Database Sync & Realtime Subscription
+  // ===========================================================================
+  // CD-28 · FIX N2 · REALTIME BLINDADO — CAUSA RAÍZ REAL (evidencia empírica)
+  // ===========================================================================
+  // Reproducido contra el proyecto real, 100% determinista:
+  //
+  //  1. El evento `postgres_changes` de `waiter_calls` SÍ se emite: en un canal con
+  //     UN solo binding llega ~300 ms después del INSERT/UPDATE.
+  //  2. El servidor de Realtime RECHAZA el `postgres_changes` COMPLETO de un canal
+  //     cuando UNA sola de sus suscripciones apunta a una tabla que NO está en la
+  //     publicación `supabase_realtime`. Lo comunica con un evento `system`:
+  //       "Unable to subscribe to changes with given parameters. Please check
+  //        Realtime is enabled for the given connect parameters:
+  //        [event: *, schema: public, table: staff, filters: [], select: nil]"
+  //     El join se responde 'ok' (con ids), el canal queda en estado SUBSCRIBED y el
+  //     callback de `.subscribe()` NO recibe error alguno: fallo 100% SILENCIOSO.
+  //  3. En este proyecto NO tienen Realtime: `staff` y `system_config`.
+  //     (Sí lo tienen: `orders`, `order_items`, `restaurant_tables`, `waiter_calls`.)
+  //
+  // Consecuencia: el canal anterior (un único canal con staff + system_config +
+  // orders + waiter_calls) estaba CIEGO ENTERO — cero llamados, cero comandas y cero
+  // cambios de mesa en vivo. La UI solo se enteraba con F5 (fetch de montaje): ese es
+  // el bug de CD-28, y limpiar canales/eliminar refetch NO lo podía arreglar.
+  //
+  // FIX N2 → AISLAMIENTO DE FALLOS: un canal por dominio (A/B/C). Un binding inválido
+  // ya no puede silenciar la ruta crítica. Se conserva además: `deps: []`, topic
+  // irrepetible por montaje, guarda `disposed` y `removeChannel` en el cleanup.
   useEffect(() => {
-    // 1. Initial fetch from Supabase
+    let disposed = false;
+    const mountId = ++realtimeChannelSeq;
+    const stamp = Date.now();
+    /** Topic irrepetible: imposibilita reutilizar una instancia zombie/moribunda. */
+    const topicFor = (scope: string) => `gastropulse_realtime_${scope}_${stamp}_${mountId}`;
+
+    console.info(
+      `[realtime] ${realtimeStamp()} montaje ${mountId} → canales AISLADOS: ` +
+      `llamados(2 bindings) | core(3 bindings) | avisos(2 bindings)`
+    );
+
+    // Re-sincronización defensiva del canal core. Envuelta en try/catch: un fallo de
+    // red se registra y NUNCA se propaga al bucle de mensajes del socket.
+    const resyncOrders = async (scope: string) => {
+      try {
+        const freshOrders = await fetchOrdersFromDb();
+        if (disposed || !freshOrders || freshOrders.length === 0) return;
+        setOrders(freshOrders);
+        realtimeCallbacksRef.current.syncDinerTicketStatus(freshOrders);
+        realtimeCallbacksRef.current.syncKdsTickets(freshOrders);
+      } catch (err) {
+        console.warn(`[realtime:${scope}] ${realtimeStamp()} error re-sincronizando comandas`, err);
+      }
+    };
+
+    const resyncTables = async (scope: string) => {
+      try {
+        const freshTables = await fetchTablesFromDb();
+        if (disposed || !freshTables || freshTables.length === 0) return;
+        setTables(freshTables);
+      } catch (err) {
+        console.warn(`[realtime:${scope}] ${realtimeStamp()} error re-sincronizando mesas`, err);
+      }
+    };
+
+    // 1. Foto inicial desde Supabase (una vez por montaje; durabilidad ante F5).
     fetchTablesFromDb().then((dbTables) => {
+      if (disposed) return;
       if (dbTables && dbTables.length > 0) {
         setTables(dbTables);
       }
     }).catch(console.warn);
 
     fetchOrdersFromDb().then((dbOrders) => {
+      if (disposed) return;
       if (dbOrders && dbOrders.length > 0) {
         setOrders(dbOrders);
-        syncDinerTicketStatus(dbOrders);
-        syncKdsTickets(dbOrders);
+        realtimeCallbacksRef.current.syncDinerTicketStatus(dbOrders);
+        realtimeCallbacksRef.current.syncKdsTickets(dbOrders);
       }
     }).catch(console.warn);
 
-    // 2. Supabase Realtime Channel
-    const channel = supabase
-      .channel('gastropulse_realtime_sync')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, async () => {
-        const freshOrders = await fetchOrdersFromDb();
-        if (freshOrders && freshOrders.length > 0) {
-          setOrders(freshOrders);
-          syncDinerTicketStatus(freshOrders);
-          syncKdsTickets(freshOrders);
-        }
+    // CD-28 · Llamados de mesa: se re-consultan al montar (durabilidad ante
+    // recarga/reapertura del KDS, algo que un canal Broadcast no puede ofrecer).
+    fetchWaiterCallsFromDb().then((dbCalls) => {
+      if (disposed) return;
+      console.info(
+        `[realtime:llamados] ${realtimeStamp()} foto inicial → ${dbCalls.length} llamado(s) abierto(s)`
+      );
+      setWaiterCalls(dbCalls);
+    }).catch((err) => {
+      console.warn(`[realtime:llamados] ${realtimeStamp()} error en la foto inicial`, err);
+    });
+
+    // -----------------------------------------------------------------------
+    // CANAL A · RUTA CRÍTICA CD-28 → SOLO waiter_calls (2 bindings)
+    // -----------------------------------------------------------------------
+    // Aislado a propósito: si alguien agrega aquí una tabla sin Realtime, el fallo
+    // queda contenido y NO puede volver a silenciar los llamados de mesa.
+    const callsTopic = topicFor('llamados');
+    const callsChannel = supabase
+      .channel(callsTopic)
+      // INSERT = nuevo llamado: se hidrata 100% desde `payload.new` (CERO fetch, por
+      // lo que ningún caché de `fetch` puede servir datos viejos) y el dedupe con
+      // update funcional protege ante reintentos/eco del canal.
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'waiter_calls' }, (payload) => {
+        if (disposed) return;
+        const insertedCall = parseWaiterCallRow(payload.new);
+        if (!insertedCall || insertedCall.status !== 'open') return;
+        console.info(
+          `[realtime:llamados] ${realtimeStamp()} ← INSERT ${insertedCall.table_number} · ` +
+          `"${insertedCall.reason}" (id ${insertedCall.id})`
+        );
+        setWaiterCalls((current) =>
+          current.some((call) => call.id === insertedCall.id) ? current : [...current, insertedCall]
+        );
       })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'order_items' }, async () => {
-        const freshOrders = await fetchOrdersFromDb();
-        if (freshOrders.length > 0) {
-          setOrders(freshOrders);
-          syncDinerTicketStatus(freshOrders);
-          syncKdsTickets(freshOrders);
-        }
+      // UPDATE = el personal marcó 'attended' → el llamado sale de la UI al instante.
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'waiter_calls' }, (payload) => {
+        if (disposed) return;
+        const updatedCall = parseWaiterCallRow(payload.new);
+        if (!updatedCall || updatedCall.status !== 'attended') return;
+        console.info(
+          `[realtime:llamados] ${realtimeStamp()} ← UPDATE ${updatedCall.table_number} atendido (id ${updatedCall.id})`
+        );
+        setWaiterCalls((current) => current.filter((call) => call.id !== updatedCall.id));
+      });
+    instrumentRealtimeChannel(callsChannel, 'llamados', callsTopic);
+    callsChannel.subscribe((status: string, error?: Error) => {
+      if (disposed) return; // 'CLOSED' por desmontaje deliberado: no es un incidente
+      describeRealtimeStatus('llamados', callsTopic, status, error);
+    });
+
+    // -----------------------------------------------------------------------
+    // CANAL B · CORE → orders + order_items + restaurant_tables (3 bindings)
+    // -----------------------------------------------------------------------
+    const coreTopic = topicFor('core');
+    const coreChannel = supabase
+      .channel(coreTopic)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+        void resyncOrders('core');
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'restaurant_tables' }, async () => {
-        const freshTables = await fetchTablesFromDb();
-        if (freshTables && freshTables.length > 0) {
-          setTables(freshTables);
-        }
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'order_items' }, () => {
+        void resyncOrders('core');
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'staff' }, async () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'restaurant_tables' }, () => {
+        void resyncTables('core');
+      });
+    instrumentRealtimeChannel(coreChannel, 'core', coreTopic);
+    coreChannel.subscribe((status: string, error?: Error) => {
+      if (disposed) return;
+      describeRealtimeStatus('core', coreTopic, status, error);
+    });
+
+    // -----------------------------------------------------------------------
+    // CANAL C · AVISOS → staff + system_config (2 bindings, NO crítico)
+    // -----------------------------------------------------------------------
+    // IMPORTANTE: estas dos tablas NO tienen Realtime habilitado en la publicación
+    // `supabase_realtime` del proyecto. Al estar SOLAS en su propio canal, su rechazo
+    // solo degrada este canal de avisos (los toasts de "Personal/Configuración
+    // actualizada") y queda registrado en consola con la instrucción SQL exacta.
+    // Al aislarlo, esa configuración incompleta ya no puede tumbar comandas ni llamados.
+    const adminTopic = topicFor('avisos');
+    const adminChannel = supabase
+      .channel(adminTopic)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'staff' }, () => {
         // Staff changes trigger cross-terminal notification
-        showToast('Personal actualizado en el sistema', 'badge');
+        if (disposed) return;
+        realtimeCallbacksRef.current.showToast('Personal actualizado en el sistema', 'badge');
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'system_config' }, async () => {
-        showToast('Configuración del sistema actualizada', 'tune');
-      })
-      .subscribe();
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'system_config' }, () => {
+        if (disposed) return;
+        realtimeCallbacksRef.current.showToast('Configuración del sistema actualizada', 'tune');
+      });
+    instrumentRealtimeChannel(adminChannel, 'avisos', adminTopic);
+    adminChannel.subscribe((status: string, error?: Error) => {
+      if (disposed) return;
+      describeRealtimeStatus('avisos', adminTopic, status, error);
+    });
 
     return () => {
-      supabase.removeChannel(channel);
+      // Teardown GARANTIZADO de los 3 canales: `disposed` evita que un callback tardío
+      // vuelva a tocar el estado y cada canal se destruye también en el servidor.
+      // `removeChannel` es async por diseño (async unsubscribe → teardown); como cada
+      // topic es irrepetible, una instancia rezagada no puede robar eventos a la
+      // siguiente ni bloquear el cleanup de React.
+      disposed = true;
+      console.info(`[realtime] ${realtimeStamp()} desmontando montaje ${mountId} (3 canales)`);
+      void supabase.removeChannel(callsChannel);
+      void supabase.removeChannel(coreChannel);
+      void supabase.removeChannel(adminChannel);
     };
-  }, [showToast, syncDinerTicketStatus, syncKdsTickets]);
+  }, []);
 
   // Load persisted state & current user on mount
   useEffect(() => {
@@ -501,7 +742,7 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
         setOrders((prev) => [payload.order, ...prev.filter((o) => o.id !== payload.order.id)]);
         if (Array.isArray(payload.tables)) setTables(payload.tables);
         kitchenAudio.playDispatchSound();
-        showToast(`¡Nueva comanda recibida de ${payload.ticket.table}!`, 'soup_kitchen');
+        realtimeCallbacksRef.current.showToast(`¡Nueva comanda recibida de ${payload.ticket.table}!`, 'soup_kitchen');
       } else if (action === 'UPDATE_TICKETS' && Array.isArray(payload?.tickets)) {
         setTickets(payload.tickets);
       } else if (action === 'UPDATE_TABLES' && Array.isArray(payload?.tables)) {
@@ -513,13 +754,13 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
       } else if (action === 'PRIORITIZE_TABLE' && Array.isArray(payload?.tickets)) {
         setTickets(payload.tickets);
         kitchenAudio.playAllergyWarning();
-        showToast(`¡Mesa ${payload.tableNumber} marcada con PRIORIDAD!`, 'priority_high');
+        realtimeCallbacksRef.current.showToast(`¡Mesa ${payload.tableNumber} marcada con PRIORIDAD!`, 'priority_high');
       } else if (action === 'RUNNER_ALERT') {
         kitchenAudio.playRunnerAlertSound();
-        showToast('¡Aviso a Runners en mesa de pase central!', 'campaign');
+        realtimeCallbacksRef.current.showToast('¡Aviso a Runners en mesa de pase central!', 'campaign');
       } else if (action === 'UPDATE_ORDERS' && Array.isArray(payload?.orders)) {
         setOrders(payload.orders);
-        syncDinerTicketStatus(payload.orders);
+        realtimeCallbacksRef.current.syncDinerTicketStatus(payload.orders);
         if (Array.isArray(payload?.tickets)) setTickets(payload.tickets);
       }
     };
@@ -527,7 +768,11 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
     return () => {
       channel.close();
     };
-  }, [showToast, syncDinerTicketStatus]);
+    // FIX N1: deps [] (el handler lee los callbacks vía `realtimeCallbacksRef`, que
+    // siempre tiene la versión más reciente). Antes dependía de `syncDinerTicketStatus`,
+    // que cambiaba con cada `dinerActiveTicket` → el bus se cerraba y se recreaba
+    // constantemente, perdiendo mensajes en tránsito y alimentando el fallo del canal.
+  }, []);
 
   // Central timer tick every 1000ms for elapsed time
   useEffect(() => {
@@ -1326,8 +1571,10 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
 
   // 18. Request Table Account from Mobile Diner Menu
   const requestTableAccount = useCallback(
-    async (paymentMethod: string = 'Efectivo'): Promise<boolean> => {
-      const activeTable = dinerActiveTicket?.table || 'MESA 04';
+    async (paymentMethod: string = 'Efectivo', tableOverride?: string): Promise<boolean> => {
+      // CD-28 · Mismo defecto hermano del llamado de mozo: la cuenta también se pedía
+      // siempre como "MESA 04" cuando el comensal aún no tenía comanda activa.
+      const activeTable = tableOverride?.trim() || dinerActiveTicket?.table || 'MESA 04';
       
       let updatedDiner = dinerActiveTicket
         ? { ...dinerActiveTicket, accountRequested: true, paymentMethod }
@@ -1370,9 +1617,16 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
   );
 
   // 19. Call Waiter from Mobile Diner Menu
+  // CD-28 · Se CONSERVA intacta toda la lógica heredada (marca la mesa en 'demora',
+  // persiste en localStorage, dispara el broadcast local y su audio) y se AÑADE el
+  // registro persistente del llamado con su motivo real en `waiter_calls`.
   const callWaiter = useCallback(
-    async (reason: string = 'Atención en mesa'): Promise<boolean> => {
-      const activeTable = dinerActiveTicket?.table || 'MESA 04';
+    async (reason: string = 'Atención en mesa', tableOverride?: string): Promise<boolean> => {
+      // CD-28 · FIX de datos estáticos: la mesa llega desde el comensal (selector / QR).
+      // Antes la función no la recibía y todo llamado SIN comanda previa se registraba en
+      // `waiter_calls` como "Mesa 04" (el fallback), ignorando la mesa que el usuario
+      // realmente seleccionó. Prioridad: mesa explícita del comensal > mesa de su comanda.
+      const activeTable = tableOverride?.trim() || dinerActiveTicket?.table || 'MESA 04';
       const cleanNum = activeTable.replace(/\D/g, '');
 
       const updatedTables = tables.map((tbl) => {
@@ -1387,11 +1641,31 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
       broadcastSync('UPDATE_TABLES', { tables: updatedTables });
       broadcastSync('RUNNER_ALERT', { message: `Llamada de mozo para ${activeTable}` });
 
+      // 1) Lógica heredada intacta (sin cambios de comportamiento).
       await callWaiterForTableInDb(activeTable, reason);
+
+      // 2) Capa NUEVA CD-28: INSERT en waiter_calls con el motivo del ticket.
+      //    Ante un llamado duplicado (índice único parcial) es idempotente.
+      await createWaiterCall(activeTable, normalizeWaiterCallReason(reason)).catch((err) => {
+        console.warn('Background sync error registering waiter call:', err);
+      });
+
       showToast(`Garzón notificado para ${activeTable}. En camino.`, 'notifications_active');
       return true;
     },
     [dinerActiveTicket, tables, persistState, broadcastSync, showToast]
+  );
+
+  // 20. CD-28 · Marcar un llamado de mesa como atendido (KDS Cocina / Panel de Salón).
+  const attendWaiterCall = useCallback(
+    async (callId: string): Promise<void> => {
+      // Optimista: desaparece de la pantalla del personal al instante.
+      setWaiterCalls((current) => current.filter((call) => call.id !== callId));
+      await attendWaiterCallInDb(callId).catch((err) => {
+        console.warn('Background sync error attending waiter call:', err);
+      });
+    },
+    []
   );
 
   return (
@@ -1402,6 +1676,7 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
         orders,
         setOrders,
         tables,
+        waiterCalls,
         runners,
         setRunners,
         totalShiftRevenue,
@@ -1435,7 +1710,8 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
         updateOrderStatus,
         addOrderNote,
         requestTableAccount,
-        callWaiter
+        callWaiter,
+        attendWaiterCall
       }}
     >
       {children}

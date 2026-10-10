@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { TableStatus, Ticket, OrderTicket } from '../types';
 import { INITIAL_MENU_ITEMS } from '../data/mockData';
+// CD-28 · Llamados de mesa en vivo (KDS + Salón comparten el mismo estado realtime).
+import { useRestaurant } from '../context/RestaurantContext';
 
 const getTableDigits = (num: string): string => {
   const digits = num.replace(/^[^\d]+/i, '').trim();
@@ -37,6 +39,8 @@ export const AdminFloorPanel: React.FC<AdminFloorPanelProps> = ({
 }) => {
   const [activeZone, setActiveZone] = useState<'all' | 'salon' | 'terraza' | 'barra'>('all');
   const [selectedTableDetail, setSelectedTableDetail] = useState<TableStatus | null>(null);
+  // CD-28 · Llamados de mesa abiertos (indicador propio, NO cuenta en `criticalCount`).
+  const { waiterCalls, attendWaiterCall } = useRestaurant();
   // 1. Dynamic Top Selection / Popular Dishes
   const popularDishes = useMemo(() => {
     const dishMap: Record<
@@ -584,8 +588,52 @@ export const AdminFloorPanel: React.FC<AdminFloorPanelProps> = ({
               <span className="flex items-center gap-1 text-[#c6c5cf]">
                 <span className="w-2 h-2 rounded-full bg-[#353437]" /> Libres ({freeCount})
               </span>
+              {waiterCalls.length > 0 && (
+                <>
+                  <span className="text-[#353437]">•</span>
+                  <span className="flex items-center gap-1 text-[#a1c9ff]">
+                    <span className="material-symbols-outlined text-[14px]">room_service</span>
+                    Llamados ({waiterCalls.length})
+                  </span>
+                </>
+              )}
             </div>
           </div>
+
+          {/* CD-28 · Llamados de mesa en vivo: indicador AZUL de servicio, deliberadamente
+              distinto del rojo de "demora" y fuera del conteo de mesas críticas. */}
+          {waiterCalls.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 p-2 rounded-xl bg-[#1c1b1d] border border-[#a1c9ff]/25">
+              <span className="flex items-center gap-1.5 px-1 font-label-code text-[11px] font-bold uppercase text-[#a1c9ff]">
+                <span className="material-symbols-outlined text-[16px]">room_service</span>
+                Asistencia solicitada
+              </span>
+
+              {waiterCalls.map((call) => (
+                <div
+                  key={call.id}
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[#2a2a2c]"
+                >
+                  <span className="font-mono-code text-[12px] font-bold text-white">
+                    {call.table_number}
+                  </span>
+                  <span className="max-w-[200px] truncate text-[11px] text-[#c6c5cf]">
+                    {call.reason}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      attendWaiterCall(call.id);
+                      onShowToast(`${call.table_number}: asistencia atendida`, 'done_all');
+                    }}
+                    className="ml-1 min-h-[28px] px-2.5 rounded-md bg-[#ff5708] text-[11px] font-bold text-[#2b0b00] hover:bg-[#ff6924] active:scale-95 cursor-pointer"
+                  >
+                    Atendido
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Cards Grid: Tables Status */}
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">

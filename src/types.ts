@@ -128,6 +128,32 @@ export interface TableStatus {
   reservationName?: string;
 }
 
+/**
+ * CD-28 · Llamar al Mozo / Asistencia en Mesa
+ * Motivos EXACTOS habilitados en la carta digital del comensal (sin agregados).
+ */
+export const WAITER_CALL_REASONS = [
+  'Traer cubiertos/servilletas',
+  'Consulta al mozo',
+  'Llamar mozo general'
+] as const;
+
+export type WaiterCallReason = (typeof WAITER_CALL_REASONS)[number];
+
+/** Estado del llamado: `open` (pendiente) o `attended` (ya atendido por el personal). */
+export type WaiterCallStatus = 'open' | 'attended';
+
+/** Fila de la tabla `public.waiter_calls` (llamado de mesa persistente y auditable). */
+export interface WaiterCall {
+  id: string;
+  table_number: string;
+  reason: WaiterCallReason;
+  status: WaiterCallStatus;
+  created_at: string;
+  resolved_at: string | null;
+}
+
+
 export interface MenuItem {
   id: string;
   name: string;

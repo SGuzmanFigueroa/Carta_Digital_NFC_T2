@@ -125,6 +125,46 @@ class KitchenAudioSystem {
     }
   }
 
+  /**
+   * CD-28 · Campanilla suave de "llamado de mesa" para el personal (KDS / Salón).
+   * Deliberadamente SUTIL: dos notas senoidales de baja ganancia con ataque/caída
+   * largos (ding cristalino). No es una alarma crítica: no usa sawtooth, no repite
+   * y no compite con los avisos rojos de demora.
+   */
+  public playWaiterCallChime() {
+    if (!this.enabled) return;
+    try {
+      this.initCtx();
+      if (!this.ctx) return;
+      if (this.ctx.state === 'suspended') {
+        this.ctx.resume().catch(() => {});
+      }
+
+      const now = this.ctx.currentTime;
+      const notes = [
+        { freq: 1318.51, startAt: now, gain: 0.06, dur: 0.45 }, // E6
+        { freq: 1975.53, startAt: now + 0.1, gain: 0.032, dur: 0.55 } // B6 (armónico tenue)
+      ];
+
+      notes.forEach(({ freq, startAt, gain, dur }) => {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const env = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, startAt);
+        env.gain.setValueAtTime(0.0001, startAt);
+        env.gain.exponentialRampToValueAtTime(gain, startAt + 0.02);
+        env.gain.exponentialRampToValueAtTime(0.0001, startAt + dur);
+        osc.connect(env);
+        env.connect(this.ctx.destination);
+        osc.start(startAt);
+        osc.stop(startAt + dur + 0.02);
+      });
+    } catch {
+      // Audio autoplay policy fallback
+    }
+  }
+
   public playAllergyWarning() {
     if (!this.enabled) return;
     try {

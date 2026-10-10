@@ -30,7 +30,9 @@ export const KDSBoard: React.FC<KDSBoardProps> = ({
     toggleKitchenPause: contextToggleKitchenPause,
     kitchenPaused: contextKitchenPaused,
     audioEnabled: contextAudioEnabled,
-    toggleAudio: contextToggleAudio
+    toggleAudio: contextToggleAudio,
+    waiterCalls: contextWaiterCalls,
+    attendWaiterCall: contextAttendWaiterCall
   } = useRestaurant();
 
   const [selectedStation, setSelectedStation] = useState<StationId>('all');
@@ -93,6 +95,20 @@ export const KDSBoard: React.FC<KDSBoardProps> = ({
 
     return () => clearInterval(timer);
   }, []);
+
+  // CD-28 · Campanilla suave: suena UNA vez por cada llamado nuevo detectado
+  // (también al reabrir el KDS con llamados pendientes = durabilidad del aviso).
+  // El `ref` evita repetir el sonido en re-renders y no provoca bucles.
+  const announcedCallIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const freshCalls = contextWaiterCalls.filter((call) => !announcedCallIdsRef.current.has(call.id));
+    if (freshCalls.length === 0) return;
+
+    freshCalls.forEach((call) => announcedCallIdsRef.current.add(call.id));
+    if (contextAudioEnabled) {
+      kitchenAudio.playWaiterCallChime();
+    }
+  }, [contextWaiterCalls, contextAudioEnabled]);
 
   const showToast = (msg: string, icon = 'check_circle') => {
     setToastMessage(msg);
@@ -424,6 +440,47 @@ export const KDSBoard: React.FC<KDSBoardProps> = ({
               <span>PET</span>
             </div>
           </div>
+
+          {/* CD-28 · Llamados de mesa en vivo (la tira solo existe si hay llamados:
+              cero impacto visual cuando no hay ninguno). */}
+          {contextWaiterCalls.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 w-full pt-2.5 border-t border-[#353437]/40">
+              <span className="flex items-center gap-1.5 font-mono-code text-[11px] font-bold uppercase text-[#ffb59c]">
+                <span className="material-symbols-outlined text-[16px]">room_service</span>
+                Llamados de mesa
+                <span className="px-1.5 py-0.5 rounded bg-[#2a2a2c] text-white">
+                  {contextWaiterCalls.length}
+                </span>
+              </span>
+
+              {contextWaiterCalls.map((call) => (
+                <div
+                  key={call.id}
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[#2a2a2c]"
+                >
+                  <span className="material-symbols-outlined text-[16px] text-[#a1c9ff]">
+                    notifications_active
+                  </span>
+                  <span className="font-mono-code text-[12px] font-bold text-white">
+                    {call.table_number}
+                  </span>
+                  <span className="max-w-[200px] truncate text-[11px] text-[#c6c5cf]">
+                    {call.reason}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      contextAttendWaiterCall(call.id);
+                      showToast(`${call.table_number}: llamado atendido`, 'done_all');
+                    }}
+                    className="ml-1 min-h-[28px] px-2.5 rounded-md bg-[#ff5708] text-[11px] font-bold text-[#2b0b00] hover:bg-[#ff6924] active:scale-95 cursor-pointer"
+                  >
+                    Atendido
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
