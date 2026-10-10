@@ -5,6 +5,7 @@ import { BookOpen, ConciergeBell, QrCode, Search, ShoppingBag } from 'lucide-rea
 import { cn } from '@/lib/utils';
 // CD-27 · Globo del contador con rebote elástico al agregar un plato.
 import { CartBadge } from './CartBadge';
+import { useLanguage } from '@/hooks/useLanguage';
 
 interface MenuBottomNavProps {
   cartItemsCount: number;
@@ -32,6 +33,8 @@ export function MenuBottomNav({
   onOpenPayment,
   className
 }: MenuBottomNavProps) {
+  // CD-31 · Etiquetas traducidas (ES/EN) en tiempo real, sin recargar la página.
+  const { t } = useLanguage();
   const itemBaseClass = cn(
     'flex flex-col items-center justify-center gap-0.5',
     'min-h-[44px] min-w-[44px] rounded-xl px-1.5 py-1.5',
@@ -45,7 +48,7 @@ export function MenuBottomNav({
 
   return (
     <nav
-      aria-label="Navegación de la carta digital"
+      aria-label={t('nav.aria')}
       className={cn(
         'fixed inset-x-0 bottom-0 z-40 sm:hidden',
         'border-t border-[#e2e8f0] bg-white/95 backdrop-blur-xl',
@@ -56,18 +59,21 @@ export function MenuBottomNav({
       <div className="mx-auto grid max-w-md grid-cols-5 items-stretch justify-items-center px-1 pt-1.5 pb-safe">
         <button type="button" onClick={onGoToMenu} className={cn(itemBaseClass, idleClass)}>
           <BookOpen aria-hidden="true" size={19} />
-          <span>Carta</span>
+          <span>{t('nav.menu')}</span>
         </button>
 
         <button type="button" onClick={onFocusSearch} className={cn(itemBaseClass, idleClass)}>
           <Search aria-hidden="true" size={19} />
-          <span>Buscar</span>
+          <span>{t('nav.search')}</span>
         </button>
 
         <button
           type="button"
           onClick={onOpenCart}
-          aria-label={`Ver pedido, ${cartItemsCount} ${cartItemsCount === 1 ? 'plato' : 'platos'}`}
+          aria-label={t('cart.aria', {
+            count: cartItemsCount,
+            dishes: t(cartItemsCount === 1 ? 'unit.dishOne' : 'unit.dishOther')
+          })}
           className={cn(
             itemBaseClass,
             cartItemsCount > 0
@@ -85,7 +91,7 @@ export function MenuBottomNav({
               className="absolute -right-2 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#ff5708] px-1 text-[9px] font-bold text-[#2b0b00]"
             />
           </span>
-          <span>Pedido</span>
+          <span>{t('nav.order')}</span>
         </button>
 
         {/* CD-10 · Acceso rápido a Pasarela de Pago Digital QR */}
@@ -93,10 +99,10 @@ export function MenuBottomNav({
           type="button"
           onClick={onOpenPayment}
           className={cn(itemBaseClass, idleClass, 'text-[#c2410c] dark:text-[#ffb59c]')}
-          title="Pedir la cuenta y pagar con Yape o Plin QR"
+          title={t('nav.payQrTitle')}
         >
           <QrCode aria-hidden="true" size={19} />
-          <span>Pagar QR</span>
+          <span>{t('nav.payQr')}</span>
         </button>
 
         <button
@@ -114,7 +120,7 @@ export function MenuBottomNav({
           )}
         >
           <ConciergeBell aria-hidden="true" size={19} />
-          <span>{waiterCalled ? 'Llamando' : 'Garzón'}</span>
+          <span>{waiterCalled ? t('nav.waiterCalling') : t('nav.waiter')}</span>
         </button>
       </div>
     </nav>

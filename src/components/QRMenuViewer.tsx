@@ -12,14 +12,8 @@ const ThreeDView = dynamic(
   () => import('./ThreeDView').then((mod) => mod.ThreeDView),
   {
     ssr: false, // Fundamental: Three.js necesita el objeto 'window', no puede renderizarse en el servidor
-    loading: () => (
-      <div className="flex items-center justify-center w-full h-64 bg-[#131418] rounded-xl border border-[#24252e]">
-        <div className="flex flex-col items-center gap-2">
-          <span className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin"></span>
-          <span className="text-primary font-mono-code text-[11px] animate-pulse">Cargando motor 3D...</span>
-        </div>
-      </div>
-    )
+    // CD-31 · El fallback es un componente propio para que su copy respete el idioma.
+    loading: () => <ThreeDLoading />
   }
 );
 
@@ -27,6 +21,9 @@ import { ARTableViewer } from './ARTableViewer';
 import { DishARViewer } from './DishARViewer';
 // CD-13 · Componentes del tema Claro/Oscuro y navegación inferior del comensal.
 import { ThemeToggle } from './menu/ThemeToggle';
+// CD-31 · Selector de idioma [ES | EN] de la carta del comensal.
+import { LanguageToggle } from './menu/LanguageToggle';
+import { useLanguage } from '@/hooks/useLanguage';
 import { MenuBottomNav } from './menu/MenuBottomNav';
 // CD-27 · Microinteracciones del carrito: globo con rebote y total que "cuenta".
 import { CartBadge } from './menu/CartBadge';
@@ -45,7 +42,19 @@ import { PromoDealModal } from './menu/PromoDealModal';
 // CD-16 · Tira "Oferta Flash" de portada: rota sola entre las ofertas activas.
 import { PromoFlashTicker } from './menu/PromoFlashTicker';
 import { OrderHistoryModal } from './menu/OrderHistoryModal';
-import { validateDinerGeofence } from '@/utils/geofence';
+import { validateDinerGeofence, type GeofenceValidationResult } from '@/utils/geofence';
+import {
+  buildMenuSearchText,
+  getMenuCategoryLabel,
+  getMenuCategoryTabs,
+  localizeMenuItem,
+  localizeMenuItemName,
+  localizePromoOffer,
+  type LocalizedMenuItem
+} from '@/i18n/menuContent';
+import type { TranslationKey, TranslationParams } from '@/i18n/translations';
+// CD-31 · Rótulo de mesa visible (ES/EN) sin alterar el identificador que usa cocina.
+import { localizeTableLabel } from '@/i18n/tableLabel';
 import { GeofenceWarningModal } from './menu/GeofenceWarningModal';
 // CD-28 · Bottom Sheet de asistencia en mesa (motivos exactos del ticket).
 import { WaiterCallModal } from './menu/WaiterCallModal';
@@ -53,6 +62,55 @@ import { formatSoles } from '@/utils/promo';
 import { INITIAL_ACTIVE_PROMO_OFFERS } from '@/data/mockData';
 import { DietaryFilters, DIETARY_FILTERS, getDietaryPreferences } from './menu/DietaryFilters';
 import type { DietaryPreference } from '../types';
+
+/**
+ * CD-31 · Fallback del visor 3D: componente propio (y no un literal dentro de
+ * `dynamic()`) porque necesita el hook de idioma para traducir su copy.
+ */
+function ThreeDLoading() {
+  const { t } = useLanguage();
+  return (
+    <div className="flex items-center justify-center w-full h-64 bg-[#131418] rounded-xl border border-[#24252e]">
+      <div className="flex flex-col items-center gap-2">
+        <span className="w-6 h-6 border-2 border-[#ff5708] border-t-transparent rounded-full animate-spin"></span>
+        <span className="text-[#ff5708] font-mono-code text-[11px] animate-pulse">{t('dish.loading3d')}</span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * CD-31 · Mensaje del aviso GPS antifraude en el idioma de la carta.
+ * `validateDinerGeofence` redacta en español (su texto lo comparte el panel de staff),
+ * así que la carta reconstruye el mensaje desde el MOTIVO real de la validación y
+ * solo cae al texto original si aparece un motivo desconocido.
+ */
+function localizeGeofenceMessage(
+  result: GeofenceValidationResult,
+  t: (key: TranslationKey, params?: TranslationParams) => string
+): string {
+  switch (result.reason) {
+    case 'valid_inside_radius':
+      return t('geofence.verified', { distance: result.distanceMeters });
+    case 'outside_radius':
+      return t('geofence.outside', {
+        distance: result.distanceMeters,
+        limit: result.maxAllowedMeters
+      });
+    case 'geofence_disabled':
+      return t('geofence.disabled');
+    case 'sandbox_dev_bypass':
+      return t('geofence.sandbox');
+    case 'unsupported_device':
+      return t('geofence.unsupported');
+    case 'permission_denied':
+      return t('geofence.permissionDenied');
+    case 'timeout':
+      return t('geofence.timeout');
+    default:
+      return result.message;
+  }
+}
 
 // =============================================================================
 // 🎯 CD-16 · CONFIGURACIÓN DE LA OFERTA FLASH (POP-UP PROMOCIONAL DEL COMENSAL)
@@ -156,6 +214,8 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   // CD-28 · Controla el Bottom Sheet de motivos de asistencia en mesa.
   const [isWaiterCallModalOpen, setIsWaiterCallModalOpen] = useState(false);
   const observedOrderStatus = useRef<{ id: string; status: OrderTicket['status'] } | null>(null);
+  /** CD-31 · Idioma de la carta (ES/EN) con persistencia en localStorage. */
+  const { language, t } = useLanguage();
 
   // Flechas de desplazamiento para la barra de categorías
   const catScrollRef = useRef<HTMLDivElement>(null);
@@ -190,7 +250,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   const [isArCameraRequesting, setIsArCameraRequesting] = useState(false);
   const [arCameraAttempted, setArCameraAttempted] = useState(false);
   const [arScale, setArScale] = useState(1.0);
-  const [arTrackingStatus, setArTrackingStatus] = useState('Esperando cámara');
+  const [arTrackingStatus, setArTrackingStatus] = useState(() => t('ar.waiting'));
   const [isArDishAnchored, setIsArDishAnchored] = useState(false);
   const [arDish, setArDish] = useState<MenuItem>(menuItems[0]); // default to Chaufa or current
 
@@ -242,7 +302,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     }));
     setShowWelcomeBack(false);
     setIsCartOpen(true);
-    onShowToast('¡Comanda favorita cargada en tu pedido! 🎉', 'receipt_long');
+    onShowToast(t('toast.repeatLoaded'), 'receipt_long');
   };
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -287,7 +347,10 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
           sessionStorage.setItem('gastropulse_active_table', formatted);
           localStorage.setItem('gastropulse_active_table', formatted);
         } catch {}
-        onShowToast(`Mesa vinculada automáticamente por QR: ${formatted}`, 'qr_code_scanner');
+        onShowToast(
+          t('toast.tableLinked', { table: localizeTableLabel(formatted, language) }),
+          'qr_code_scanner'
+        );
       } else {
         try {
           const saved = sessionStorage.getItem('gastropulse_active_table') || localStorage.getItem('gastropulse_active_table');
@@ -391,10 +454,10 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   }, []);
 
   const showBlockedCameraMessage = React.useCallback(() => {
-    setArCameraMessage('No se pudo activar la cámara.');
-    setArCameraHelp('Chrome denegó el acceso. Toca Reintentar cámara y, si aparece el permiso, selecciona Permitir.');
-    onShowToast('La cámara no se activó; puedes reintentar', 'info');
-  }, [onShowToast]);
+    setArCameraMessage(t('ar.blocked'));
+    setArCameraHelp(t('ar.blockedHelp'));
+    onShowToast(t('toast.cameraNotActivated'), 'info');
+  }, [onShowToast, t]);
 
   const attachArCameraStream = React.useCallback(async (stream: MediaStream) => {
     pendingArStreamRef.current = stream;
@@ -409,8 +472,8 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     setArCameraActive(true);
     setArCameraMessage(null);
     setArCameraHelp(null);
-    onShowToast('Cámara AR activada: apunta hacia la mesa', 'view_in_ar');
-  }, [onShowToast]);
+    onShowToast(t('toast.cameraOn'), 'view_in_ar');
+  }, [onShowToast, t]);
 
   const handleCameraError = React.useCallback((err: unknown) => {
     console.warn('Camera access error or denied:', err);
@@ -423,24 +486,18 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     }
 
     if (errorName === 'NotFoundError' || errorName === 'OverconstrainedError') {
-      setArCameraMessage('No se encontró una cámara disponible.');
-      setArCameraHelp('Cierra Zoom, Meet, OBS u otra app que esté usando la cámara y vuelve a intentar.');
+      setArCameraMessage(t('ar.noCamera'));
+      setArCameraHelp(t('ar.noCameraHelp'));
       return;
     }
 
-    if (errorName === 'AbortError') {
-      setArCameraMessage('La cámara tardó demasiado en responder.');
-      setArCameraHelp('Reintenta y acepta el permiso de cámara apenas aparezca. Si otra app usa la cámara, ciérrala primero.');
-      return;
-    }
-
-    setArCameraMessage('No se pudo activar la cámara.');
-    setArCameraHelp('Cierra otras apps que usen la cámara y vuelve a intentar.');
-  }, [showBlockedCameraMessage, stopArCamera]);
+    setArCameraMessage(t('ar.blocked'));
+    setArCameraHelp(t('ar.failedHelp'));
+  }, [showBlockedCameraMessage, stopArCamera, t]);
 
   const startArCamera = React.useCallback(async () => {
     setArCameraAttempted(true);
-    setArCameraMessage('Solicitando permiso de cámara...');
+    setArCameraMessage(t('ar.requestingPermission'));
     setArCameraHelp(null);
     setIsArCameraRequesting(true);
 
@@ -453,7 +510,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     } finally {
       setIsArCameraRequesting(false);
     }
-  }, [attachArCameraStream, handleCameraError, requestArCameraStream, stopArCamera]);
+  }, [attachArCameraStream, handleCameraError, requestArCameraStream, stopArCamera, t]);
 
   useEffect(() => {
     if (isArModalOpen) return;
@@ -463,9 +520,9 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     setArCameraHelp(null);
     setArCameraAttempted(false);
     setIsArCameraRequesting(false);
-    setArTrackingStatus('Esperando cámara');
+    setArTrackingStatus(t('ar.waiting'));
     setIsArDishAnchored(false);
-  }, [isArModalOpen, stopArCamera]);
+  }, [isArModalOpen, stopArCamera, t]);
 
   useEffect(() => {
     if (!isArModalOpen) return;
@@ -482,18 +539,18 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     }
 
     if (!arCameraActive && !isArCameraRequesting && !arCameraMessage) {
-      setArCameraMessage('Toca Activar cámara para ver el plato en tu mesa.');
-      setArCameraHelp('El navegador puede pedir permiso de cámara una sola vez.');
+      setArCameraMessage(t('ar.tapToActivate'));
+      setArCameraHelp(t('ar.permissionOnce'));
     }
-  }, [arCameraActive, arCameraMessage, isArCameraRequesting, isArModalOpen]);
+  }, [arCameraActive, arCameraMessage, isArCameraRequesting, isArModalOpen, t]);
 
   const openArViewer = React.useCallback(async (dish: MenuItem) => {
     setArDish(dish);
-    setArTrackingStatus('Solicitando cámara');
+    setArTrackingStatus(t('ar.requestingPermission'));
     setIsArDishAnchored(false);
     setIsArModalOpen(true);
     setArCameraAttempted(true);
-    setArCameraMessage('Solicitando permiso de cámara...');
+    setArCameraMessage(t('ar.requestingPermission'));
     setArCameraHelp(null);
     setIsArCameraRequesting(true);
 
@@ -506,30 +563,51 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     } finally {
       setIsArCameraRequesting(false);
     }
-  }, [attachArCameraStream, handleCameraError, requestArCameraStream, stopArCamera]);
-  const filteredItems = React.useMemo(() => {
-    const query = normalizeSearchText(searchQuery);
-    const selectedCategoryNormalized = normalizeSearchText(selectedCategory);
+  }, [attachArCameraStream, handleCameraError, requestArCameraStream, stopArCamera, t]);
 
-    return menuItems.filter((item) => {
-      const itemCategory = normalizeSearchText(item.category);
-      const matchesCategory =
-        selectedCategory === 'todos' ||
-        itemCategory === selectedCategoryNormalized ||
-        itemCategory.startsWith(selectedCategoryNormalized) ||
-        selectedCategoryNormalized.startsWith(itemCategory);
+  const searchIndexById = React.useMemo(() => {
+    const index = new Map<string, string>();
+    menuItems.forEach((item) => index.set(item.id, buildMenuSearchText(item)));
+    return index;
+  }, [menuItems]);
 
-      if (!matchesCategory || !query) return matchesCategory;
+  const filteredItems: LocalizedMenuItem[] = React.useMemo(() => {
+    return menuItems
+      .filter((item) => {
+        const itemCat = normalizeStr(item.category || '');
+        const selCat = normalizeStr(selectedCategory);
+        const matchesCategory =
+          selectedCategory === 'todos' ||
+          itemCat === selCat ||
+          itemCat.startsWith(selCat) ||
+          selCat.startsWith(itemCat);
 
+        const query = normalizeStr(searchQuery);
+        const indexedText = searchIndexById.get(item.id) ?? '';
+        const matchesSearch =
+          !query ||
+          normalizeStr(item.name).includes(query) ||
+          normalizeStr(item.description).includes(query) ||
+          (item.tag && normalizeStr(item.tag).includes(query)) ||
+          indexedText.includes(query) ||
+          normalizeStr(getMenuCategoryLabel(item.category, language)).includes(query) ||
+          (item.ingredients &&
+            item.ingredients.some((ingredient) => normalizeStr(ingredient).includes(query)));
 
+        const matchesDietary =
+          selectedDietaryFilters.length === 0 ||
+          selectedDietaryFilters.every((filter) => {
+            if (filter === 'vegano') return item.isVegan;
+            if (filter === 'sin-gluten') return item.isGlutenFree;
+            if (filter === 'sin-lactosa') return item.isDairyFree;
+            if (filter === 'picante') return item.isSpicy;
+            return true;
+          });
 
-  const toggleDietaryFilter = (filter: DietaryPreference) => {
-    setSelectedDietaryFilters((current) =>
-      current.includes(filter)
-        ? current.filter((selected) => selected !== filter)
-        : [...current, filter]
-    );
-  };
+        return matchesCategory && matchesSearch && matchesDietary;
+      })
+      .map((item) => localizeMenuItem(item, language));
+  }, [menuItems, selectedCategory, searchQuery, selectedDietaryFilters, searchIndexById, language]);
 
   const cartTotal = cart.reduce((acc, curr) => acc + curr.item.price * curr.quantity, 0);
   const cartItemsCount = cart.reduce((acc, curr) => acc + curr.quantity, 0);
@@ -583,6 +661,12 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     kitchenAudio.playReadyBell();
   }, [activeTableTicket?.id, activeTableTicket?.status]);
 
+  /** CD-31 · Etiqueta accesible del carrito, traducida (con singular/plural). */
+  const cartAriaLabel = t('cart.aria', {
+    count: cartItemsCount,
+    dishes: t(cartItemsCount === 1 ? 'unit.dishOne' : 'unit.dishOther')
+  });
+
   const handleAddToCart = (item: MenuItem) => {
     // CD-27 · Feedback háptico inmediato: micro-vibración de 15 ms que confirma
     // el toque. Es un no-op silencioso donde la API no existe (iOS Safari).
@@ -597,7 +681,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       }
       return [...prev, { item, quantity: 1 }];
     });
-    onShowToast(`Agregado: ${item.name}`, 'add_shopping_cart');
+    onShowToast(t('toast.added', { dish: item.name }), 'add_shopping_cart');
   };
 
   const handleAddPairing = (pairing: string, sourceItemId: string) => {
@@ -639,9 +723,12 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
         .map((offer) => {
           const item = menuItems.find((m) => m.id === offer.mainDishId);
           if (!item) return null;
+          // CD-31 · Título de la oferta (dato de la BD) y plato, localizados a la vez.
+          const localizedOffer = localizePromoOffer(offer, language);
+          const localizedItem = localizeMenuItem(item, language);
           return {
-            ...item,
-            name: offer.title || item.name,
+            ...localizedItem,
+            name: localizedOffer.title || localizedItem.name,
             promoDiscountPercent: offer.discountPercent ?? PROMO_DEAL_DISCOUNT,
             promoPriceCustom: offer.promoPrice,
             promoOriginalPriceCustom: offer.originalPrice,
@@ -659,8 +746,9 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     const matched = PROMO_DEAL_IDS.map((id) => menuItems.find((item) => item.id === id)).filter(
       (item): item is MenuItem => Boolean(item)
     );
-    return matched.length > 0 ? matched : menuItems.slice(0, 3);
-  }, [menuItems, activeStoredOffers]);
+    const fallbackDeals = matched.length > 0 ? matched : menuItems.slice(0, 3);
+    return fallbackDeals.map((item) => localizeMenuItem(item, language));
+  }, [menuItems, activeStoredOffers, language]);
 
   /**
    * Abre el pop-up promocional. Si llega el `id` de un plato (toque en la tira
@@ -763,7 +851,11 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
 
     setIsPromoModalOpen(false);
     onShowToast(
-      `🔥 Oferta aplicada: ${dish.name} a ${formatSoles(promoPrice)} (-${PROMO_DEAL_DISCOUNT}%)`,
+      t('toast.promoApplied', {
+        dish: dish.name,
+        price: formatSoles(promoPrice),
+        percent: PROMO_DEAL_DISCOUNT
+      }),
       'local_fire_department'
     );
   };
@@ -800,13 +892,13 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
           isOpen: true,
           distance: geoCheck.distanceMeters,
           maxAllowed: geoCheck.maxAllowedMeters,
-          message: geoCheck.message,
+          message: localizeGeofenceMessage(geoCheck, t),
         });
         return;
       }
 
       if (geoCheck.reason === 'valid_inside_radius') {
-        onShowToast(`📍 Ubicación verificada en mesa (±${geoCheck.userCoords?.accuracy || 5}m)`, 'verified_user');
+        onShowToast(t('toast.geofenceVerified', { accuracy: geoCheck.userCoords?.accuracy || 5 }), 'verified_user');
       }
     } catch (e) {
       console.warn('Geofence check bypassed on error:', e);
@@ -868,7 +960,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
 
     setCart([]);
     setIsCartOpen(false);
-    onShowToast(`¡Comanda enviada a Cocina KDS desde ${selectedTable}!`, 'soup_kitchen');
+    onShowToast(t('toast.orderSent', { table: localizeTableLabel(selectedTable, language) }), 'soup_kitchen');
   };
 
   const handleConfirmAccountRequest = async () => {
@@ -877,7 +969,10 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       await onRequestTableAccount(selectedPaymentMethod, selectedTable);
     }
     setIsPaymentModalOpen(false);
-    onShowToast(`Cuenta solicitada (${selectedPaymentMethod}). Garzón en camino con el comprobante.`, 'receipt_long');
+    onShowToast(
+      t('pay.accountRequested', { method: selectedPaymentMethod }),
+      'receipt_long'
+    );
   };
 
   const handleOpenSplitBill = () => {
@@ -906,7 +1001,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       // que usa `handleSendOrder` para crear la comanda.
       await onCallWaiter(reason, selectedTable);
     }
-    onShowToast('¡Garzón alertado! Un miembro del salón se acerca a tu mesa.', 'notifications_active');
+    onShowToast(t('toast.waiterAlerted'), 'notifications_active');
     setTimeout(() => setWaiterCalled(false), 8000);
   };
 
@@ -949,7 +1044,31 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     return () => observer.disconnect();
   }, [filteredItems, selectedCategory]);
 
-  const heroItem = menuItems[0]; // Arroz Chaufa Wok de Autor
+  const heroItem: LocalizedMenuItem = localizeMenuItem(menuItems[0], language);
+
+  /**
+   * CD-31 · Opciones del selector de mesa. El VALOR se mantiene canónico ("MESA 04")
+   * para casar con pedidos/KDS, pero el RÓTULO visible se localiza ("Mesa 04" en ES,
+   * "Table 04" en EN) y sin prefijos duplicados ("MESA Mesa 01" → "Table 01").
+   */
+  const tableOptions = React.useMemo(() => {
+    const rawValues =
+      tables && tables.length > 0
+        ? tables.map((table) => {
+            const digits = table.number.toString().replace(/\D/g, '');
+            return digits ? `MESA ${digits.padStart(2, '0')}` : table.number.toString();
+          })
+        : [
+            'MESA 01', 'MESA 02', 'MESA 03', 'MESA 04',
+            'MESA 05', 'MESA 06', 'MESA 07', 'MESA 08',
+            'MESA 09', 'MESA 10', 'MESA 11', 'MESA 12'
+          ];
+    return Array.from(new Set(rawValues)).map((value) => ({
+      value,
+      label: localizeTableLabel(value, language)
+    }));
+  }, [tables, language]);
+
   // Extrae el ID del modelo desde la URL de la imagen (ej: /images/smoked-old-fashioned.jpg -> smoked-old-fashioned)
   const getModelId = (dish: MenuItem) => dish.id;
   return (
@@ -977,26 +1096,30 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                   type="button"
                   onClick={() => setIsTableModalOpen(true)}
                   className="group inline-flex min-h-[44px] min-w-[44px] items-center justify-center cursor-pointer"
-                  title="Cambiar Mesa"
-                  aria-label={`Cambiar mesa, mesa actual ${selectedTable}`}
+                  title={t('header.changeTable')}
+                  aria-label={t('header.changeTableAria', { table: localizeTableLabel(selectedTable, language) })}
                 >
                   <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#f1f5f9] group-hover:bg-[#e2e8f0] border border-[#cbd5e1] text-primary dark:bg-[#1c1d23] dark:group-hover:bg-[#282932] dark:border-[#353642] dark:text-primary text-[10px] sm:text-[11px] font-mono-code font-semibold transition-colors">
-                    <span>{selectedTable}</span>
+                    <span>{localizeTableLabel(selectedTable, language)}</span>
                     <span className="material-symbols-outlined text-[12px] text-primary">expand_more</span>
                   </span>
                 </button>
-                <span className="text-[10px] text-emerald-400 font-medium hidden xs:inline flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>Auto-pedido QR activo</span>
+                <span className="text-[10px] text-emerald-400 font-medium hidden xs:inline flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>{t('header.autoOrderActive')}</span>
               </div>
             </div>
           </div>
 
           {/* Right Header Controls: Theme Toggle + Cart Pill Button */}
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* CD-31 · Pastilla de idioma [ES | EN], gemela visual del toggle Sol/Luna */}
+            <LanguageToggle />
             <ThemeToggle />
 
             <button
               type="button"
               onClick={() => setIsCartOpen(true)}
+              aria-label={cartAriaLabel}
+              title={t('header.openCart')}
               className="relative px-3 py-1.5 min-h-[44px] rounded-xl bg-primary hover:brightness-110 text-on-primary font-bold text-[12px] flex items-center gap-1.5 shadow-[0_0_15px] shadow-primary/35 active:scale-95 transition-all cursor-pointer"
             >
               <span className="material-symbols-outlined text-[17px]">shopping_bag</span>
@@ -1025,32 +1148,35 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                   <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary"></span>
                 </span>
                 <span className="font-mono-code text-[11px] sm:text-[12px] text-[#c2410c] dark:text-[#ffb59c] font-bold uppercase truncate">
-                  Comanda #{latestRound.orderId.replace('ticket-', '').replace('cmd-', '')} • {selectedTable}
+                  {t('tracker.orderLabel', {
+                    id: latestRound.orderId.replace('ticket-', '').replace('cmd-', ''),
+                    table: localizeTableLabel(selectedTable, language)
+                  })}
                 </span>
               </div>
-              <span className="px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-mono-code font-bold uppercase bg-[#ff5708]/15 text-[#c2410c] border border-[#ff5708]/40 dark:bg-[#ff5708]/20 dark:text-[#ffb59c] shrink-0 inline-flex items-center gap-1">
+              <span className="px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-mono-code font-bold uppercase bg-primary/15 text-primary border border-primary/40 dark:bg-primary/20 dark:text-primary shrink-0 inline-flex items-center gap-1">
                 {activeTableTicket?.status === 'en-cocina' && (
                   <>
                     <span className="material-symbols-outlined text-[13px]">local_fire_department</span>
-                    <span>En Cocina</span>
+                    <span>{t('tracker.inKitchen')}</span>
                   </>
                 )}
                 {activeTableTicket?.status === 'pase-listo' && (
                   <>
                     <span className="material-symbols-outlined text-[13px]">done_all</span>
-                    <span>Listo en Pase</span>
+                    <span>{t('tracker.ready')}</span>
                   </>
                 )}
                 {activeTableTicket?.status === 'entregado' && (
                   <>
                     <span className="material-symbols-outlined text-[13px]">restaurant</span>
-                    <span>Servido en Mesa</span>
+                    <span>{t('tracker.served')}</span>
                   </>
                 )}
                 {(!activeTableTicket || activeTableTicket.status === 'por-validar') && (
                   <>
                     <span className="material-symbols-outlined text-[13px]">hourglass_top</span>
-                    <span>Recibido</span>
+                    <span>{t('tracker.received')}</span>
                   </>
                 )}
               </span>
@@ -1064,7 +1190,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
               >
                 <span className="material-symbols-outlined text-[20px] text-emerald-600 dark:text-emerald-400 shrink-0">notifications_active</span>
                 <span className="font-sans leading-tight">
-                  <strong className="font-bold">¡Tu comanda está lista en el pase!</strong> Ya sale a tu mesa.
+                  <strong className="font-bold">{t('tracker.readyTitle')}</strong> {t('tracker.readyBody')}
                 </span>
               </div>
             )}
@@ -1096,8 +1222,22 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
             </div>
 
             <div className="flex items-center justify-between text-[11px] text-[#475569] dark:text-[#a1a1aa] font-mono-code pt-1 border-t border-[#e2e8f0] dark:border-[#24252e]">
-              <span>{consumptionDishCount} platos en marcha</span>
+              <span>{t('tracker.itemsInProgress', { count: consumptionDishCount })}</span>
               <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsOrderHistoryOpen(true)}
+                  className="px-2.5 py-1 min-h-[36px] rounded-lg border border-[#cbd5e1] bg-white/70 font-bold text-[11px] text-[#334155] transition-colors hover:bg-white dark:border-[#3a3b46] dark:bg-[#24252e] dark:text-white dark:hover:bg-[#2d2e3a]"
+                  title="Consultar el historial de consumo de la mesa"
+                >
+                  <span className="material-symbols-outlined mr-1 align-middle text-[15px]">receipt_long</span>
+                  <span>Consumo de Mesa</span>
+                </button>
+                <span className="text-[#0f172a] dark:text-white font-bold">{t('tracker.total', { amount: `S/ ${consumptionTotal.toFixed(2)}` })}</span>
+                <button
+                  type="button"
+                  onClick={handleOpenSplitBill}
+                  className="px-2.5 py-1 min-h-[36px] rounded-lg bg-primary hover:brightness-110 text-on-primary font-bold text-[11px] flex items-center gap-1 shadow cursor-pointer transition-all active:scale-95"
                 <button
                   type="button"
                   onClick={() => setIsOrderHistoryOpen(true)}
@@ -1112,10 +1252,10 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                   type="button"
                   onClick={handleOpenSplitBill}
                   className="px-2.5 py-1 min-h-[36px] rounded-lg bg-[#ff5708] hover:bg-[#ff6924] text-[#2b0b00] font-bold text-[11px] flex items-center gap-1 shadow cursor-pointer transition-all active:scale-95"
-                  title="Pedir la cuenta y pagar con Yape o Plin QR"
+                  title={t('tracker.requestBillTitle')}
                 >
                   <span className="material-symbols-outlined text-[15px]">qr_code_2</span>
-                  <span>Pedir Cuenta / Pagar QR</span>
+                  <span>{t('tracker.requestBill')}</span>
                 </button>
               </div>
             </div>
@@ -1139,12 +1279,12 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                 </div>
                 <div>
                   <span className="font-mono-code text-[10px] text-primary font-bold tracking-wider uppercase flex items-center gap-1">
-                    <span>Cliente Frecuente</span>
+                    <span>{t('welcome.kicker')}</span>
                     <span className="text-[8px] text-primary">•</span>
                     <span>AUREA Bistro</span>
                   </span>
                   <h4 className="text-[14px] sm:text-[15px] font-bold text-[#0f172a] dark:text-white tracking-tight leading-snug">
-                    ¡Qué gusto tenerte de nuevo en mesa! ✨
+                    {t('welcome.title')}
                   </h4>
                 </div>
               </div>
@@ -1153,17 +1293,19 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                 type="button"
                 onClick={() => setShowWelcomeBack(false)}
                 className="w-8 h-8 rounded-lg flex items-center justify-center text-[#64748b] dark:text-[#94a3b8] hover:text-[#0f172a] dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer shrink-0"
-                title="Descartar recordatorio"
+                title={t('welcome.dismiss')}
               >
                 <span className="material-symbols-outlined text-[18px]">close</span>
               </button>
             </div>
 
             <p className="text-[12px] sm:text-[13px] text-[#475569] dark:text-[#cbd5e1] leading-relaxed relative z-10">
-              En tu visita anterior disfrutaste de:{' '}
+              {t('welcome.bodyPrefix')}{' '}
               <strong className="text-[#0f172a] dark:text-white font-semibold">
-                {lastOrder.items.map((it) => `${it.quantity}x ${it.item.name}`).join(', ')}
-              </strong>. ¿Deseas repetir tu combinación favorita hoy?
+                {lastOrder.items
+                  .map((it) => `${it.quantity}x ${localizeMenuItemName(it.item, language)}`)
+                  .join(', ')}
+              </strong>. {t('welcome.bodySuffix')}
             </p>
 
             <div className="flex flex-wrap items-center gap-2 pt-1 relative z-10">
@@ -1173,7 +1315,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                 className="h-10 px-4 rounded-xl bg-primary hover:brightness-110 text-on-primary font-bold text-[12px] sm:text-[13px] flex items-center gap-1.5 shadow-md shadow-primary/25 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
               >
                 <span className="material-symbols-outlined text-[17px]">replay</span>
-                <span>Repetir este Pedido • S/ {lastOrder.total.toFixed(2)}</span>
+                <span>{t('welcome.repeat', { amount: `S/ ${lastOrder.total.toFixed(2)}` })}</span>
               </button>
 
               <button
@@ -1181,7 +1323,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                 onClick={() => setShowWelcomeBack(false)}
                 className="h-10 px-3.5 rounded-xl bg-[#f1f5f9] hover:bg-[#e2e8f0] text-[#334155] dark:bg-white/5 dark:hover:bg-white/10 dark:text-[#e2e8f0] text-[12px] font-medium border border-[#cbd5e1] dark:border-white/10 transition-colors cursor-pointer whitespace-nowrap"
               >
-                Explorar Otros Platos
+                {t('welcome.explore')}
               </button>
             </div>
           </div>
@@ -1203,12 +1345,13 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               ref={searchInputRef}
-              placeholder="Buscar plato de autor, insumo o maridaje..."
+              placeholder={t('search.placeholder')}
               className="w-full bg-white dark:bg-[#15161c] text-[#0f172a] dark:text-[#e5e1e4] pl-10 pr-12 py-2 min-h-[44px] rounded-xl text-[13px] placeholder:text-[#64748b] dark:placeholder:text-[#71717a] border border-[#cbd5e1] dark:border-[#2d2e38] focus:outline-none focus:border-primary transition-colors"
             />
             {searchQuery && (
               <button
                 type="button"
+                aria-label={t('search.clear')}
                 onClick={() => setSearchQuery('')}
                 className="absolute right-1 top-1/2 -translate-y-1/2 flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-[#64748b] hover:text-[#0f172a] dark:text-[#71717a] dark:hover:text-white cursor-pointer"
               >
@@ -1223,7 +1366,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
               <button
                 type="button"
                 onClick={() => scrollCategories('left')}
-                aria-label="Ver categorías anteriores"
+                aria-label={t('search.categoriesPrev')}
                 className="absolute left-0 top-0 bottom-1 z-10 w-11 flex items-center justify-start bg-gradient-to-r from-[#f4f5f7] via-[#f4f5f7]/90 to-transparent dark:from-[#0b0c0e] dark:via-[#0b0c0e]/90 cursor-pointer"
               >
                 <span className="w-7 h-7 rounded-full bg-white dark:bg-[#1e1f28] border border-[#cbd5e1] dark:border-[#353642] flex items-center justify-center text-primary">
@@ -1237,13 +1380,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
               onScroll={updateCatArrows}
               className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar -mx-3.5 px-3.5 sm:mx-0 sm:px-0"
             >
-              {[
-                { id: 'todos', label: 'Todos' },
-                { id: 'fondos', label: 'Fondos & Wok' },
-                { id: 'entradas', label: 'Entradas Nikkei' },
-                { id: 'postres', label: 'Postres de Autor' },
-                { id: 'bebidas', label: 'Bebidas Signature' }
-              ].map((cat) => (
+              {getMenuCategoryTabs(language).map((cat) => (
                 <button
                   key={cat.id}
                   onClick={() => setSelectedCategory(cat.id)}
@@ -1262,7 +1399,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
               <button
                 type="button"
                 onClick={() => scrollCategories('right')}
-                aria-label="Ver más categorías"
+                aria-label={t('search.categoriesNext')}
                 className="absolute right-0 top-0 bottom-1 z-10 w-11 flex items-center justify-end bg-gradient-to-l from-[#f4f5f7] via-[#f4f5f7]/90 to-transparent dark:from-[#0b0c0e] dark:via-[#0b0c0e]/90 cursor-pointer"
               >
                 <span className="w-7 h-7 rounded-full bg-white dark:bg-[#1e1f28] border border-[#cbd5e1] dark:border-[#353642] flex items-center justify-center text-primary">
@@ -1304,13 +1441,13 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                 }`}
               >
                 <span className="material-symbols-outlined text-[14px]">image</span>
-                <span>Foto HD</span>
+                <span>{t('dish.photoHd')}</span>
               </button>
               <button
                 type="button"
                 onClick={() => {
                   setHeroViewMode('3d');
-                  onShowToast('Cargando plato en visor 3D interactivo', 'view_in_ar');
+                  onShowToast(t('toast.loading3dViewer'), 'view_in_ar');
                 }}
                 aria-pressed={heroViewMode === '3d'}
                 className={`px-3 py-1 rounded-lg text-[11px] font-sans font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
@@ -1320,7 +1457,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                 }`}
               >
                 <span className="material-symbols-outlined text-[14px]">view_in_ar</span>
-                <span>3D 360°</span>
+                <span>{t('dish.view3d360')}</span>
               </button>
             </div>
           </div>
@@ -1331,7 +1468,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                 <button
                   type="button"
                   onClick={() => setSelectedDishDetails(heroItem)}
-                  aria-label={`Abrir ficha técnica de ${heroItem.name}`}
+                  aria-label={t('dish.openHeroDetails', { dish: heroItem.name })}
                   className="absolute inset-0 h-full w-full cursor-zoom-in text-left"
                 >
                   <img
@@ -1348,14 +1485,14 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                   className="absolute bottom-3 right-3 px-3 py-1.5 rounded-full bg-black/80 backdrop-blur-md border border-primary/50 text-primary hover:text-white text-[11px] font-mono-code font-semibold flex items-center gap-1.5 shadow-xl hover:scale-105 transition-all cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-[15px] text-primary">view_in_ar</span>
-                  <span>Interactuar en 3D</span>
+                  <span>{t('dish.interact3d')}</span>
                 </button>
               </div>
             ) : (
               <ThreeDView
                 dishId={getModelId(heroItem)}
                 heightClass="h-64 sm:h-80"
-                onInteract={() => onShowToast(`Rotando ${heroItem.name}`, '3d_rotation')}
+                onInteract={() => onShowToast(t('toast.rotating', { dish: heroItem.name }), '3d_rotation')}
               />
             )}
           </div>
@@ -1379,7 +1516,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                 <span className="font-mono-code text-[22px] sm:text-[24px] font-bold text-primary">
                   S/ {heroItem.price.toFixed(2)}
                 </span>
-                <span className="font-mono-code text-[10px] text-[#64748b] dark:text-[#71717a]">Incluye IGV 18%</span>
+                <span className="font-mono-code text-[10px] text-[#64748b] dark:text-[#71717a]">{t('dish.igvNote')}</span>
               </div>
             </div>
 
@@ -1391,7 +1528,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
             <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[#e2e8f0] dark:border-[#24252e] text-[11px] font-mono-code">
               <span className="inline-flex items-center gap-1 text-primary bg-primary/10 dark:bg-[#1a1b22] px-2.5 py-1 rounded-lg border border-primary/20 dark:text-primary">
                 <span className="material-symbols-outlined text-[14px] text-primary">star</span>
-                {heroItem.rating} ({heroItem.reviewsCount} reseñas)
+                {heroItem.rating} {t('dish.reviewsCount', { count: heroItem.reviewsCount })}
               </span>
 
               <span className="inline-flex items-center gap-1 text-emerald-700 bg-[#ecfdf5] dark:bg-[#1a1b22] px-2.5 py-1 rounded-lg border border-emerald-500/20 dark:text-emerald-400">
@@ -1411,19 +1548,19 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                 type="button"
                 onClick={() => setSelectedDishDetails(heroItem)}
                 className="h-11 px-3 rounded-xl bg-white hover:bg-[#f1f5f9] text-[#334155] border border-[#cbd5e1] text-[12px] sm:text-[13px] font-semibold flex items-center justify-center gap-1.5 dark:bg-[#1e1f28] dark:hover:bg-[#282935] dark:text-[#e5e1e4] dark:border-[#353642] transition-colors cursor-pointer shrink-0 whitespace-nowrap active:scale-95"
-                aria-label={`Abrir ficha HD de ${heroItem.name}`}
+                aria-label={t('dish.openHeroHd', { dish: heroItem.name })}
               >
                 <span className="material-symbols-outlined text-[17px] text-primary">photo</span>
-                <span>Ficha HD</span>
+                <span>{t('dish.hdSheet')}</span>
               </button>
               <button
                 type="button"
                 onClick={() => openArViewer(heroItem)}
                 className="h-11 px-3.5 rounded-xl bg-[#f1f5f9] hover:bg-[#e2e8f0] text-[#334155] hover:text-[#0f172a] dark:bg-[#1e1f28] dark:hover:bg-[#282935] dark:text-[#e5e1e4] text-[13px] font-medium flex items-center justify-center gap-1.5 border border-[#cbd5e1] dark:border-[#353642] transition-colors cursor-pointer shrink-0 whitespace-nowrap active:scale-95"
-                title="Proyectar plato con cámara en tu mesa"
+                title={t('dish.projectArTableTitle')}
               >
                 <span className="material-symbols-outlined text-[18px] text-primary">view_in_ar</span>
-                <span>Visor AR</span>
+                <span>{t('dish.arViewer')}</span>
               </button>
 
               <button
@@ -1432,7 +1569,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                 className="flex-1 h-11 px-3.5 rounded-xl bg-primary hover:brightness-110 text-on-primary font-bold text-[13px] sm:text-[14px] flex items-center justify-center gap-2 shadow-[0_0_20px] shadow-primary/35 active:scale-98 transition-all cursor-pointer whitespace-nowrap"
               >
                 <span className="material-symbols-outlined text-[18px]">add_shopping_cart</span>
-                <span>Agregar • S/ {heroItem.price.toFixed(2)}</span>
+                <span>{t('dish.addPrice', { price: `S/ ${heroItem.price.toFixed(2)}` })}</span>
               </button>
             </div>
           </div>
@@ -1445,10 +1582,12 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
           <div className="flex items-center justify-between">
             <h3 className="text-[16px] sm:text-[18px] font-bold text-[#0f172a] dark:text-white flex items-center gap-2">
               <span className="material-symbols-outlined text-primary text-[20px]">menu_book</span>
-              <span>Nuestra Carta de Especialidades</span>
+              <span>{t('grid.title')}</span>
             </h3>
             <span className="font-mono-code text-[11px] text-[#64748b] dark:text-[#71717a]">
-              {filteredItems.length} {filteredItems.length === 1 ? 'plato encontrado' : 'platos encontrados'}
+              {t(filteredItems.length === 1 ? 'grid.countOne' : 'grid.countOther', {
+                count: filteredItems.length
+              })}
             </span>
           </div>
 
@@ -1462,9 +1601,13 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
               <div className="w-12 h-12 rounded-full bg-[#f1f5f9] dark:bg-[#1e1f28] border border-primary/30 text-primary flex items-center justify-center mx-auto">
                 <span className="material-symbols-outlined text-[24px]">search_off</span>
               </div>
-              <h4 className="text-[#0f172a] dark:text-white font-bold text-[16px]">No se encontraron platos</h4>
+              <h4 className="text-[#0f172a] dark:text-white font-bold text-[16px]">{t('grid.emptyTitle')}</h4>
               <p className="text-[#475569] dark:text-[#a1a1aa] text-[13px] max-w-sm mx-auto">
-                No encontramos ningún resultado para "{selectedDietaryFilters.length > 0 ? selectedDietaryFilters.map((selectedFilter) => DIETARY_FILTERS.find((filter) => filter.value === selectedFilter)?.label).join(', ') : searchQuery}". Prueba con otro ingrediente o limpia los filtros.
+                {selectedDietaryFilters.length > 0 ? (
+                  `No encontramos ningún resultado para "${selectedDietaryFilters.map((selectedFilter) => DIETARY_FILTERS.find((filter) => filter.value === selectedFilter)?.label).join(', ')}". Prueba con otro ingrediente o limpia los filtros.`
+                ) : (
+                  t('grid.emptyBody', { query: searchQuery })
+                )}
               </p>
               <button
                 type="button"
@@ -1475,7 +1618,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                 }}
                 className="px-4 py-2 min-h-[44px] rounded-xl bg-primary text-on-primary font-bold text-[12px] transition-all hover:brightness-110 cursor-pointer"
               >
-                Ver toda la carta
+                {t('grid.emptyAction')}
               </button>
             </div>
           ) : (
@@ -1493,7 +1636,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                   <button
                     type="button"
                     onClick={() => setSelectedDishDetails(dish)}
-                    aria-label={`Ver ficha técnica de ${dish.name}`}
+                    aria-label={t('dish.openDetails', { dish: dish.name })}
                     className="absolute inset-0 h-full w-full cursor-zoom-in text-left"
                   >
                     <img
@@ -1517,13 +1660,13 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                       type="button"
                       onClick={() => {
                         setSelectedDishForModal(dish);
-                        onShowToast(`Abriendo modelo 3D: ${dish.name}`, 'view_in_ar');
+                        onShowToast(t('toast.opening3d', { dish: dish.name }), 'view_in_ar');
                       }}
                       className="absolute top-2.5 right-2.5 px-2.5 py-1.5 min-h-[44px] rounded-full bg-black/80 backdrop-blur-md text-primary border border-primary/50 font-mono-code text-[10px] font-bold flex items-center gap-1 cursor-pointer hover:bg-primary hover:text-on-primary transition-colors shadow-lg"
-                      title="Ver plato en 3D interactivo"
+                      title={t('dish.viewIn3dTitle')}
                     >
                       <span className="material-symbols-outlined text-[14px]">view_in_ar</span>
-                      <span>Ver en 3D</span>
+                      <span>{t('dish.viewIn3d')}</span>
                     </button>
                   )}
 
@@ -1577,7 +1720,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                           type="button"
                           onClick={() => openArViewer(dish)}
                           className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl bg-[#f1f5f9] hover:bg-[#e2e8f0] text-[#1d4ed8] border border-[#cbd5e1] dark:bg-[#1e1f28] dark:hover:bg-[#282935] dark:text-[#a1c9ff] dark:border-[#353642] transition-colors cursor-pointer"
-                          title="Proyectar con cámara AR"
+                          title={t('dish.projectArTitle')}
                         >
                           <span className="material-symbols-outlined text-[16px]">view_in_ar</span>
                         </button>
@@ -1588,7 +1731,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                         className="px-3 py-1.5 min-h-[44px] rounded-xl bg-[#f1f5f9] hover:bg-primary text-[#0f172a] hover:text-on-primary border border-[#cbd5e1] hover:border-primary dark:bg-[#24252e] dark:text-white dark:border-transparent dark:hover:bg-primary dark:hover:text-on-primary font-semibold text-[12px] flex items-center gap-1 transition-colors cursor-pointer active:scale-95"
                       >
                         <span className="material-symbols-outlined text-[16px]">add</span>
-                        <span>Agregar</span>
+                        <span>{t('dish.add')}</span>
                       </button>
                     </div>
                   </div>
@@ -1615,7 +1758,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
             <div className="flex items-center gap-2">
               <span className="font-bold text-[#0f172a] dark:text-white">AUREA BISTRO</span>
               <span>• RUC: 20608945231</span>
-              <span className="hidden sm:inline">• Gastronomía Peruana de Autor</span>
+              <span className="hidden sm:inline">• {t('footer.cuisine')}</span>
             </div>
 
             <div className="flex items-center gap-2.5">
@@ -1623,15 +1766,15 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                 type="button"
                 onClick={() => setIsComplaintModalOpen(true)}
                 className="inline-flex min-h-[44px] items-center gap-2 px-3.5 py-2 rounded-xl bg-[#f1f5f9] hover:bg-[#e2e8f0] text-[#0f172a] dark:bg-[#1a1b22] dark:hover:bg-[#252630] dark:text-[#e2e8f0] border border-[#cbd5e1] dark:border-[#2d2e38] text-[12px] font-semibold transition-all cursor-pointer shadow-sm hover:border-primary/50 active:scale-95"
-                title="Libro de Reclamaciones Oficial conforme a ley INDECOPI"
+                title={t('footer.complaintsTitle')}
               >
                 <span className="material-symbols-outlined text-primary text-[18px]">menu_book</span>
-                <span>Libro de Reclamaciones</span>
+                <span>{t('footer.complaints')}</span>
               </button>
             </div>
           </div>
           <p className="text-[10px] text-[#94a3b8] dark:text-[#64748b] font-mono-code">
-            Conforme al D.S. N° 011-2011-PCM / Ley N° 29571 Código de Protección y Defensa del Consumidor.
+            {t('footer.legal')}
           </p>
         </footer>
       </main>
@@ -1652,7 +1795,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                 className="w-9 h-9 rounded-xl bg-[#ff5708] text-[#2b0b00] flex items-center justify-center font-bold font-mono-code text-[15px] shrink-0 shadow-md"
               />
               <div className="flex flex-col min-w-0">
-                <span className="text-[11px] text-[#475569] dark:text-[#a1a1aa] truncate">Total ({cartItemsCount} platos):</span>
+                <span className="text-[11px] text-[#475569] dark:text-[#a1a1aa] truncate">{t('cart.totalWithCount', { count: cartItemsCount, dishes: t(cartItemsCount === 1 ? 'unit.dishOne' : 'unit.dishOther') })}</span>
                 <span className="font-mono-code text-[15px] sm:text-[16px] font-bold text-[#c2410c] dark:text-[#ff5708]">
                   {/* CD-27 · El importe cuenta a 60 FPS en lugar de saltar. */}
                   <AnimatedSoles value={cartTotal} />
@@ -1667,14 +1810,14 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                 title="Ver y editar los platos pendientes del pedido"
                 className="px-2.5 sm:px-3 py-2 min-h-[44px] rounded-xl bg-[#f1f5f9] hover:bg-[#e2e8f0] text-[#0f172a] border border-[#cbd5e1] dark:bg-[#24252e] dark:hover:bg-[#2d2e3a] dark:text-white dark:border-transparent text-[11px] sm:text-[12px] font-medium transition-colors cursor-pointer"
               >
-                Ver Pedido
+                {t('cart.viewOrder')}
               </button>
               <button
                 type="button"
                 onClick={handleSendOrder}
                 className="px-3 sm:px-4 py-2 min-h-[44px] rounded-xl bg-primary text-on-primary font-bold text-[12px] sm:text-[13px] flex items-center gap-1 hover:brightness-110 active:scale-95 transition-all shadow-[0_0_15px] shadow-primary/35 cursor-pointer"
               >
-                <span>Enviar</span>
+                <span>{t('cart.send')}</span>
                 <span className="material-symbols-outlined text-[16px]">send</span>
               </button>
             </div>
@@ -1691,7 +1834,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
             <div className="flex items-center justify-between pb-2 border-b border-[#e2e8f0] dark:border-[#24252e]">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary text-[20px]">table_restaurant</span>
-                <h3 className="text-[16px] font-bold text-[#0f172a] dark:text-white">Selecciona tu Mesa</h3>
+                <h3 className="text-[16px] font-bold text-[#0f172a] dark:text-white">{t('table.title')}</h3>
               </div>
               <button
                 type="button"
@@ -1703,39 +1846,32 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
             </div>
 
             <p className="text-[12px] text-[#475569] dark:text-[#a1a1aa]">
-              Indica la mesa donde te encuentras para despachar tu comanda a la estación de cocina correspondiente:
+              {t('table.help')}
             </p>
 
             <div className="grid grid-cols-3 gap-2.5 max-h-60 overflow-y-auto pr-1">
-              {(tables && tables.length > 0
-                ? tables.map((t) => `MESA ${t.number.toString().padStart(2, '0')}`)
-                : [
-                    'MESA 01', 'MESA 02', 'MESA 03', 'MESA 04',
-                    'MESA 05', 'MESA 06', 'MESA 07', 'MESA 08',
-                    'MESA 09', 'MESA 10', 'MESA 11', 'MESA 12'
-                  ]
-              ).map((tableNum) => (
+              {tableOptions.map(({ value, label }) => (
                 <button
-                  key={tableNum}
+                  key={value}
                   type="button"
                   onClick={() => {
-                    setSelectedTable(tableNum);
+                    setSelectedTable(value);
                     try {
-                      sessionStorage.setItem('gastropulse_active_table', tableNum);
-                      localStorage.setItem('gastropulse_active_table', tableNum);
+                      sessionStorage.setItem('gastropulse_active_table', value);
+                      localStorage.setItem('gastropulse_active_table', value);
                     } catch (error) {
                       console.warn('Could not save selected table:', error);
                     }
                     setIsTableModalOpen(false);
-                    onShowToast(`Mesa configurada: ${tableNum}`, 'check_circle');
+                    onShowToast(t('toast.tableSet', { table: label }), 'check_circle');
                   }}
                   className={`py-2.5 px-2 min-h-[44px] rounded-xl text-[12px] font-mono-code font-bold transition-colors border text-center cursor-pointer ${
-                    selectedTable === tableNum
+                    selectedTable === value
                       ? 'bg-primary text-on-primary border-primary shadow-lg shadow-primary/30'
                       : 'bg-[#f1f5f9] text-[#0f172a] border-[#cbd5e1] hover:border-primary/60 dark:bg-[#1e1f28] dark:text-white dark:border-[#2e2f3a] dark:hover:border-primary/40'
                   }`}
                 >
-                  {tableNum}
+                  {label}
                 </button>
               ))}
             </div>
@@ -1746,7 +1882,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                 onClick={() => setIsTableModalOpen(false)}
                 className="w-full py-2.5 min-h-[44px] rounded-xl bg-[#f1f5f9] hover:bg-[#e2e8f0] text-[#0f172a] dark:bg-[#24252e] dark:hover:bg-[#2e2f3a] dark:text-white text-[13px] font-medium cursor-pointer"
               >
-                Confirmar
+                {t('table.confirm')}
               </button>
             </div>
           </div>
@@ -1762,10 +1898,11 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
             <div className="flex items-center justify-between pb-2 border-b border-[#e2e8f0] dark:border-[#24252e]">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary text-[20px]">receipt_long</span>
-                <h3 className="text-[16px] font-bold text-[#0f172a] dark:text-white">Tu Pedido • {selectedTable}</h3>
+                <h3 className="text-[16px] font-bold text-[#0f172a] dark:text-white">{t('cart.title', { table: localizeTableLabel(selectedTable, language) })}</h3>
               </div>
               <button
                 type="button"
+                aria-label={t('cart.close')}
                 onClick={() => setIsCartOpen(false)}
                 className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-[#475569] dark:text-[#a1a1aa] hover:text-[#0f172a] dark:hover:text-white hover:bg-[#f1f5f9] dark:hover:bg-[#24252e] cursor-pointer"
               >
@@ -1782,7 +1919,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex-1 min-w-0">
                       <h4 className="text-[13px] sm:text-[14px] font-semibold text-[#0f172a] dark:text-white truncate">
-                        {c.item.name}
+                        {localizeMenuItemName(c.item, language)}
                       </h4>
                       <span className="font-mono-code text-[12px] text-primary font-bold">
                         S/ {(c.item.price * c.quantity).toFixed(2)}
@@ -1794,7 +1931,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                         type="button"
                         onClick={() => handleRemoveFromCart(c.item.id)}
                         className="w-7 h-7 rounded-lg flex items-center justify-center text-[#475569] dark:text-[#a1a1aa] hover:bg-primary hover:text-white active:scale-90 transition-all font-bold text-[15px] cursor-pointer select-none"
-                        title="Disminuir cantidad"
+                        title={t('cart.decrease')}
                       >
                         -
                       </button>
@@ -1805,7 +1942,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                         type="button"
                         onClick={() => handleAddToCart(c.item)}
                         className="w-7 h-7 rounded-lg flex items-center justify-center text-[#475569] dark:text-[#a1a1aa] hover:bg-primary hover:text-white active:scale-90 transition-all font-bold text-[15px] cursor-pointer select-none"
-                        title="Aumentar cantidad"
+                        title={t('cart.increase')}
                       >
                         +
                       </button>
@@ -1814,7 +1951,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
 
                   <input
                     type="text"
-                    placeholder="Nota de cocina (ej. Sin cebolla, término medio...)"
+                    placeholder={t('cart.notePlaceholder')}
                     value={c.notes || ''}
                     onChange={(e) => handleUpdateNotes(c.item.id, e.target.value)}
                     className="w-full bg-white dark:bg-[#15161c] text-[#0f172a] dark:text-[#e5e1e4] px-2.5 py-2 min-h-[44px] rounded-lg text-[11px] placeholder:text-[#94a3b8] dark:placeholder:text-[#71717a] border border-[#e2e8f0] dark:border-[#2d2e38] focus:outline-none focus:border-primary"
@@ -1828,16 +1965,16 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                 exactamente el total en todos los frames intermedios). */}
             <div className="p-3 bg-[#f1f5f9] dark:bg-[#0e0e10] rounded-xl space-y-1.5 text-[11px] sm:text-[12px] font-mono-code">
               <div className="flex justify-between text-[#475569] dark:text-[#a1a1aa]">
-                <span>SUBTOTAL (SIN IGV)</span>
+                <span>{t('cart.subtotalNoIgv')}</span>
                 <span><AnimatedSoles value={cartTotal / 1.18} /></span>
               </div>
               <div className="flex justify-between text-[#475569] dark:text-[#a1a1aa]">
-                <span>IGV (18%)</span>
+                <span>{t('cart.igv')}</span>
                 <span><AnimatedSoles value={cartTotal - cartTotal / 1.18} /></span>
               </div>
               <div className="flex justify-between text-[#0f172a] dark:text-white font-bold text-[14px] sm:text-[15px] pt-1.5 border-t border-[#e2e8f0] dark:border-[#24252e]">
-                <span>TOTAL A PAGAR</span>
-                <span className="text-[#c2410c] dark:text-[#ff5708]"><AnimatedSoles value={cartTotal} /></span>
+                <span>{t('cart.totalToPay')}</span>
+                <span className="text-primary font-bold"><AnimatedSoles value={cartTotal} /></span>
               </div>
             </div>
 
@@ -1848,14 +1985,14 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                   onClick={() => setIsCartOpen(false)}
                   className="flex-1 py-2.5 min-h-[44px] rounded-xl bg-[#f1f5f9] text-[#0f172a] border border-[#cbd5e1] dark:border-transparent dark:bg-[#24252e] dark:text-[#e5e1e4] font-medium text-[13px] hover:bg-[#e2e8f0] dark:hover:bg-[#2d2e3a] cursor-pointer"
                 >
-                  Seguir Pidiendo
+                  {t('cart.keepOrdering')}
                 </button>
                 <button
                   type="button"
                   onClick={handleSendOrder}
                   className="flex-1 py-2.5 min-h-[44px] rounded-xl bg-primary text-on-primary font-bold text-[13px] flex items-center justify-center gap-1.5 hover:brightness-110 shadow-lg cursor-pointer"
                 >
-                  <span>Confirmar y Enviar</span>
+                  <span>{t('cart.confirmSend')}</span>
                   <span className="material-symbols-outlined text-[16px]">send</span>
                 </button>
               </div>
@@ -1870,7 +2007,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                 className="w-full py-2.5 min-h-[44px] rounded-xl border border-primary/40 bg-primary/10 text-primary hover:bg-primary/20 font-bold text-[12px] flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
               >
                 <span className="material-symbols-outlined text-[17px]">qr_code_2</span>
-                <span>Pedir la Cuenta / Pagar con Yape o Plin QR</span>
+                <span>{t('cart.requestAccount')}</span>
               </button>
             </div>
           </div>
@@ -1887,7 +2024,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary text-[20px]">view_in_ar</span>
                 <h3 className="text-[15px] sm:text-[16px] font-bold text-[#0f172a] dark:text-white truncate">
-                  {selectedDishForModal.name} (3D)
+                  {t('dish.threeDTitle', { dish: selectedDishForModal.name })}
                 </h3>
               </div>
               <button
@@ -1903,7 +2040,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
             <ThreeDView
               dishId={getModelId(selectedDishForModal)}
               heightClass="h-64 sm:h-72"
-              onInteract={() => onShowToast(`Inspeccionando ${selectedDishForModal.name}`, '3d_rotation')}
+              onInteract={() => onShowToast(t('toast.inspecting', { dish: selectedDishForModal.name }), '3d_rotation')}
             />
 
             <div className="space-y-1">
@@ -1926,10 +2063,10 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                   setSelectedDishForModal(null);
                 }}
                 className="px-3.5 py-2.5 min-h-[44px] rounded-xl bg-[#f1f5f9] hover:bg-[#e2e8f0] text-[#1d4ed8] border border-[#cbd5e1] dark:bg-[#1e1f28] dark:hover:bg-[#282935] dark:text-[#a1c9ff] dark:border-[#353642] text-[12px] flex items-center gap-1.5 cursor-pointer"
-                title="Proyectar con cámara en tu mesa"
+                title={t('dish.projectArTableTitle')}
               >
                 <span className="material-symbols-outlined text-[16px]">view_in_ar</span>
-                <span>Visor AR</span>
+                <span>{t('dish.arViewer')}</span>
               </button>
 
               <button
@@ -1941,7 +2078,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                 className="flex-1 py-2.5 min-h-[44px] rounded-xl bg-primary text-on-primary font-bold text-[13px] flex items-center justify-center gap-1.5 shadow-lg hover:brightness-110 cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[16px]">add_shopping_cart</span>
-                <span>Pedir Plato • S/ {selectedDishForModal.price.toFixed(2)}</span>
+                <span>{t('dish.orderPrice', { price: `S/ ${selectedDishForModal.price.toFixed(2)}` })}</span>
               </button>
             </div>
           </div>
@@ -1984,7 +2121,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                     disabled={isArCameraRequesting}
                     className="mt-3 min-h-[42px] rounded-xl bg-primary px-4 py-2 text-[13px] font-black text-on-primary shadow-lg active:scale-95 disabled:cursor-wait disabled:opacity-70"
                   >
-                    {isArCameraRequesting ? 'Activando cámara...' : arCameraAttempted ? 'Reintentar cámara' : 'Activar cámara'}
+                    {isArCameraRequesting ? t('ar.activatingCamera') : arCameraAttempted ? t('ar.retryCamera') : t('ar.activateCamera')}
                   </button>
                 </div>
               </div>
@@ -1995,16 +2132,17 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-[24px] text-primary">view_in_ar</span>
               <div className="flex flex-col">
-                <span className="text-[13px] font-bold text-white leading-tight">Visor AR en Mesa</span>
+                <span className="text-[13px] font-bold text-white leading-tight">{t('ar.title')}</span>
                 <span className="text-[10px] font-mono-code text-emerald-400 flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
-                  <span>{arCameraActive ? arTrackingStatus : isArCameraRequesting ? 'Activando cámara' : 'Esperando cámara'}</span>
+                  <span>{arCameraActive ? arTrackingStatus : isArCameraRequesting ? t('ar.activating') : t('ar.waiting')}</span>
                 </span>
               </div>
             </div>
 
             <button
               type="button"
+              aria-label={t('ar.close')}
               onClick={() => setIsArModalOpen(false)}
               className="w-11 h-11 min-h-[44px] min-w-[44px] rounded-full bg-black/60 backdrop-blur-md border border-white/20 flex items-center justify-center text-white hover:bg-white/20 transition-colors cursor-pointer"
             >
@@ -2028,10 +2166,11 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
           <div className="relative z-20 px-4 pb-safe pb-5 bg-gradient-to-t from-black/90 via-black/60 to-transparent pt-4 space-y-3">
             {/* Scale controls */}
             <div className="flex items-center justify-between bg-black/70 backdrop-blur-md px-3 py-2 rounded-xl border border-white/15 text-[11px] font-mono-code">
-              <span className="text-[#a1a1aa]">{isArDishAnchored ? 'Plato fijado en mesa:' : 'Escala Real en Mesa:'}</span>
+              <span className="text-[#a1a1aa]">{isArDishAnchored ? t('ar.anchored') : t('ar.realScale')}</span>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
+                  aria-label={t('ar.scaleDown')}
                   onClick={() => setArScale((s) => Math.max(0.6, s - 0.1))}
                   className="w-11 h-11 min-h-[44px] min-w-[44px] rounded bg-[#2a2b36] text-white flex items-center justify-center font-bold cursor-pointer"
                 >
@@ -2040,6 +2179,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                 <span className="text-primary font-bold">{(arScale * 28).toFixed(0)} cm Ø</span>
                 <button
                   type="button"
+                  aria-label={t('ar.scaleUp')}
                   onClick={() => setArScale((s) => Math.min(1.4, s + 0.1))}
                   className="w-11 h-11 min-h-[44px] min-w-[44px] rounded bg-[#2a2b36] text-white flex items-center justify-center font-bold cursor-pointer"
                 >
@@ -2064,7 +2204,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                 className="px-4 py-2.5 min-h-[44px] rounded-xl bg-primary text-on-primary font-bold text-[13px] flex items-center gap-1.5 shadow-lg hover:brightness-110 active:scale-95 cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[17px]">add_shopping_cart</span>
-                <span>Pedir este Plato</span>
+                <span>{t('dish.orderThisDish')}</span>
               </button>
             </div>
           </div>
@@ -2150,7 +2290,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
         onCallWaiter={() => {
           // CD-28 · Tercer punto con el mismo defecto: también debe viajar la mesa real.
           if (onCallWaiter) onCallWaiter('Solicitud de asistencia por verificación de mesa', selectedTable);
-          onShowToast('Mozo notificado para asistir tu mesa', 'room_service');
+          onShowToast(t('toast.waiterNotified'), 'room_service');
         }}
       />
 

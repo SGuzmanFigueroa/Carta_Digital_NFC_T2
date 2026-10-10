@@ -3,9 +3,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRight, Clock, Star, TrendingUp, X, Zap } from 'lucide-react';
 import type { MenuItem } from '@/types';
-import { buildPromoSubtitleText, calculatePromoPricing, formatPromoCountdown, formatSoles } from '@/utils/promo';
+import { calculatePromoPricing, formatPromoCountdown, formatSoles } from '@/utils/promo';
 import type { PromoPricing, PromoSubtitleTextInput } from '@/utils/promo';
 import { getPromoMechanic } from '@/utils/promoOffers';
+import { buildMenuPromoSubtitle, buildPromoSecondDishAltText } from '@/i18n/menuContent';
+import { useLanguage } from '@/hooks/useLanguage';
 
 interface PromoDealModalProps {
   isOpen: boolean;
@@ -290,6 +292,8 @@ function PromoPhotoGallery({ images, altTexts, ariaLabel }: PromoPhotoGalleryPro
  * que el temporizador siempre pertenece a la oferta que se está viendo.
  */
 const PromoFlashCountdown = React.memo(function PromoFlashCountdown({ seconds }: { seconds: number }) {
+  // CD-31 · Cuenta regresiva localizada (ES/EN) sin dejar de ser un tick aislado.
+  const { t } = useLanguage();
   // Arranca con la duración de la oferta. Si el pop-up cambiara de duración, el
   // `key={countdownSeconds}` del padre remonta este temporizador (sin efectos).
   const [remainingSeconds, setRemainingSeconds] = useState(seconds);
@@ -311,7 +315,7 @@ const PromoFlashCountdown = React.memo(function PromoFlashCountdown({ seconds }:
       }`}
     >
       <Clock size={13} strokeWidth={2.8} className={isUrgent ? 'text-rose-400' : 'text-primary'} />
-      <span>¡Termina en {formatPromoCountdown(remainingSeconds)}!</span>
+      <span>{t('promo.endsIn', { time: formatPromoCountdown(remainingSeconds) })}</span>
     </span>
   );
 });
@@ -366,10 +370,12 @@ const PromoDealSlide = React.memo(function PromoDealSlide({
   positionLabel,
   countdownSeconds
 }: PromoDealSlideModel) {
+  // CD-31 · Copy de cada tarjeta (título, reseñas y ahorro) en el idioma activo.
+  const { t } = useLanguage();
   return (
     <div
       role="group"
-      aria-roledescription="oferta"
+      aria-roledescription={t('promo.roledescription')}
       aria-label={positionLabel}
       className="flex w-full min-w-full shrink-0 basis-full snap-center snap-always flex-col bg-white dark:bg-[#131418]"
     >
@@ -384,7 +390,7 @@ const PromoDealSlide = React.memo(function PromoDealSlide({
           key={deal.id}
           images={images}
           altTexts={altTexts}
-          ariaLabel={`Fotos de la oferta: ${deal.name}`}
+          ariaLabel={t('promo.photosAria', { dish: deal.name })}
         />
 
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-white via-white/25 to-black/45 dark:from-[#131418] dark:via-[#131418]/25 dark:to-black/45" />
@@ -402,7 +408,7 @@ const PromoDealSlide = React.memo(function PromoDealSlide({
             id={titleId}
             className="text-[22px] sm:text-[24px] leading-none font-black text-[#0f172a] dark:text-white uppercase tracking-tight"
           >
-            ¡Oferta Especial!
+            {t('promo.specialOffer')}
           </h2>
 
           <p className="text-[12px] sm:text-[12.5px] font-black text-[#475569] dark:text-[#e5e1e4] uppercase leading-snug">
@@ -412,7 +418,7 @@ const PromoDealSlide = React.memo(function PromoDealSlide({
           <p className="inline-flex items-center justify-center gap-1.5 text-[11.5px] font-mono-code text-[#64748b] dark:text-[#a1a1aa]">
             <Star size={12} strokeWidth={2.6} className="text-amber-400" fill="currentColor" />
             <span className="text-[#0f172a] dark:text-[#e5e1e4] font-bold">{deal.rating.toFixed(1)}</span>
-            <span>({deal.reviewsCount} valoraciones)</span>
+            <span>{t('dish.ratingsCount', { count: deal.reviewsCount })}</span>
           </p>
         </div>
 
@@ -426,7 +432,7 @@ const PromoDealSlide = React.memo(function PromoDealSlide({
           </span>
           <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-mono-code text-[12px] font-bold">
             <TrendingUp size={13} strokeWidth={2.8} />
-            <span>Ahorra {formatSoles(pricing.savings)}</span>
+            <span>{t('promo.savings', { amount: formatSoles(pricing.savings) })}</span>
           </span>
         </div>
 
@@ -475,6 +481,8 @@ export function PromoDealModal({
   countdownSeconds = 755,
   onApply
 }: PromoDealModalProps) {
+  // CD-31 · Idioma de la carta: las tarjetas y su copy se recalculan al cambiarlo.
+  const { language, t } = useLanguage();
   const [activeIndex, setActiveIndex] = useState(0);
   const [wasOpen, setWasOpen] = useState(isOpen);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -540,13 +548,14 @@ export function PromoDealModal({
             discountPercent: itemDiscount
           }
         : (offerPricing ?? calculatePromoPricing(item.price, itemDiscount));
-      const subtitleText = buildPromoSubtitleText(
+      const subtitleText = buildMenuPromoSubtitle(
         offerCopy ?? {
           mechanic: 'discount',
           mainDishName: item.name,
           discountLabel: `${Math.round(itemPricing.discountPercent)}%`,
           complementDishName: null
-        }
+        },
+        language
       );
 
       // 🖼️ Galería de la cabecera: 2 fotos sólo cuando la mecánica usa un SEGUNDO
@@ -563,16 +572,27 @@ export function PromoDealModal({
         images,
         altTexts: [
           item.name,
-          offerCopy?.complementDishName
-            ? `${offerCopy.complementDishName} (segundo plato de la oferta)`
-            : 'Segundo plato de la oferta'
+          buildPromoSecondDishAltText(offerCopy?.complementDishName, language)
         ],
         titleId: `promo-deal-title-${item.id}`,
-        positionLabel: `Oferta ${index + 1} de ${validDeals.length}: ${item.name}`,
+        positionLabel: t('promo.offerPosition', {
+          index: index + 1,
+          total: validDeals.length,
+          dish: item.name
+        }),
         countdownSeconds
       };
     });
-  }, [validDeals, pricingOverride, promoCopy, complementDishImage, discountPercent, countdownSeconds]);
+  }, [
+    validDeals,
+    pricingOverride,
+    promoCopy,
+    complementDishImage,
+    discountPercent,
+    countdownSeconds,
+    language,
+    t
+  ]);
 
   /** Tarjeta centrada AHORA: gobierna el CTA del pie y el título del diálogo. */
   const currentSlide: PromoDealSlideModel | null =
@@ -720,7 +740,7 @@ export function PromoDealModal({
           ref={closeButtonRef}
           type="button"
           onClick={onClose}
-          aria-label="Cerrar oferta flash"
+          aria-label={t('promo.close')}
           className="absolute top-2.5 right-2.5 z-40 w-11 h-11 min-h-[44px] min-w-[44px] rounded-full bg-black/55 backdrop-blur-md border border-white/15 text-white flex items-center justify-center hover:bg-black/80 active:scale-95 transition-all cursor-pointer"
         >
           <X size={18} strokeWidth={2.8} />
@@ -746,8 +766,8 @@ export function PromoDealModal({
           role="group"
           aria-label={
             totalDeals > 1
-              ? `Carrusel de ofertas: ${totalDeals} disponibles`
-              : `Oferta activa: ${deal.name}`
+              ? t('promo.carouselAria', { count: totalDeals })
+              : t('promo.activeAria', { dish: deal.name })
           }
           className={railClassName}
         >
@@ -771,7 +791,7 @@ export function PromoDealModal({
             onClick={() => onApply(deal, pricing.promoPrice)}
             className="w-full h-12 min-h-[48px] rounded-2xl bg-primary hover:brightness-110 text-white font-black text-[13.5px] uppercase tracking-[0.04em] flex items-center justify-center gap-2 shadow-[0_10px_30px_-8px] shadow-primary/75 active:scale-[0.98] transition-all cursor-pointer"
           >
-            <span>Aplicar Descuento</span>
+            <span>{t('promo.applyDiscount')}</span>
             <ArrowRight size={17} strokeWidth={3} />
           </button>
 
@@ -784,7 +804,7 @@ export function PromoDealModal({
                     key={`promo-dot-${slide.deal.id}`}
                     type="button"
                     onClick={() => goToOffer(index)}
-                    aria-label={`Ver oferta ${index + 1} de ${totalDeals}: ${slide.deal.name}`}
+                    aria-label={t('promo.viewOffer', { index: index + 1, total: totalDeals, dish: slide.deal.name })}
                     aria-current={index === currentIndex}
                     className="group flex h-9 w-7 items-center justify-center cursor-pointer"
                   >
@@ -797,7 +817,7 @@ export function PromoDealModal({
                 ))}
               </div>
               <p className="font-mono-code text-[10.5px] text-[#64748b] dark:text-[#71717a]">
-                ({currentIndex + 1} de {totalDeals} ofertas)
+                {t('promo.counter', { index: currentIndex + 1, total: totalDeals })}
               </p>
             </div>
           )}

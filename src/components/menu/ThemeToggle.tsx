@@ -3,6 +3,7 @@
 import React, { useRef } from 'react';
 import { Moon, Sun } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useLanguage } from '@/hooks/useLanguage';
 import { useMenuTheme } from '@/hooks/useMenuTheme';
 
 interface ThemeToggleProps {
@@ -16,6 +17,8 @@ interface ThemeToggleProps {
  */
 export function ThemeToggle({ className }: ThemeToggleProps) {
   const { isDark, toggleTheme } = useMenuTheme();
+  // CD-31 · Textos accesibles del interruptor (ES/EN) según el idioma de la carta.
+  const { t } = useLanguage();
   const lastClickRef = useRef<number>(0);
 
   const handleToggle = () => {
@@ -31,8 +34,8 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
       type="button"
       onClick={handleToggle}
       aria-pressed={!isDark}
-      aria-label="Alternar tema claro u oscuro de la carta"
-      title={isDark ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'}
+      aria-label={t('theme.aria')}
+      title={isDark ? t('theme.toLight') : t('theme.toDark')}
       className={cn(
         'group relative flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center',
         'bg-transparent border-0 shadow-none outline-none',

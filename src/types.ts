@@ -195,6 +195,17 @@ export interface MenuItem {
   prepTime?: string;
   popularityShare?: number;
   ordersCount?: number;
+  /**
+   * CD-31 · Columnas bilingües OPCIONALES de la BD (`name_en`, `description_en`,
+   * `tag_en`, `badge_en`, `dietary_en`, `pairing_en`). Si llegan rellenas,
+   * `localizeMenuItem` las prefiere automáticamente sobre el diccionario simulado.
+   */
+  nameEn?: string;
+  descriptionEn?: string;
+  tagEn?: string;
+  badgeEn?: string;
+  dietaryEn?: string;
+  pairingEn?: string;
 }
 
 export type DietaryPreference = 'vegetarian' | 'gluten-free' | 'dairy-free' | 'spicy';
