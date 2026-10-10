@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
-import { Ticket, OrderTicket, TableStatus, Runner, MenuItem, StationId, TicketItem, AuthUser } from '../types';
+import { Ticket, OrderTicket, OrderRound, OrderRoundItem, TableStatus, Runner, MenuItem, StationId, TicketItem, AuthUser } from '../types';
 import { INITIAL_TICKETS, INITIAL_RUNNERS } from '../data/initialData';
 import { INITIAL_ORDERS, INITIAL_TABLES, INITIAL_MENU_ITEMS } from '../data/mockData';
 import { kitchenAudio } from '../utils/audio';
@@ -36,6 +36,7 @@ interface RestaurantContextType {
   setTickets: React.Dispatch<React.SetStateAction<Ticket[]>>;
   orders: OrderTicket[];
   setOrders: React.Dispatch<React.SetStateAction<OrderTicket[]>>;
+  tableOrderRounds: OrderRound[];
   tables: TableStatus[];
   runners: Runner[];
   setRunners: React.Dispatch<React.SetStateAction<Runner[]>>;
@@ -49,6 +50,12 @@ interface RestaurantContextType {
 
   // Actions
   sendOrderFromMenu: (tableStr: string, cartItems: { item: MenuItem; quantity: number; notes?: string }[], pax?: number) => OrderTicket;
+  recordTableOrderRound: (
+    tableStr: string,
+    cartItems: { item: MenuItem; quantity: number }[],
+    createdAt: Date,
+    orderId: string
+  ) => void;
   updateTicketItem: (ticketId: string, itemId: string, checked?: boolean) => void;
   startTicketPrep: (ticketId: string) => void;
   dispatchTicket: (ticketId: string) => void;
@@ -83,6 +90,10 @@ const STORAGE_KEY_TABLES = 'gastropulse_tables_v1';
 const STORAGE_KEY_REVENUE = 'gastropulse_revenue_v1';
 const STORAGE_KEY_DINER = 'gastropulse_diner_ticket_v1';
 const STORAGE_KEY_AUTH = 'gastropulse_auth_user';
+
+function getTableRoundKey(table: string): string {
+  return table.replace(/\D/g, '') || table.trim().toUpperCase();
+}
 
 const ALLOWED_BROADCAST_ACTIONS = [
   'NEW_ORDER',
@@ -179,6 +190,7 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
   const isStaffTerminal = isStaffManagementRoute(currentPath);
   const [tickets, setTickets] = useState<Ticket[]>(INITIAL_TICKETS);
   const [orders, setOrders] = useState<OrderTicket[]>(INITIAL_ORDERS);
+  const [tableOrderRounds, setTableOrderRounds] = useState<OrderRound[]>([]);
   const [tables, setTables] = useState<TableStatus[]>(INITIAL_TABLES);
   const [runners, setRunners] = useState<Runner[]>(INITIAL_RUNNERS);
   const [totalShiftRevenue, setTotalShiftRevenue] = useState<number>(4215.00);
@@ -758,6 +770,44 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
     [tickets, orders, tables, persistState, broadcastSync, showToast]
   );
 
+  const recordTableOrderRound = useCallback(
+    (
+      tableStr: string,
+      cartItems: { item: MenuItem; quantity: number }[],
+      createdAt: Date,
+      orderId: string
+    ) => {
+      const safeTable = validateTableString(tableStr);
+      const tableKey = getTableRoundKey(safeTable);
+
+      setTableOrderRounds((previousRounds) => {
+        const rounds = previousRounds.filter((round) => getTableRoundKey(round.table) === tableKey);
+        const roundNumber = rounds.length + 1;
+        const newRound: OrderRound = {
+          id: `${tableKey}-${createdAt.getTime()}-${roundNumber}`,
+          orderId,
+          table: safeTable,
+          createdAt: createdAt.toISOString(),
+          time: createdAt.toLocaleTimeString('es-PE', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
+          }),
+          items: cartItems.map((cartItem, index): OrderRoundItem => ({
+            id: `${tableKey}-${createdAt.getTime()}-${index}`,
+            name: cartItem.item.name,
+            quantity: cartItem.quantity,
+            price: cartItem.item.price,
+            status: 'Recibido'
+          }))
+        };
+
+        return [...previousRounds, newRound];
+      });
+    },
+    []
+  );
+
   // 2. Check / Toggle Item Ready in KDS
   const updateTicketItem = useCallback(
     (ticketId: string, itemId: string, explicitChecked?: boolean) => {
@@ -1147,6 +1197,7 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
   const resetAllDemoData = useCallback(() => {
     setTickets(INITIAL_TICKETS);
     setOrders(INITIAL_ORDERS);
+    setTableOrderRounds([]);
     setTables(INITIAL_TABLES);
     setRunners(INITIAL_RUNNERS);
     setTotalShiftRevenue(4215.00);
@@ -1401,6 +1452,7 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
         setTickets,
         orders,
         setOrders,
+        tableOrderRounds,
         tables,
         runners,
         setRunners,
@@ -1412,6 +1464,7 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
         currentUser,
         isTerminalLocked,
         sendOrderFromMenu,
+        recordTableOrderRound,
         updateTicketItem,
         startTicketPrep,
         dispatchTicket,

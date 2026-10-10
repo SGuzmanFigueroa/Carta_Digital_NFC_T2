@@ -17,7 +17,10 @@ import {
 export default function MenuPage() {
   const {
     sendOrderFromMenu,
+    recordTableOrderRound,
     dinerActiveTicket,
+    orders,
+    tableOrderRounds,
     tables,
     toast,
     showToast,
@@ -99,8 +102,11 @@ export default function MenuPage() {
           onAddNewOrder={handleAddNewOrder}
           onShowToast={showToast}
           activeTicket={dinerActiveTicket}
+          orderHistory={orders}
+          tableOrderRounds={tableOrderRounds}
           tables={tables}
           onSendOrderFromMenu={sendOrderFromMenu}
+          onRecordTableOrderRound={recordTableOrderRound}
           onRequestTableAccount={requestTableAccount}
           onCallWaiter={callWaiter}
           onDishCreated={(newDish) => {
