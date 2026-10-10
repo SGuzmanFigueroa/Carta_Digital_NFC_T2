@@ -328,9 +328,9 @@ export const PromoFlashTicker = React.memo(function PromoFlashTicker({
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchEnd}
-      className="w-full text-left relative overflow-hidden rounded-2xl border border-[#ff5708]/35 bg-gradient-to-r from-[#ff5708]/15 via-[#ff5708]/5 to-transparent p-2.5 flex items-center gap-3 shadow-[0_4px_20px_rgba(255,87,8,0.12)] active:scale-[0.99] transition-transform cursor-pointer"
+      className="w-full text-left relative overflow-hidden rounded-2xl border border-primary/35 bg-gradient-to-r from-primary/15 via-primary/5 to-transparent p-2.5 flex items-center gap-3 shadow-[0_4px_20px] shadow-primary/12 active:scale-[0.99] transition-transform cursor-pointer"
     >
-      <span className="w-11 h-11 min-w-[44px] rounded-xl bg-[#ff5708] text-white flex items-center justify-center shrink-0 shadow-md shadow-[#ff5708]/30">
+      <span className="w-11 h-11 min-w-[44px] rounded-xl bg-primary text-white flex items-center justify-center shrink-0 shadow-md shadow-primary/30">
         <svg className="w-5 h-5 text-white shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
         </svg>
@@ -338,20 +338,20 @@ export const PromoFlashTicker = React.memo(function PromoFlashTicker({
 
       {/* 🎞️ Bloque rotativo. `key={deal.id}` lo remonta en cada cambio de oferta,
           así la animación de entrada (fade + slide de 500ms) corre de cero sin
-          tocar el resto de la barra: el ícono naranja, el chevron y el marco
+          tocar el resto de la barra: el ícono del acento, el chevron y el marco
           permanecen intactos y el layout no se desplaza. */}
       <span
         key={deal.id}
         className="promo-deal-ticker transition-all duration-500 ease-out will-change-transform flex flex-col min-w-0 flex-1"
       >
-        <span className="font-mono-code text-[10px] font-bold uppercase tracking-wider text-[#c2410c] dark:text-[#ffb59c]">
+        <span className="font-mono-code text-[10px] font-bold uppercase tracking-wider text-primary">
           Oferta Flash · -{Math.round(discountPercent)}% del día
         </span>
         <span className="text-[13px] font-semibold text-[#0f172a] dark:text-white truncate">
           {deal.name}
         </span>
         <span className="flex items-center gap-2 font-mono-code text-[11px] pt-0.5">
-          <span className="text-[#ff5708] font-bold">{formatSoles(pricing.promoPrice)}</span>
+          <span className="text-primary font-bold">{formatSoles(pricing.promoPrice)}</span>
           <span className="text-[#64748b] dark:text-[#71717a] line-through">
             {formatSoles(pricing.originalPrice)}
           </span>
@@ -361,7 +361,7 @@ export const PromoFlashTicker = React.memo(function PromoFlashTicker({
         </span>
       </span>
 
-      <span className="material-symbols-outlined text-[#ff5708] text-[22px] shrink-0">chevron_right</span>
+      <span className="material-symbols-outlined text-primary text-[22px] shrink-0">chevron_right</span>
     </button>
   );
 });

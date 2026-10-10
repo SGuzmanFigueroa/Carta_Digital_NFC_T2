@@ -11,6 +11,8 @@ export interface AccentDefinition {
   lightBg: string;
   darkBg: string;
   textLight: string;
+  /** Tinta de máximo contraste sobre `hex` (texto e iconos de botones llenos). */
+  ink: string;
 }
 
 export const ACCENT_PALETTE: Record<string, AccentDefinition> = {
@@ -20,7 +22,8 @@ export const ACCENT_PALETTE: Record<string, AccentDefinition> = {
     hex: '#ff5708',
     lightBg: '#fff7ed',
     darkBg: '#221A15',
-    textLight: '#c2410c'
+    textLight: '#c2410c',
+    ink: '#2b0b00'
   },
   emerald: {
     id: 'emerald',
@@ -28,7 +31,8 @@ export const ACCENT_PALETTE: Record<string, AccentDefinition> = {
     hex: '#10b981',
     lightBg: '#f0fdf4',
     darkBg: '#10221A',
-    textLight: '#15803d'
+    textLight: '#15803d',
+    ink: '#052e16'
   },
   cyan: {
     id: 'cyan',
@@ -36,7 +40,8 @@ export const ACCENT_PALETTE: Record<string, AccentDefinition> = {
     hex: '#00b4d8',
     lightBg: '#f0f9ff',
     darkBg: '#102028',
-    textLight: '#0369a1'
+    textLight: '#0369a1',
+    ink: '#083344'
   },
   ruby: {
     id: 'ruby',
@@ -44,7 +49,8 @@ export const ACCENT_PALETTE: Record<string, AccentDefinition> = {
     hex: '#e11d48',
     lightBg: '#fff1f2',
     darkBg: '#251217',
-    textLight: '#be123c'
+    textLight: '#be123c',
+    ink: '#ffffff'
   },
   champagne: {
     id: 'champagne',
@@ -52,7 +58,8 @@ export const ACCENT_PALETTE: Record<string, AccentDefinition> = {
     hex: '#eab308',
     lightBg: '#fefce8',
     darkBg: '#231e0f',
-    textLight: '#a16207'
+    textLight: '#a16207',
+    ink: '#422006'
   },
   indigo: {
     id: 'indigo',
@@ -60,7 +67,8 @@ export const ACCENT_PALETTE: Record<string, AccentDefinition> = {
     hex: '#6366f1',
     lightBg: '#eef2ff',
     darkBg: '#16182a',
-    textLight: '#4338ca'
+    textLight: '#4338ca',
+    ink: '#ffffff'
   },
   terracotta: {
     id: 'terracotta',
@@ -68,7 +76,8 @@ export const ACCENT_PALETTE: Record<string, AccentDefinition> = {
     hex: '#ea580c',
     lightBg: '#fff7ed',
     darkBg: '#231711',
-    textLight: '#c2410c'
+    textLight: '#c2410c',
+    ink: '#2b0b00'
   },
   lavender: {
     id: 'lavender',
@@ -76,7 +85,8 @@ export const ACCENT_PALETTE: Record<string, AccentDefinition> = {
     hex: '#a855f7',
     lightBg: '#faf5ff',
     darkBg: '#1f132a',
-    textLight: '#7e22ce'
+    textLight: '#7e22ce',
+    ink: '#2e1065'
   },
   titanium: {
     id: 'titanium',
@@ -84,7 +94,8 @@ export const ACCENT_PALETTE: Record<string, AccentDefinition> = {
     hex: '#94a3b8',
     lightBg: '#f8fafc',
     darkBg: '#181b20',
-    textLight: '#475569'
+    textLight: '#475569',
+    ink: '#0f172a'
   }
 };
 
@@ -129,6 +140,7 @@ export function applyTheme(
 
   // Inject CSS Custom Properties for live reactivity in QR menu and admin
   root.style.setProperty('--primary-accent', accentConfig.hex);
+  root.style.setProperty('--primary-accent-ink', accentConfig.ink);
   root.style.setProperty('--color-primary', accentConfig.hex);
   root.style.setProperty('--color-kinetic-amber', accentConfig.hex);
 

@@ -15,8 +15,8 @@ const ThreeDView = dynamic(
     loading: () => (
       <div className="flex items-center justify-center w-full h-64 bg-[#131418] rounded-xl border border-[#24252e]">
         <div className="flex flex-col items-center gap-2">
-          <span className="w-6 h-6 border-2 border-[#ff5708] border-t-transparent rounded-full animate-spin"></span>
-          <span className="text-[#ff5708] font-mono-code text-[11px] animate-pulse">Cargando motor 3D...</span>
+          <span className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin"></span>
+          <span className="text-primary font-mono-code text-[11px] animate-pulse">Cargando motor 3D...</span>
         </div>
       </div>
     )
@@ -31,6 +31,9 @@ import { MenuBottomNav } from './menu/MenuBottomNav';
 // CD-27 · Microinteracciones del carrito: globo con rebote y total que "cuenta".
 import { CartBadge } from './menu/CartBadge';
 import { AnimatedSoles } from './menu/AnimatedSoles';
+// CD-26 · Puente con el banner de instalación de la PWA: le informa cuándo el
+// panel "Total" del carrito ocupa el carril inferior para que flote por encima.
+import { setDinerCartBarVisible } from '@/hooks/useDinerCartBar';
 import { PaymentModal } from './menu/PaymentModal';
 import { SplitBillModal } from './menu/SplitBillModal';
 import { ComplaintBookModal } from './menu/ComplaintBookModal';
@@ -254,6 +257,18 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       return { ...previous, [selectedTableKey]: nextCart };
     });
   };
+
+  /**
+   * CD-26 · Publica si el panel flotante del carrito ocupa el carril inferior.
+   * El banner de instalación PWA lo lee para flotar justo encima del "Total" sin
+   * taparlo ni quedar debajo. Se limpia al desmontar la carta para no dejar el
+   * carril marcado como ocupado en otras vistas.
+   */
+  const isCartBarVisible = cart.length > 0;
+  useEffect(() => {
+    setDinerCartBarVisible(isCartBarVisible);
+    return () => setDinerCartBarVisible(false);
+  }, [isCartBarVisible]);
 
   // Sincronizar automáticamente la mesa desde el QR escaneado (?mesa=4, ?table=04, ?m=2)
   useEffect(() => {
@@ -938,7 +953,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   // Extrae el ID del modelo desde la URL de la imagen (ej: /images/smoked-old-fashioned.jpg -> smoked-old-fashioned)
   const getModelId = (dish: MenuItem) => dish.id;
   return (
-    <div className="w-full min-h-screen bg-[#f4f5f7] text-[#0f172a] dark:bg-[#0b0c0e] dark:text-[#e5e1e4] pb-44 sm:pb-36 selection:bg-[#ff5708] selection:text-white transition-colors duration-300">
+    <div className="w-full min-h-screen bg-[#f4f5f7] text-[#0f172a] dark:bg-[#0b0c0e] dark:text-[#e5e1e4] pb-44 sm:pb-36 selection:bg-primary selection:text-white transition-colors duration-300">
       {/* ========================================================================= */}
       {/* 📱 ULTRA-CLEAN MOBILE-FIRST TOP APP BAR */}
       {/* ========================================================================= */}
@@ -946,14 +961,14 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-2">
           {/* Brand & Table Badge */}
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#ff5708] to-[#ff7b39] flex items-center justify-center shadow-lg shadow-[#ff5708]/25 shrink-0">
+            <div className="w-8 h-8 rounded-xl bg-primary bg-gradient-to-br from-white/20 to-transparent flex items-center justify-center shadow-lg shadow-primary/25 shrink-0">
               <span className="material-symbols-outlined text-[#0e0e10] text-[18px] font-bold">restaurant_menu</span>
             </div>
 
             <div className="flex flex-col min-w-0">
               <div className="flex items-center gap-1.5">
                 <span className="text-[13px] sm:text-[14px] font-bold text-[#0f172a] dark:text-white tracking-tight truncate font-sans">
-                  AUREA <span className="text-[#ff5708] font-normal text-[11px]">BISTRO</span>
+                  AUREA <span className="text-primary font-normal text-[11px]">BISTRO</span>
                 </span>
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
               </div>
@@ -965,9 +980,9 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                   title="Cambiar Mesa"
                   aria-label={`Cambiar mesa, mesa actual ${selectedTable}`}
                 >
-                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#f1f5f9] group-hover:bg-[#e2e8f0] border border-[#cbd5e1] text-[#c2410c] dark:bg-[#1c1d23] dark:group-hover:bg-[#282932] dark:border-[#353642] dark:text-[#ffb59c] text-[10px] sm:text-[11px] font-mono-code font-semibold transition-colors">
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#f1f5f9] group-hover:bg-[#e2e8f0] border border-[#cbd5e1] text-primary dark:bg-[#1c1d23] dark:group-hover:bg-[#282932] dark:border-[#353642] dark:text-primary text-[10px] sm:text-[11px] font-mono-code font-semibold transition-colors">
                     <span>{selectedTable}</span>
-                    <span className="material-symbols-outlined text-[12px] text-[#ff5708]">expand_more</span>
+                    <span className="material-symbols-outlined text-[12px] text-primary">expand_more</span>
                   </span>
                 </button>
                 <span className="text-[10px] text-emerald-400 font-medium hidden xs:inline flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>Auto-pedido QR activo</span>
@@ -982,7 +997,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
             <button
               type="button"
               onClick={() => setIsCartOpen(true)}
-              className="relative px-3 py-1.5 min-h-[44px] rounded-xl bg-[#ff5708] hover:bg-[#ff6924] text-[#2b0b00] font-bold text-[12px] flex items-center gap-1.5 shadow-[0_0_15px_rgba(255,87,8,0.35)] active:scale-95 transition-all cursor-pointer"
+              className="relative px-3 py-1.5 min-h-[44px] rounded-xl bg-primary hover:brightness-110 text-on-primary font-bold text-[12px] flex items-center gap-1.5 shadow-[0_0_15px] shadow-primary/35 active:scale-95 transition-all cursor-pointer"
             >
               <span className="material-symbols-outlined text-[17px]">shopping_bag</span>
               {/* CD-27 · Globo del contador con rebote elástico (badge pop). */}
@@ -1002,22 +1017,42 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       {/* ========================================================================= */}
       {orderRounds.length > 0 && (
         <div className="max-w-4xl mx-auto px-3.5 sm:px-6 pt-3.5">
-          <div className="bg-gradient-to-r from-white via-[#fff7ed] to-white dark:from-[#181920] dark:via-[#20212b] dark:to-[#181920] border border-[#ff5708]/50 rounded-2xl p-3.5 shadow-[0_0_25px_-5px_rgba(255,87,8,0.25)] flex flex-col gap-2.5">
+          <div className="bg-gradient-to-r from-white via-primary/10 to-white dark:from-[#181920] dark:via-[#20212b] dark:to-[#181920] border border-primary/50 rounded-2xl p-3.5 shadow-[0_0_25px_-5px] shadow-primary/25 flex flex-col gap-2.5">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0">
                 <span className="relative flex h-2.5 w-2.5 shrink-0">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff5708] opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#ff5708]"></span>
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary"></span>
                 </span>
                 <span className="font-mono-code text-[11px] sm:text-[12px] text-[#c2410c] dark:text-[#ffb59c] font-bold uppercase truncate">
                   Comanda #{latestRound.orderId.replace('ticket-', '').replace('cmd-', '')} • {selectedTable}
                 </span>
               </div>
-              <span className="px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-mono-code font-bold uppercase bg-[#ff5708]/15 text-[#c2410c] border border-[#ff5708]/40 dark:bg-[#ff5708]/20 dark:text-[#ffb59c] shrink-0">
-                {activeTableTicket?.status === 'en-cocina' && '🔥 En Cocina'}
-                {activeTableTicket?.status === 'pase-listo' && '✨ Listo en Pase'}
-                {activeTableTicket?.status === 'entregado' && '🍽️ Servido en Mesa'}
-                {(!activeTableTicket || activeTableTicket.status === 'por-validar') && '⏳ Recibido'}
+              <span className="px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-mono-code font-bold uppercase bg-[#ff5708]/15 text-[#c2410c] border border-[#ff5708]/40 dark:bg-[#ff5708]/20 dark:text-[#ffb59c] shrink-0 inline-flex items-center gap-1">
+                {activeTableTicket?.status === 'en-cocina' && (
+                  <>
+                    <span className="material-symbols-outlined text-[13px]">local_fire_department</span>
+                    <span>En Cocina</span>
+                  </>
+                )}
+                {activeTableTicket?.status === 'pase-listo' && (
+                  <>
+                    <span className="material-symbols-outlined text-[13px]">done_all</span>
+                    <span>Listo en Pase</span>
+                  </>
+                )}
+                {activeTableTicket?.status === 'entregado' && (
+                  <>
+                    <span className="material-symbols-outlined text-[13px]">restaurant</span>
+                    <span>Servido en Mesa</span>
+                  </>
+                )}
+                {(!activeTableTicket || activeTableTicket.status === 'por-validar') && (
+                  <>
+                    <span className="material-symbols-outlined text-[13px]">hourglass_top</span>
+                    <span>Recibido</span>
+                  </>
+                )}
               </span>
             </div>
 
@@ -1036,7 +1071,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
 
             {/* Stepper Progress Bar */}
             <div className="grid grid-cols-4 gap-1.5 pt-0.5">
-              <div className="h-1.5 rounded-full bg-[#ff5708] shadow-[0_0_8px_#ff5708]" />
+              <div className="h-1.5 rounded-full bg-primary shadow-[0_0_8px] shadow-primary" />
               <div
                 className={`h-1.5 rounded-full transition-all ${
                   ['en-cocina', 'pase-listo', 'entregado'].includes(activeTableTicket?.status || '')
@@ -1093,19 +1128,19 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       {/* ========================================================================= */}
       {showWelcomeBack && lastOrder && !activeTableTicket && (
         <div className="max-w-4xl mx-auto px-3.5 sm:px-6 pt-3.5 animate-fadeIn">
-          <div className="bg-gradient-to-r from-white via-[#fff7ed] to-white dark:from-[#171821] dark:via-[#22212c] dark:to-[#171821] border border-[#ff5708]/30 dark:border-[#ff5708]/40 rounded-2xl p-4 shadow-[0_4px_25px_rgba(255,87,8,0.12)] flex flex-col gap-3 relative overflow-hidden">
+          <div className="bg-gradient-to-r from-white via-primary/10 to-white dark:from-[#171821] dark:via-[#22212c] dark:to-[#171821] border border-primary/30 dark:border-primary/40 rounded-2xl p-4 shadow-[0_4px_25px] shadow-primary/12 flex flex-col gap-3 relative overflow-hidden">
             {/* Subtle glow background */}
-            <div className="absolute -top-12 -right-12 w-32 h-32 bg-[#ff5708]/10 rounded-full blur-2xl pointer-events-none" />
+            <div className="absolute -top-12 -right-12 w-32 h-32 bg-primary/10 rounded-full blur-2xl pointer-events-none" />
 
             <div className="flex items-start justify-between gap-3 relative z-10">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-[#ff5708]/15 border border-[#ff5708]/30 flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-[#ff5708] text-[20px]">auto_awesome</span>
+                <div className="w-9 h-9 rounded-xl bg-primary/15 border border-primary/30 flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-primary text-[20px]">auto_awesome</span>
                 </div>
                 <div>
-                  <span className="font-mono-code text-[10px] text-[#c2410c] dark:text-[#ffb59c] font-bold tracking-wider uppercase flex items-center gap-1">
+                  <span className="font-mono-code text-[10px] text-primary font-bold tracking-wider uppercase flex items-center gap-1">
                     <span>Cliente Frecuente</span>
-                    <span className="text-[8px] text-[#ff5708]">•</span>
+                    <span className="text-[8px] text-primary">•</span>
                     <span>AUREA Bistro</span>
                   </span>
                   <h4 className="text-[14px] sm:text-[15px] font-bold text-[#0f172a] dark:text-white tracking-tight leading-snug">
@@ -1135,7 +1170,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
               <button
                 type="button"
                 onClick={handleRepeatLastOrder}
-                className="h-10 px-4 rounded-xl bg-[#ff5708] hover:bg-[#ff6924] text-[#2b0b00] font-bold text-[12px] sm:text-[13px] flex items-center gap-1.5 shadow-md shadow-[#ff5708]/25 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+                className="h-10 px-4 rounded-xl bg-primary hover:brightness-110 text-on-primary font-bold text-[12px] sm:text-[13px] flex items-center gap-1.5 shadow-md shadow-primary/25 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
               >
                 <span className="material-symbols-outlined text-[17px]">replay</span>
                 <span>Repetir este Pedido • S/ {lastOrder.total.toFixed(2)}</span>
@@ -1169,7 +1204,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
               onChange={(e) => setSearchQuery(e.target.value)}
               ref={searchInputRef}
               placeholder="Buscar plato de autor, insumo o maridaje..."
-              className="w-full bg-white dark:bg-[#15161c] text-[#0f172a] dark:text-[#e5e1e4] pl-10 pr-12 py-2 min-h-[44px] rounded-xl text-[13px] placeholder:text-[#64748b] dark:placeholder:text-[#71717a] border border-[#cbd5e1] dark:border-[#2d2e38] focus:outline-none focus:border-[#ff5708] transition-colors"
+              className="w-full bg-white dark:bg-[#15161c] text-[#0f172a] dark:text-[#e5e1e4] pl-10 pr-12 py-2 min-h-[44px] rounded-xl text-[13px] placeholder:text-[#64748b] dark:placeholder:text-[#71717a] border border-[#cbd5e1] dark:border-[#2d2e38] focus:outline-none focus:border-primary transition-colors"
             />
             {searchQuery && (
               <button
@@ -1191,7 +1226,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                 aria-label="Ver categorías anteriores"
                 className="absolute left-0 top-0 bottom-1 z-10 w-11 flex items-center justify-start bg-gradient-to-r from-[#f4f5f7] via-[#f4f5f7]/90 to-transparent dark:from-[#0b0c0e] dark:via-[#0b0c0e]/90 cursor-pointer"
               >
-                <span className="w-7 h-7 rounded-full bg-white dark:bg-[#1e1f28] border border-[#cbd5e1] dark:border-[#353642] flex items-center justify-center text-[#c2410c] dark:text-[#ffb59c]">
+                <span className="w-7 h-7 rounded-full bg-white dark:bg-[#1e1f28] border border-[#cbd5e1] dark:border-[#353642] flex items-center justify-center text-primary">
                   <span className="material-symbols-outlined text-[18px]">chevron_left</span>
                 </span>
               </button>
@@ -1214,7 +1249,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                   onClick={() => setSelectedCategory(cat.id)}
                   className={`px-3.5 py-2 min-h-[44px] rounded-full text-[12px] font-medium whitespace-nowrap transition-colors cursor-pointer ${
                     selectedCategory === cat.id
-                      ? 'bg-[#ff5708] text-[#2b0b00] font-bold shadow-[0_0_12px_rgba(255,87,8,0.35)]'
+                      ? 'bg-primary text-on-primary font-bold shadow-[0_0_12px] shadow-primary/35'
                       : 'bg-white text-[#475569] hover:text-[#0f172a] border border-[#cbd5e1] dark:bg-[#181920] dark:text-[#a1a1aa] dark:hover:text-white dark:border-[#2a2b35]'
                   }`}
                 >
@@ -1230,7 +1265,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                 aria-label="Ver más categorías"
                 className="absolute right-0 top-0 bottom-1 z-10 w-11 flex items-center justify-end bg-gradient-to-l from-[#f4f5f7] via-[#f4f5f7]/90 to-transparent dark:from-[#0b0c0e] dark:via-[#0b0c0e]/90 cursor-pointer"
               >
-                <span className="w-7 h-7 rounded-full bg-white dark:bg-[#1e1f28] border border-[#cbd5e1] dark:border-[#353642] flex items-center justify-center text-[#c2410c] dark:text-[#ffb59c]">
+                <span className="w-7 h-7 rounded-full bg-white dark:bg-[#1e1f28] border border-[#cbd5e1] dark:border-[#353642] flex items-center justify-center text-primary">
                   <span className="material-symbols-outlined text-[18px]">chevron_right</span>
                 </span>
               </button>
@@ -1255,7 +1290,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
         {/* ========================================================================= */}
         {/* ⭐ HERO FEATURED DISH (DUAL VIEW: 📸 FOTO HD / 🧊 3D 360°) */}
         {/* ========================================================================= */}
-        <section className="bg-white dark:bg-[#15161c] rounded-2xl overflow-hidden border border-[#ff5708]/35 shadow-[0_4px_30px_rgba(255,87,8,0.15)] transition-colors duration-300">
+        <section className="bg-white dark:bg-[#15161c] rounded-2xl overflow-hidden border border-primary/35 shadow-[0_4px_30px] shadow-primary/15 transition-colors duration-300">
           <div className="px-3.5 py-2 bg-[#f8fafc]/90 dark:bg-[#121318]/90 border-b border-[#e2e8f0] dark:border-[#24252e] flex items-center justify-end">
             <div className="inline-flex items-center bg-[#e2e8f0]/80 dark:bg-[#1c1d24] p-0.5 rounded-xl border border-[#cbd5e1] dark:border-[#2a2b36] shadow-inner">
               <button
@@ -1264,7 +1299,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                 aria-pressed={heroViewMode === 'photo'}
                 className={`px-3 py-1 rounded-lg text-[11px] font-sans font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
                   heroViewMode === 'photo'
-                    ? 'bg-[#ff5708] text-white font-bold shadow-md shadow-[#ff5708]/30 scale-[1.02]'
+                    ? 'bg-primary text-white font-bold shadow-md shadow-primary/30 scale-[1.02]'
                     : 'text-[#64748b] hover:text-[#0f172a] dark:text-[#a1a1aa] dark:hover:text-white'
                 }`}
               >
@@ -1280,7 +1315,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                 aria-pressed={heroViewMode === '3d'}
                 className={`px-3 py-1 rounded-lg text-[11px] font-sans font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
                   heroViewMode === '3d'
-                    ? 'bg-[#ff5708] text-white font-bold shadow-md shadow-[#ff5708]/30 scale-[1.02]'
+                    ? 'bg-primary text-white font-bold shadow-md shadow-primary/30 scale-[1.02]'
                     : 'text-[#64748b] hover:text-[#0f172a] dark:text-[#a1a1aa] dark:hover:text-white'
                 }`}
               >
@@ -1310,9 +1345,9 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                                 <button
                   type="button"
                   onClick={() => setHeroViewMode('3d')}
-                  className="absolute bottom-3 right-3 px-3 py-1.5 rounded-full bg-black/80 backdrop-blur-md border border-[#ff5708]/50 text-[#ffb59c] hover:text-white text-[11px] font-mono-code font-semibold flex items-center gap-1.5 shadow-xl hover:scale-105 transition-all cursor-pointer"
+                  className="absolute bottom-3 right-3 px-3 py-1.5 rounded-full bg-black/80 backdrop-blur-md border border-primary/50 text-primary hover:text-white text-[11px] font-mono-code font-semibold flex items-center gap-1.5 shadow-xl hover:scale-105 transition-all cursor-pointer"
                 >
-                  <span className="material-symbols-outlined text-[15px] text-[#ff5708]">view_in_ar</span>
+                  <span className="material-symbols-outlined text-[15px] text-primary">view_in_ar</span>
                   <span>Interactuar en 3D</span>
                 </button>
               </div>
@@ -1329,7 +1364,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <span className="font-mono-code text-[11px] text-[#c2410c] dark:text-[#ff5708] font-bold">
+                  <span className="font-mono-code text-[11px] text-primary font-bold">
                     {heroItem.tag}
                   </span>
                   <span className="text-[#cbd5e1] dark:text-[#353642]">•</span>
@@ -1341,7 +1376,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
               </div>
 
               <div className="flex sm:flex-col items-baseline sm:items-end justify-between sm:justify-start gap-1">
-                <span className="font-mono-code text-[22px] sm:text-[24px] font-bold text-[#c2410c] dark:text-[#ff5708]">
+                <span className="font-mono-code text-[22px] sm:text-[24px] font-bold text-primary">
                   S/ {heroItem.price.toFixed(2)}
                 </span>
                 <span className="font-mono-code text-[10px] text-[#64748b] dark:text-[#71717a]">Incluye IGV 18%</span>
@@ -1354,8 +1389,8 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
 
             {/* Flavor & Pairing Ribbon */}
             <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[#e2e8f0] dark:border-[#24252e] text-[11px] font-mono-code">
-              <span className="inline-flex items-center gap-1 text-[#c2410c] bg-[#fff7ed] dark:bg-[#1a1b22] px-2.5 py-1 rounded-lg border border-[#ff5708]/20 dark:text-[#ffb59c]">
-                <span className="material-symbols-outlined text-[14px] text-[#ff5708]">star</span>
+              <span className="inline-flex items-center gap-1 text-primary bg-primary/10 dark:bg-[#1a1b22] px-2.5 py-1 rounded-lg border border-primary/20 dark:text-primary">
+                <span className="material-symbols-outlined text-[14px] text-primary">star</span>
                 {heroItem.rating} ({heroItem.reviewsCount} reseñas)
               </span>
 
@@ -1378,7 +1413,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                 className="h-11 px-3 rounded-xl bg-white hover:bg-[#f1f5f9] text-[#334155] border border-[#cbd5e1] text-[12px] sm:text-[13px] font-semibold flex items-center justify-center gap-1.5 dark:bg-[#1e1f28] dark:hover:bg-[#282935] dark:text-[#e5e1e4] dark:border-[#353642] transition-colors cursor-pointer shrink-0 whitespace-nowrap active:scale-95"
                 aria-label={`Abrir ficha HD de ${heroItem.name}`}
               >
-                <span className="material-symbols-outlined text-[17px] text-[#ff5708]">photo</span>
+                <span className="material-symbols-outlined text-[17px] text-primary">photo</span>
                 <span>Ficha HD</span>
               </button>
               <button
@@ -1387,14 +1422,14 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                 className="h-11 px-3.5 rounded-xl bg-[#f1f5f9] hover:bg-[#e2e8f0] text-[#334155] hover:text-[#0f172a] dark:bg-[#1e1f28] dark:hover:bg-[#282935] dark:text-[#e5e1e4] text-[13px] font-medium flex items-center justify-center gap-1.5 border border-[#cbd5e1] dark:border-[#353642] transition-colors cursor-pointer shrink-0 whitespace-nowrap active:scale-95"
                 title="Proyectar plato con cámara en tu mesa"
               >
-                <span className="material-symbols-outlined text-[18px] text-[#ff5708]">view_in_ar</span>
+                <span className="material-symbols-outlined text-[18px] text-primary">view_in_ar</span>
                 <span>Visor AR</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => handleAddToCart(heroItem)}
-                className="flex-1 h-11 px-3.5 rounded-xl bg-[#ff5708] hover:bg-[#ff6924] text-[#2b0b00] font-bold text-[13px] sm:text-[14px] flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(255,87,8,0.35)] active:scale-98 transition-all cursor-pointer whitespace-nowrap"
+                className="flex-1 h-11 px-3.5 rounded-xl bg-primary hover:brightness-110 text-on-primary font-bold text-[13px] sm:text-[14px] flex items-center justify-center gap-2 shadow-[0_0_20px] shadow-primary/35 active:scale-98 transition-all cursor-pointer whitespace-nowrap"
               >
                 <span className="material-symbols-outlined text-[18px]">add_shopping_cart</span>
                 <span>Agregar • S/ {heroItem.price.toFixed(2)}</span>
@@ -1409,7 +1444,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
         <section className="space-y-3.5 pt-1">
           <div className="flex items-center justify-between">
             <h3 className="text-[16px] sm:text-[18px] font-bold text-[#0f172a] dark:text-white flex items-center gap-2">
-              <span className="material-symbols-outlined text-[#ff5708] text-[20px]">menu_book</span>
+              <span className="material-symbols-outlined text-primary text-[20px]">menu_book</span>
               <span>Nuestra Carta de Especialidades</span>
             </h3>
             <span className="font-mono-code text-[11px] text-[#64748b] dark:text-[#71717a]">
@@ -1424,7 +1459,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
 
           {filteredItems.length === 0 ? (
             <div className="bg-white dark:bg-[#15161c] rounded-2xl border border-[#e2e8f0] dark:border-[#24252e] p-8 text-center space-y-3 my-4">
-              <div className="w-12 h-12 rounded-full bg-[#f1f5f9] dark:bg-[#1e1f28] border border-[#ff5708]/30 text-[#ff5708] flex items-center justify-center mx-auto">
+              <div className="w-12 h-12 rounded-full bg-[#f1f5f9] dark:bg-[#1e1f28] border border-primary/30 text-primary flex items-center justify-center mx-auto">
                 <span className="material-symbols-outlined text-[24px]">search_off</span>
               </div>
               <h4 className="text-[#0f172a] dark:text-white font-bold text-[16px]">No se encontraron platos</h4>
@@ -1438,7 +1473,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                   setSelectedCategory('todos');
                   setSelectedDietaryFilters([]);
                 }}
-                className="px-4 py-2 min-h-[44px] rounded-xl bg-[#ff5708] text-[#2b0b00] font-bold text-[12px] transition-all hover:bg-[#e04800] cursor-pointer"
+                className="px-4 py-2 min-h-[44px] rounded-xl bg-primary text-on-primary font-bold text-[12px] transition-all hover:brightness-110 cursor-pointer"
               >
                 Ver toda la carta
               </button>
@@ -1448,7 +1483,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
             {filteredItems.map((dish, index) => (
               <article
                 key={dish.id}
-                className="scroll-reveal-card bg-white dark:bg-[#15161c] rounded-2xl overflow-hidden border border-[#e2e8f0] dark:border-[#24252e] hover:border-[#ff5708]/50 transition-all duration-300 flex flex-col justify-between group shadow-sm dark:shadow-none hover:shadow-lg dark:hover:shadow-[0_4px_25px_rgba(255,87,8,0.12)] hover:-translate-y-0.5"
+                className="scroll-reveal-card bg-white dark:bg-[#15161c] rounded-2xl overflow-hidden border border-[#e2e8f0] dark:border-[#24252e] hover:border-primary/50 transition-all duration-300 flex flex-col justify-between group shadow-sm dark:shadow-none hover:shadow-lg dark:hover:shadow-[0_4px_25px] dark:hover:shadow-primary/12 hover:-translate-y-0.5"
                 style={{
                   transitionDelay: `${Math.min(index * 30, 240)}ms`
                 }}
@@ -1472,7 +1507,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                   </button>
 
                   {dish.badge && (
-                    <span className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-full bg-[#ff5708] text-[#2b0b00] font-mono-code text-[9px] font-bold shadow">
+                    <span className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-full bg-primary text-on-primary font-mono-code text-[9px] font-bold shadow">
                       {dish.badge}
                     </span>
                   )}
@@ -1484,7 +1519,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                         setSelectedDishForModal(dish);
                         onShowToast(`Abriendo modelo 3D: ${dish.name}`, 'view_in_ar');
                       }}
-                      className="absolute top-2.5 right-2.5 px-2.5 py-1.5 min-h-[44px] rounded-full bg-black/80 backdrop-blur-md text-[#ffb59c] border border-[#ff5708]/50 font-mono-code text-[10px] font-bold flex items-center gap-1 cursor-pointer hover:bg-[#ff5708] hover:text-[#2b0b00] transition-colors shadow-lg"
+                      className="absolute top-2.5 right-2.5 px-2.5 py-1.5 min-h-[44px] rounded-full bg-black/80 backdrop-blur-md text-primary border border-primary/50 font-mono-code text-[10px] font-bold flex items-center gap-1 cursor-pointer hover:bg-primary hover:text-on-primary transition-colors shadow-lg"
                       title="Ver plato en 3D interactivo"
                     >
                       <span className="material-symbols-outlined text-[14px]">view_in_ar</span>
@@ -1493,7 +1528,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                   )}
 
                   <div className="absolute bottom-2 left-2.5 right-2.5 flex items-center justify-between text-[10px] sm:text-[11px] font-mono-code">
-                    <span className="text-[#ffb59c] bg-black/75 backdrop-blur-md px-1.5 py-0.5 rounded">
+                    <span className="text-primary bg-black/75 backdrop-blur-md px-1.5 py-0.5 rounded">
                       ★ {dish.rating} ({dish.reviewsCount})
                     </span>
                     <span className="text-[#a1a1aa] bg-black/75 backdrop-blur-md px-1.5 py-0.5 rounded">
@@ -1505,7 +1540,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                 {/* Content Details */}
                 <div className="p-3.5 space-y-2 flex-1 flex flex-col justify-between">
                   <div className="space-y-1">
-                    <h4 className="text-[15px] font-semibold text-[#0f172a] dark:text-white leading-snug group-hover:text-[#ff5708] transition-colors">
+                    <h4 className="text-[15px] font-semibold text-[#0f172a] dark:text-white leading-snug group-hover:text-primary transition-colors">
                       {dish.name}
                     </h4>
                     <p className="text-[12px] text-[#475569] dark:text-[#a1a1aa] line-clamp-2 leading-relaxed">
@@ -1531,7 +1566,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
 
                   <div className="pt-2 flex items-center justify-between border-t border-[#e2e8f0] dark:border-[#24252e]">
                     <div className="flex flex-col">
-                      <span className="font-mono-code text-[16px] sm:text-[17px] font-bold text-[#c2410c] dark:text-[#ff5708]">
+                      <span className="font-mono-code text-[16px] sm:text-[17px] font-bold text-primary">
                         S/ {dish.price.toFixed(2)}
                       </span>
                     </div>
@@ -1550,7 +1585,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                       <button
                         type="button"
                         onClick={() => handleAddToCart(dish)}
-                        className="px-3 py-1.5 min-h-[44px] rounded-xl bg-[#f1f5f9] hover:bg-[#ff5708] text-[#0f172a] hover:text-[#2b0b00] border border-[#cbd5e1] hover:border-[#ff5708] dark:bg-[#24252e] dark:text-white dark:border-transparent dark:hover:bg-[#ff5708] dark:hover:text-[#2b0b00] font-semibold text-[12px] flex items-center gap-1 transition-colors cursor-pointer active:scale-95"
+                        className="px-3 py-1.5 min-h-[44px] rounded-xl bg-[#f1f5f9] hover:bg-primary text-[#0f172a] hover:text-on-primary border border-[#cbd5e1] hover:border-primary dark:bg-[#24252e] dark:text-white dark:border-transparent dark:hover:bg-primary dark:hover:text-on-primary font-semibold text-[12px] flex items-center gap-1 transition-colors cursor-pointer active:scale-95"
                       >
                         <span className="material-symbols-outlined text-[16px]">add</span>
                         <span>Agregar</span>
@@ -1587,10 +1622,10 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
               <button
                 type="button"
                 onClick={() => setIsComplaintModalOpen(true)}
-                className="inline-flex min-h-[44px] items-center gap-2 px-3.5 py-2 rounded-xl bg-[#f1f5f9] hover:bg-[#e2e8f0] text-[#0f172a] dark:bg-[#1a1b22] dark:hover:bg-[#252630] dark:text-[#e2e8f0] border border-[#cbd5e1] dark:border-[#2d2e38] text-[12px] font-semibold transition-all cursor-pointer shadow-sm hover:border-[#ff5708]/50 active:scale-95"
+                className="inline-flex min-h-[44px] items-center gap-2 px-3.5 py-2 rounded-xl bg-[#f1f5f9] hover:bg-[#e2e8f0] text-[#0f172a] dark:bg-[#1a1b22] dark:hover:bg-[#252630] dark:text-[#e2e8f0] border border-[#cbd5e1] dark:border-[#2d2e38] text-[12px] font-semibold transition-all cursor-pointer shadow-sm hover:border-primary/50 active:scale-95"
                 title="Libro de Reclamaciones Oficial conforme a ley INDECOPI"
               >
-                <span className="material-symbols-outlined text-[#ff5708] text-[18px]">menu_book</span>
+                <span className="material-symbols-outlined text-primary text-[18px]">menu_book</span>
                 <span>Libro de Reclamaciones</span>
               </button>
             </div>
@@ -1606,7 +1641,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       {/* ========================================================================= */}
       {cart.length > 0 && (
         <div className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] sm:bottom-3 left-3 right-3 max-w-md mx-auto z-40">
-          <div className="bg-white/95 dark:bg-[#15161c]/95 backdrop-blur-xl border border-[#ff5708]/50 p-2.5 sm:p-3 rounded-2xl shadow-[0_4px_25px_rgba(15,23,42,0.18)] dark:shadow-[0_4px_25px_rgba(0,0,0,0.8)] flex items-center justify-between gap-2.5">
+          <div className="bg-white/95 dark:bg-[#15161c]/95 backdrop-blur-xl border border-primary/50 p-2.5 sm:p-3 rounded-2xl shadow-[0_4px_25px_rgba(15,23,42,0.18)] dark:shadow-[0_4px_25px_rgba(0,0,0,0.8)] flex items-center justify-between gap-2.5">
             <div
               className="flex items-center gap-2.5 cursor-pointer min-w-0"
               onClick={() => setIsCartOpen(true)}
@@ -1637,7 +1672,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
               <button
                 type="button"
                 onClick={handleSendOrder}
-                className="px-3 sm:px-4 py-2 min-h-[44px] rounded-xl bg-[#ff5708] text-[#2b0b00] font-bold text-[12px] sm:text-[13px] flex items-center gap-1 hover:bg-[#ff6924] active:scale-95 transition-all shadow-[0_0_15px_rgba(255,87,8,0.35)] cursor-pointer"
+                className="px-3 sm:px-4 py-2 min-h-[44px] rounded-xl bg-primary text-on-primary font-bold text-[12px] sm:text-[13px] flex items-center gap-1 hover:brightness-110 active:scale-95 transition-all shadow-[0_0_15px] shadow-primary/35 cursor-pointer"
               >
                 <span>Enviar</span>
                 <span className="material-symbols-outlined text-[16px]">send</span>
@@ -1655,7 +1690,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
           <div className="bg-white dark:bg-[#15161c] w-full max-w-md rounded-t-3xl sm:rounded-2xl border border-[#e2e8f0] dark:border-[#2d2e38] shadow-2xl p-5 space-y-4">
             <div className="flex items-center justify-between pb-2 border-b border-[#e2e8f0] dark:border-[#24252e]">
               <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-[#ff5708] text-[20px]">table_restaurant</span>
+                <span className="material-symbols-outlined text-primary text-[20px]">table_restaurant</span>
                 <h3 className="text-[16px] font-bold text-[#0f172a] dark:text-white">Selecciona tu Mesa</h3>
               </div>
               <button
@@ -1696,8 +1731,8 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                   }}
                   className={`py-2.5 px-2 min-h-[44px] rounded-xl text-[12px] font-mono-code font-bold transition-colors border text-center cursor-pointer ${
                     selectedTable === tableNum
-                      ? 'bg-[#ff5708] text-[#2b0b00] border-[#ff5708] shadow-lg shadow-[#ff5708]/30'
-                      : 'bg-[#f1f5f9] text-[#0f172a] border-[#cbd5e1] hover:border-[#ff5708]/60 dark:bg-[#1e1f28] dark:text-white dark:border-[#2e2f3a] dark:hover:border-[#ff5708]/40'
+                      ? 'bg-primary text-on-primary border-primary shadow-lg shadow-primary/30'
+                      : 'bg-[#f1f5f9] text-[#0f172a] border-[#cbd5e1] hover:border-primary/60 dark:bg-[#1e1f28] dark:text-white dark:border-[#2e2f3a] dark:hover:border-primary/40'
                   }`}
                 >
                   {tableNum}
@@ -1726,7 +1761,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
           <div className="bg-white dark:bg-[#15161c] w-full max-w-lg rounded-t-3xl sm:rounded-2xl border border-[#e2e8f0] dark:border-[#2d2e38] shadow-2xl p-5 space-y-4 max-h-[88vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-2 border-b border-[#e2e8f0] dark:border-[#24252e]">
               <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-[#ff5708] text-[20px]">receipt_long</span>
+                <span className="material-symbols-outlined text-primary text-[20px]">receipt_long</span>
                 <h3 className="text-[16px] font-bold text-[#0f172a] dark:text-white">Tu Pedido • {selectedTable}</h3>
               </div>
               <button
@@ -1749,7 +1784,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                       <h4 className="text-[13px] sm:text-[14px] font-semibold text-[#0f172a] dark:text-white truncate">
                         {c.item.name}
                       </h4>
-                      <span className="font-mono-code text-[12px] text-[#c2410c] dark:text-[#ff5708] font-bold">
+                      <span className="font-mono-code text-[12px] text-primary font-bold">
                         S/ {(c.item.price * c.quantity).toFixed(2)}
                       </span>
                     </div>
@@ -1758,7 +1793,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                       <button
                         type="button"
                         onClick={() => handleRemoveFromCart(c.item.id)}
-                        className="w-7 h-7 rounded-lg flex items-center justify-center text-[#475569] dark:text-[#a1a1aa] hover:bg-[#ff5708] hover:text-white active:scale-90 transition-all font-bold text-[15px] cursor-pointer select-none"
+                        className="w-7 h-7 rounded-lg flex items-center justify-center text-[#475569] dark:text-[#a1a1aa] hover:bg-primary hover:text-white active:scale-90 transition-all font-bold text-[15px] cursor-pointer select-none"
                         title="Disminuir cantidad"
                       >
                         -
@@ -1769,7 +1804,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                       <button
                         type="button"
                         onClick={() => handleAddToCart(c.item)}
-                        className="w-7 h-7 rounded-lg flex items-center justify-center text-[#475569] dark:text-[#a1a1aa] hover:bg-[#ff5708] hover:text-white active:scale-90 transition-all font-bold text-[15px] cursor-pointer select-none"
+                        className="w-7 h-7 rounded-lg flex items-center justify-center text-[#475569] dark:text-[#a1a1aa] hover:bg-primary hover:text-white active:scale-90 transition-all font-bold text-[15px] cursor-pointer select-none"
                         title="Aumentar cantidad"
                       >
                         +
@@ -1782,7 +1817,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                     placeholder="Nota de cocina (ej. Sin cebolla, término medio...)"
                     value={c.notes || ''}
                     onChange={(e) => handleUpdateNotes(c.item.id, e.target.value)}
-                    className="w-full bg-white dark:bg-[#15161c] text-[#0f172a] dark:text-[#e5e1e4] px-2.5 py-2 min-h-[44px] rounded-lg text-[11px] placeholder:text-[#94a3b8] dark:placeholder:text-[#71717a] border border-[#e2e8f0] dark:border-[#2d2e38] focus:outline-none focus:border-[#ff5708]"
+                    className="w-full bg-white dark:bg-[#15161c] text-[#0f172a] dark:text-[#e5e1e4] px-2.5 py-2 min-h-[44px] rounded-lg text-[11px] placeholder:text-[#94a3b8] dark:placeholder:text-[#71717a] border border-[#e2e8f0] dark:border-[#2d2e38] focus:outline-none focus:border-primary"
                   />
                 </div>
               ))}
@@ -1818,7 +1853,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                 <button
                   type="button"
                   onClick={handleSendOrder}
-                  className="flex-1 py-2.5 min-h-[44px] rounded-xl bg-[#ff5708] text-[#2b0b00] font-bold text-[13px] flex items-center justify-center gap-1.5 hover:bg-[#ff6924] shadow-lg cursor-pointer"
+                  className="flex-1 py-2.5 min-h-[44px] rounded-xl bg-primary text-on-primary font-bold text-[13px] flex items-center justify-center gap-1.5 hover:brightness-110 shadow-lg cursor-pointer"
                 >
                   <span>Confirmar y Enviar</span>
                   <span className="material-symbols-outlined text-[16px]">send</span>
@@ -1832,7 +1867,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                   setIsCartOpen(false);
                   handleOpenSplitBill();
                 }}
-                className="w-full py-2.5 min-h-[44px] rounded-xl border border-[#ff5708]/40 bg-[#ff5708]/10 text-[#c2410c] dark:text-[#ffb59c] hover:bg-[#ff5708]/20 font-bold text-[12px] flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                className="w-full py-2.5 min-h-[44px] rounded-xl border border-primary/40 bg-primary/10 text-primary hover:bg-primary/20 font-bold text-[12px] flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
               >
                 <span className="material-symbols-outlined text-[17px]">qr_code_2</span>
                 <span>Pedir la Cuenta / Pagar con Yape o Plin QR</span>
@@ -1847,10 +1882,10 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       {/* ========================================================================= */}
       {selectedDishForModal && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
-          <div className="bg-white dark:bg-[#15161c] w-full max-w-lg rounded-t-3xl sm:rounded-2xl border border-[#ff5708]/40 shadow-2xl p-4 sm:p-5 space-y-3.5">
+          <div className="bg-white dark:bg-[#15161c] w-full max-w-lg rounded-t-3xl sm:rounded-2xl border border-primary/40 shadow-2xl p-4 sm:p-5 space-y-3.5">
             <div className="flex items-center justify-between pb-2 border-b border-[#e2e8f0] dark:border-[#24252e]">
               <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-[#ff5708] text-[20px]">view_in_ar</span>
+                <span className="material-symbols-outlined text-primary text-[20px]">view_in_ar</span>
                 <h3 className="text-[15px] sm:text-[16px] font-bold text-[#0f172a] dark:text-white truncate">
                   {selectedDishForModal.name} (3D)
                 </h3>
@@ -1873,8 +1908,8 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
 
             <div className="space-y-1">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-mono-code text-[#c2410c] dark:text-[#ffb59c] font-bold">{selectedDishForModal.tag}</span>
-                <span className="text-[18px] font-mono-code font-bold text-[#c2410c] dark:text-[#ff5708]">
+                <span className="text-[11px] font-mono-code text-primary font-bold">{selectedDishForModal.tag}</span>
+                <span className="text-[18px] font-mono-code font-bold text-primary">
                   S/ {selectedDishForModal.price.toFixed(2)}
                 </span>
               </div>
@@ -1903,7 +1938,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                   handleAddToCart(selectedDishForModal);
                   setSelectedDishForModal(null);
                 }}
-                className="flex-1 py-2.5 min-h-[44px] rounded-xl bg-[#ff5708] text-[#2b0b00] font-bold text-[13px] flex items-center justify-center gap-1.5 shadow-lg hover:bg-[#ff6924] cursor-pointer"
+                className="flex-1 py-2.5 min-h-[44px] rounded-xl bg-primary text-on-primary font-bold text-[13px] flex items-center justify-center gap-1.5 shadow-lg hover:brightness-110 cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[16px]">add_shopping_cart</span>
                 <span>Pedir Plato • S/ {selectedDishForModal.price.toFixed(2)}</span>
@@ -1932,14 +1967,14 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
           {/* Superficie de mesa simulada con iluminación cálida cuando no hay cámara activa */}
           {!arCameraActive && (
             <div className="absolute inset-0 z-0 bg-gradient-to-b from-[#111216] via-[#161820] to-[#0c0d10] flex flex-col items-center justify-center pointer-events-none">
-              <div className="w-80 h-80 rounded-full bg-[#ff5708]/8 blur-3xl" />
+              <div className="w-80 h-80 rounded-full bg-primary/8 blur-3xl" />
             </div>
           )}
 
           {!arCameraActive && arCameraMessage && (
-            <div className="absolute left-4 right-4 bottom-36 z-30 rounded-2xl border border-[#ff5708]/45 bg-black/80 backdrop-blur-md p-4 text-white shadow-2xl sm:left-1/2 sm:right-auto sm:w-[380px] sm:-translate-x-1/2">
+            <div className="absolute left-4 right-4 bottom-36 z-30 rounded-2xl border border-primary/45 bg-black/80 backdrop-blur-md p-4 text-white shadow-2xl sm:left-1/2 sm:right-auto sm:w-[380px] sm:-translate-x-1/2">
               <div className="flex items-start gap-2.5">
-                <span className="material-symbols-outlined text-[#ff5708] text-[22px] shrink-0">photo_camera</span>
+                <span className="material-symbols-outlined text-primary text-[22px] shrink-0">photo_camera</span>
                 <div className="min-w-0 flex-1">
                   <p className="text-[13px] font-bold leading-snug text-white">{arCameraMessage}</p>
                   {arCameraHelp && <p className="mt-1.5 text-[11px] leading-snug text-white/75">{arCameraHelp}</p>}
@@ -1947,7 +1982,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                     type="button"
                     onClick={startArCamera}
                     disabled={isArCameraRequesting}
-                    className="mt-3 min-h-[42px] rounded-xl bg-[#ff5708] px-4 py-2 text-[13px] font-black text-[#2b0b00] shadow-lg active:scale-95 disabled:cursor-wait disabled:opacity-70"
+                    className="mt-3 min-h-[42px] rounded-xl bg-primary px-4 py-2 text-[13px] font-black text-on-primary shadow-lg active:scale-95 disabled:cursor-wait disabled:opacity-70"
                   >
                     {isArCameraRequesting ? 'Activando cámara...' : arCameraAttempted ? 'Reintentar cámara' : 'Activar cámara'}
                   </button>
@@ -1958,7 +1993,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
           {/* Top Bar Overlay */}
           <div className="relative z-20 px-4 pt-safe pt-4 flex items-center justify-between bg-gradient-to-b from-black/80 to-transparent pb-6">
             <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-[24px] text-[#ff5708]">view_in_ar</span>
+              <span className="material-symbols-outlined text-[24px] text-primary">view_in_ar</span>
               <div className="flex flex-col">
                 <span className="text-[13px] font-bold text-white leading-tight">Visor AR en Mesa</span>
                 <span className="text-[10px] font-mono-code text-emerald-400 flex items-center gap-1">
@@ -2002,7 +2037,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                 >
                   -
                 </button>
-                <span className="text-[#ff5708] font-bold">{(arScale * 28).toFixed(0)} cm Ø</span>
+                <span className="text-primary font-bold">{(arScale * 28).toFixed(0)} cm Ø</span>
                 <button
                   type="button"
                   onClick={() => setArScale((s) => Math.min(1.4, s + 0.1))}
@@ -2017,7 +2052,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
             <div className="flex items-center justify-between gap-2">
               <div className="flex flex-col min-w-0">
                 <span className="text-[14px] font-bold text-white truncate">{arDish.name}</span>
-                <span className="text-[12px] font-mono-code text-[#ff5708] font-bold">S/ {arDish.price.toFixed(2)}</span>
+                <span className="text-[12px] font-mono-code text-primary font-bold">S/ {arDish.price.toFixed(2)}</span>
               </div>
 
               <button
@@ -2026,7 +2061,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                   handleAddToCart(arDish);
                   setIsArModalOpen(false);
                 }}
-                className="px-4 py-2.5 min-h-[44px] rounded-xl bg-[#ff5708] text-[#2b0b00] font-bold text-[13px] flex items-center gap-1.5 shadow-lg hover:bg-[#ff6924] active:scale-95 cursor-pointer"
+                className="px-4 py-2.5 min-h-[44px] rounded-xl bg-primary text-on-primary font-bold text-[13px] flex items-center gap-1.5 shadow-lg hover:brightness-110 active:scale-95 cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[17px]">add_shopping_cart</span>
                 <span>Pedir este Plato</span>
