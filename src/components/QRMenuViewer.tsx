@@ -1411,7 +1411,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                             title={filter.label}
                             className="inline-flex items-center gap-1 rounded-full border border-[#e2e8f0] bg-[#f8fafc]/90 px-2 py-0.5 text-[10px] font-medium text-[#475569] backdrop-blur-md dark:border-white/10 dark:bg-white/[0.06] dark:text-[#c4c4ce]"
                           >
-                            <span aria-hidden="true">{filter.icon}</span>
+                            <span aria-hidden="true"><span className="material-symbols-outlined text-[13px]">{filter.materialIcon}</span></span>
                             {filter.label}
                           </span>
                         ))}

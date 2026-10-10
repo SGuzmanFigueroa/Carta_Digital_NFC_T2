@@ -5,13 +5,13 @@ import type { DietaryPreference, MenuItem } from '@/types';
 export const DIETARY_FILTERS: {
   value: DietaryPreference;
   label: string;
-  icon: string;
+  materialIcon: string;
   keywords: string[];
 }[] = [
-  { value: 'vegetarian', label: 'Vegetariano', icon: '🌱', keywords: ['vegetariano', 'vegetariana', 'vegetarian'] },
-  { value: 'gluten-free', label: 'Sin Gluten', icon: '🌾', keywords: ['sin gluten', 'gluten free', 'libre de gluten'] },
-  { value: 'dairy-free', label: 'Sin Lactosa', icon: '🥛', keywords: ['sin lactosa', 'lactose free', 'sin lacteos', 'dairy free'] },
-  { value: 'spicy', label: 'Picante', icon: '🔥', keywords: ['picante', 'spicy'] }
+  { value: 'vegetarian', label: 'Vegetariano', materialIcon: 'eco', keywords: ['vegetariano', 'vegetariana', 'vegetarian'] },
+  { value: 'gluten-free', label: 'Sin Gluten', materialIcon: 'grain', keywords: ['sin gluten', 'gluten free', 'libre de gluten'] },
+  { value: 'dairy-free', label: 'Sin Lactosa', materialIcon: 'water_drop', keywords: ['sin lactosa', 'lactose free', 'sin lacteos', 'dairy free'] },
+  { value: 'spicy', label: 'Picante', materialIcon: 'local_fire_department', keywords: ['picante', 'spicy'] }
 ];
 
 export function getDietaryPreferences(item: Pick<MenuItem, 'dietary' | 'dietaryPreferences'>): DietaryPreference[] {
@@ -57,7 +57,7 @@ export function DietaryFilters({ selectedFilters, onToggle }: DietaryFiltersProp
                 : 'border-white/70 bg-white/65 text-[#475569] shadow-sm hover:border-[#ff5708]/40 hover:bg-white/85 dark:border-white/10 dark:bg-white/[0.06] dark:text-[#c4c4ce] dark:hover:bg-white/10'
             }`}
           >
-            <span aria-hidden="true">{filter.icon}</span>
+            <span aria-hidden="true"><span className="material-symbols-outlined text-[15px]">{filter.materialIcon}</span></span>
             <span>{filter.label}</span>
           </button>
         );
