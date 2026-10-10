@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MenuItem, OrderRound, OrderTicket, TableStatus } from '../types';
+import { MenuItem, OrderRound, OrderTicket, TableStatus, WaiterCallReason } from '../types';
 import { kitchenAudio } from '../utils/audio';
 // CD-27 · Confirmación táctil (vibración de 15 ms) del gesto "agregar al carrito".
 import { hapticAddToCart } from '../utils/haptics';
@@ -44,6 +44,8 @@ import { PromoFlashTicker } from './menu/PromoFlashTicker';
 import { OrderHistoryModal } from './menu/OrderHistoryModal';
 import { validateDinerGeofence } from '@/utils/geofence';
 import { GeofenceWarningModal } from './menu/GeofenceWarningModal';
+// CD-28 · Bottom Sheet de asistencia en mesa (motivos exactos del ticket).
+import { WaiterCallModal } from './menu/WaiterCallModal';
 import { formatSoles } from '@/utils/promo';
 import { INITIAL_ACTIVE_PROMO_OFFERS } from '@/data/mockData';
 import { DietaryFilters, DIETARY_FILTERS, getDietaryPreferences } from './menu/DietaryFilters';
@@ -108,8 +110,8 @@ interface QRMenuViewerProps {
     createdAt: Date,
     orderId: string
   ) => void;
-  onRequestTableAccount?: (paymentMethod: string) => Promise<boolean> | void;
-  onCallWaiter?: (reason?: string) => Promise<boolean> | void;
+  onCallWaiter?: (reason?: string, table?: string) => Promise<boolean> | void;
+  onRequestTableAccount?: (paymentMethod: string, table?: string) => Promise<boolean> | void;
   onDishCreated?: (dish: MenuItem) => void;
   onRefreshDishes?: () => void;
 }
@@ -148,6 +150,8 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   const [selectedDishDetails, setSelectedDishDetails] = useState<MenuItem | null>(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'Efectivo' | 'Tarjeta POS (Visa/MC)' | 'Yape / Plin'>('Tarjeta POS (Visa/MC)');
   const [waiterCalled, setWaiterCalled] = useState(false);
+  // CD-28 · Controla el Bottom Sheet de motivos de asistencia en mesa.
+  const [isWaiterCallModalOpen, setIsWaiterCallModalOpen] = useState(false);
   const observedOrderStatus = useRef<{ id: string; status: OrderTicket['status'] } | null>(null);
 
   // Flechas de desplazamiento para la barra de categorías
@@ -854,7 +858,8 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
 
   const handleConfirmAccountRequest = async () => {
     if (onRequestTableAccount) {
-      await onRequestTableAccount(selectedPaymentMethod);
+      // CD-28 · Mismo defecto hermano: la cuenta también se pedía sin mesa (fallback "MESA 04").
+      await onRequestTableAccount(selectedPaymentMethod, selectedTable);
     }
     setIsPaymentModalOpen(false);
     onShowToast(`Cuenta solicitada (${selectedPaymentMethod}). Garzón en camino con el comprobante.`, 'receipt_long');
@@ -872,10 +877,19 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     setIsPaymentModalOpen(true);
   };
 
-  const handleTriggerCallWaiter = async () => {
+  const handleTriggerCallWaiter = () => {
+    setIsWaiterCallModalOpen(true);
+  };
+
+  const handleSubmitWaiterCall = async (reason: WaiterCallReason) => {
+    setIsWaiterCallModalOpen(false);
     setWaiterCalled(true);
     if (onCallWaiter) {
-      await onCallWaiter('Solicitud de atención general');
+      // 🔴 FIX CD-28 · AQUÍ ESTABA EL BUG: se llamaba `onCallWaiter(reason)` SIN la mesa,
+      // así que RestaurantContext caía en su fallback estático `'MESA 04'` e ignoraba la
+      // mesa elegida por el comensal. Ahora se envía la MISMA variable (`selectedTable`)
+      // que usa `handleSendOrder` para crear la comanda.
+      await onCallWaiter(reason, selectedTable);
     }
     onShowToast('¡Garzón alertado! Un miembro del salón se acerca a tu mesa.', 'notifications_active');
     setTimeout(() => setWaiterCalled(false), 8000);
@@ -2066,6 +2080,18 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       />
 
       {/* ========================================================================= */}
+      {/* 🔔 CD-28 · BOTTOM SHEET "ASISTENCIA EN MESA" (MOTIVOS DEL LLAMADO)         */}
+      {/* ========================================================================= */}
+      <WaiterCallModal
+        isOpen={isWaiterCallModalOpen}
+        onClose={() => setIsWaiterCallModalOpen(false)}
+        onSelect={handleSubmitWaiterCall}
+        /* CD-28 · Se muestra EXACTAMENTE la mesa que se va a registrar (WYSIWYG):
+           `selectedTable` es la fuente única (QR `?mesa=` + modal selector). */
+        tableNumber={selectedTable}
+      />
+
+      {/* ========================================================================= */}
       {/* ⚡ CD-16 · POP-UP PROMOCIONAL "OFERTA FLASH" (PLATOS REALES + DESCUENTO)   */}
       {/* ========================================================================= */}
       <PromoDealModal
@@ -2087,7 +2113,8 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
         onRetry={handleSendOrder}
         onClose={() => setGeofenceModalState((prev) => ({ ...prev, isOpen: false }))}
         onCallWaiter={() => {
-          if (onCallWaiter) onCallWaiter('Solicitud de asistencia por verificación de mesa');
+          // CD-28 · Tercer punto con el mismo defecto: también debe viajar la mesa real.
+          if (onCallWaiter) onCallWaiter('Solicitud de asistencia por verificación de mesa', selectedTable);
           onShowToast('Mozo notificado para asistir tu mesa', 'room_service');
         }}
       />
