@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MenuItem, OrderTicket, TableStatus } from '../types';
 import { kitchenAudio } from '../utils/audio';
+// CD-27 · Confirmación táctil (vibración de 15 ms) del gesto "agregar al carrito".
+import { hapticAddToCart } from '../utils/haptics';
 //import { ThreeDView } from './ThreeDView';
 import dynamic from 'next/dynamic';
 
@@ -26,6 +28,9 @@ import { DishARViewer } from './DishARViewer';
 // CD-13 · Componentes del tema Claro/Oscuro y navegación inferior del comensal.
 import { ThemeToggle } from './menu/ThemeToggle';
 import { MenuBottomNav } from './menu/MenuBottomNav';
+// CD-27 · Microinteracciones del carrito: globo con rebote y total que "cuenta".
+import { CartBadge } from './menu/CartBadge';
+import { AnimatedSoles } from './menu/AnimatedSoles';
 import { PaymentModal } from './menu/PaymentModal';
 import { ComplaintBookModal } from './menu/ComplaintBookModal';
 import { DishDetailModal } from './menu/DishDetailModal';
@@ -469,6 +474,10 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   const cartItemsCount = cart.reduce((acc, curr) => acc + curr.quantity, 0);
 
   const handleAddToCart = (item: MenuItem) => {
+    // CD-27 · Feedback háptico inmediato: micro-vibración de 15 ms que confirma
+    // el toque. Es un no-op silencioso donde la API no existe (iOS Safari).
+    hapticAddToCart();
+
     setCart((prev) => {
       const existing = prev.find((c) => c.item.id === item.id);
       if (existing) {
@@ -628,6 +637,10 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   // Aplica la oferta: agrega el plato al pedido con su PRECIO PROMOCIONAL real
   // (el precio de lista del menú se mantiene intacto para el resto de la carta).
   const handleApplyPromoDeal = (dish: MenuItem, promoPrice: number) => {
+    // CD-27 · Aplicar una oferta flash también es "agregar al carrito": misma
+    // confirmación táctil de 15 ms.
+    hapticAddToCart();
+
     setCart((prev) => {
       const existing = prev.find((c) => c.item.id === dish.id && c.item.price === promoPrice);
       if (existing) {
@@ -845,10 +858,11 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
               className="relative px-3 py-1.5 min-h-[44px] rounded-xl bg-[#ff5708] hover:bg-[#ff6924] text-[#2b0b00] font-bold text-[12px] flex items-center gap-1.5 shadow-[0_0_15px_rgba(255,87,8,0.35)] active:scale-95 transition-all cursor-pointer"
             >
               <span className="material-symbols-outlined text-[17px]">shopping_bag</span>
-              <span>{cartItemsCount}</span>
+              {/* CD-27 · Globo del contador con rebote elástico (badge pop). */}
+              <CartBadge count={cartItemsCount} hideWhenEmpty={false} />
               {cartTotal > 0 && (
                 <span className="hidden sm:inline-block font-mono-code text-[11px] border-l border-[#511500]/30 pl-1.5">
-                  S/ {cartTotal.toFixed(2)}
+                  <AnimatedSoles value={cartTotal} />
                 </span>
               )}
             </button>
@@ -1436,13 +1450,16 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
               className="flex items-center gap-2.5 cursor-pointer min-w-0"
               onClick={() => setIsCartOpen(true)}
             >
-              <div className="w-9 h-9 rounded-xl bg-[#ff5708] text-[#2b0b00] flex items-center justify-center font-bold font-mono-code text-[15px] shrink-0 shadow-md">
-                {cartItemsCount}
-              </div>
+              {/* CD-27 · Globo del carrito: rebote elástico al agregar un plato. */}
+              <CartBadge
+                count={cartItemsCount}
+                className="w-9 h-9 rounded-xl bg-[#ff5708] text-[#2b0b00] flex items-center justify-center font-bold font-mono-code text-[15px] shrink-0 shadow-md"
+              />
               <div className="flex flex-col min-w-0">
                 <span className="text-[11px] text-[#475569] dark:text-[#a1a1aa] truncate">Total ({cartItemsCount} platos):</span>
                 <span className="font-mono-code text-[15px] sm:text-[16px] font-bold text-[#c2410c] dark:text-[#ff5708]">
-                  S/ {cartTotal.toFixed(2)}
+                  {/* CD-27 · El importe cuenta a 60 FPS en lugar de saltar. */}
+                  <AnimatedSoles value={cartTotal} />
                 </span>
               </div>
             </div>
@@ -1603,18 +1620,21 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
               ))}
             </div>
 
+            {/* CD-27 · Resumen del pedido: los tres importes cuentan a 60 FPS
+                (misma duración y easing, así el subtotal + IGV siguen sumando
+                exactamente el total en todos los frames intermedios). */}
             <div className="p-3 bg-[#f1f5f9] dark:bg-[#0e0e10] rounded-xl space-y-1.5 text-[11px] sm:text-[12px] font-mono-code">
               <div className="flex justify-between text-[#475569] dark:text-[#a1a1aa]">
                 <span>SUBTOTAL (SIN IGV)</span>
-                <span>S/ {(cartTotal / 1.18).toFixed(2)}</span>
+                <span><AnimatedSoles value={cartTotal / 1.18} /></span>
               </div>
               <div className="flex justify-between text-[#475569] dark:text-[#a1a1aa]">
                 <span>IGV (18%)</span>
-                <span>S/ {(cartTotal - cartTotal / 1.18).toFixed(2)}</span>
+                <span><AnimatedSoles value={cartTotal - cartTotal / 1.18} /></span>
               </div>
               <div className="flex justify-between text-[#0f172a] dark:text-white font-bold text-[14px] sm:text-[15px] pt-1.5 border-t border-[#e2e8f0] dark:border-[#24252e]">
                 <span>TOTAL A PAGAR</span>
-                <span className="text-[#c2410c] dark:text-[#ff5708]">S/ {cartTotal.toFixed(2)}</span>
+                <span className="text-[#c2410c] dark:text-[#ff5708]"><AnimatedSoles value={cartTotal} /></span>
               </div>
             </div>
 

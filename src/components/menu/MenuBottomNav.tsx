@@ -3,6 +3,8 @@
 import React from 'react';
 import { BookOpen, ConciergeBell, QrCode, Search, ShoppingBag } from 'lucide-react';
 import { cn } from '@/lib/utils';
+// CD-27 · Globo del contador con rebote elástico al agregar un plato.
+import { CartBadge } from './CartBadge';
 
 interface MenuBottomNavProps {
   cartItemsCount: number;
@@ -75,11 +77,13 @@ export function MenuBottomNav({
         >
           <span className="relative">
             <ShoppingBag aria-hidden="true" size={19} />
-            {cartItemsCount > 0 && (
-              <span className="absolute -right-2 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#ff5708] px-1 text-[9px] font-bold text-[#2b0b00]">
-                {cartItemsCount}
-              </span>
-            )}
+            {/* El globo late (badge pop) cada vez que el contador sube. Es
+                decorativo: el botón ya anuncia el número en su `aria-label`. */}
+            <CartBadge
+              count={cartItemsCount}
+              ariaHidden
+              className="absolute -right-2 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#ff5708] px-1 text-[9px] font-bold text-[#2b0b00]"
+            />
           </span>
           <span>Pedido</span>
         </button>
