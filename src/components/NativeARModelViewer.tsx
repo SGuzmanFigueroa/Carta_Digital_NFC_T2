@@ -111,21 +111,21 @@ export const NativeARModelViewer: React.FC<NativeARModelViewerProps> = ({
   }
 
   return (
-    <div className="mt-2 overflow-hidden rounded-xl border border-[#ff5708]/35 bg-[#0b0c10]/85 shadow-inner shadow-black/40">
+    <div className="mt-2 overflow-hidden rounded-xl border border-primary/35 bg-[#0b0c10]/85 shadow-inner shadow-black/40">
       <div className="flex items-center justify-between gap-2 border-b border-white/10 px-2.5 py-1.5">
         <div className="min-w-0">
           <p className="truncate text-[11px] font-bold text-white">AR nativo del plato</p>
           <p className="text-[10px] text-white/55">Android compatible abre Scene Viewer/WebXR</p>
         </div>
-        <span className="shrink-0 rounded-full bg-[#ff5708]/15 px-2 py-0.5 text-[10px] font-bold text-[#ffb59c]">
+        <span className="shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-bold text-primary">
           {diameterCm} cm
         </span>
       </div>
 
       <div className="relative h-28">
         {!isReady && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 bg-black/30 text-[11px] font-semibold text-[#ffb59c]">
-            <span className="h-3 w-3 animate-spin rounded-full border-2 border-[#ff5708] border-t-transparent" />
+          <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 bg-black/30 text-[11px] font-semibold text-primary">
+            <span className="h-3 w-3 animate-spin rounded-full border-2 border-primary border-t-transparent" />
             Cargando AR nativo...
           </div>
         )}
@@ -140,7 +140,7 @@ export const NativeARModelViewer: React.FC<NativeARModelViewerProps> = ({
                 slot: 'ar-button',
                 type: 'button',
                 className:
-                  'absolute bottom-2 left-1/2 min-h-[40px] -translate-x-1/2 rounded-xl bg-[#ff5708] px-3 py-2 text-[12px] font-black text-[#2b0b00] shadow-xl shadow-[#ff5708]/25 active:scale-95'
+                  'absolute bottom-2 left-1/2 min-h-[40px] -translate-x-1/2 rounded-xl bg-primary px-3 py-2 text-[12px] font-black text-on-primary shadow-xl shadow-primary/25 active:scale-95'
               },
               'Abrir AR nativo'
             )
@@ -151,7 +151,7 @@ export const NativeARModelViewer: React.FC<NativeARModelViewerProps> = ({
         {androidSceneViewerUrl && (
           <a
             href={androidSceneViewerUrl}
-            className="flex min-h-[38px] items-center justify-center rounded-lg border border-[#ff5708]/50 bg-[#ff5708]/15 px-3 text-center text-[11px] font-black text-[#ffb59c] active:scale-95"
+            className="flex min-h-[38px] items-center justify-center rounded-lg border border-primary/50 bg-primary/15 px-3 text-center text-[11px] font-black text-primary active:scale-95"
           >
             Abrir AR Android directo
           </a>

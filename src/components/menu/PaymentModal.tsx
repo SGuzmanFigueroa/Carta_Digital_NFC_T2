@@ -117,7 +117,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         id: 'tarjeta' as PaymentMethod,
         label: 'Tarjeta',
         icon: 'credit_card',
-        activeColor: 'bg-[#ff5708] text-[#2b0b00] shadow-md'
+        activeColor: 'bg-primary text-on-primary shadow-md'
       } : null,
       paymentConfig.acceptCash ? {
         id: 'efectivo' as PaymentMethod,
@@ -259,7 +259,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
-      <div className="bg-white dark:bg-[#15161c] w-full max-w-lg rounded-t-3xl sm:rounded-2xl border border-[#e2e8f0] dark:border-[#ff5708]/30 shadow-2xl p-4 sm:p-6 pb-8 sm:pb-6 space-y-4 max-h-[92vh] overflow-y-auto overscroll-contain">
+      <div className="bg-white dark:bg-[#15161c] w-full max-w-lg rounded-t-3xl sm:rounded-2xl border border-[#e2e8f0] dark:border-primary/30 shadow-2xl p-4 sm:p-6 pb-8 sm:pb-6 space-y-4 max-h-[92vh] overflow-y-auto overscroll-contain">
         
         {/* ========================================================================= */}
         {/* PASO 1: PASARELA DE PAGO DIGITAL QR                                       */}
@@ -269,12 +269,12 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             {/* Header */}
             <div className="flex items-center justify-between pb-3 border-b border-[#e2e8f0] dark:border-[#24252e]">
               <div className="flex items-center gap-2.5">
-                <span className="material-symbols-outlined text-[28px] text-[#ff5708] shrink-0">qr_code_2</span>
+                <span className="material-symbols-outlined text-[28px] text-primary shrink-0">qr_code_2</span>
                 <div>
                   <h3 className="text-[17px] font-bold text-[#0f172a] dark:text-white leading-tight">
                     Pedir la Cuenta y Pagar
                   </h3>
-                  <span className="text-[11px] font-mono-code text-[#c2410c] dark:text-[#ffb59c] font-semibold">
+                  <span className="text-[11px] font-mono-code text-primary font-semibold">
                     {tableNumber} • Total: S/ {totalAmount.toFixed(2)}
                   </span>
                 </div>
@@ -417,7 +417,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     <div className="text-[12px] font-bold text-[#0f172a] dark:text-white">
                       {titular}
                     </div>
-                    <div className="text-[12px] font-mono-code text-[#ff5708] font-bold">
+                    <div className="text-[12px] font-mono-code text-primary font-bold">
                       {phoneAccount}
                     </div>
                   </div>
@@ -438,7 +438,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     <button
                       type="button"
                       onClick={handleSimulateVoucher}
-                      className="text-[10px] text-[#ff5708] hover:underline cursor-pointer"
+                      className="text-[10px] text-primary hover:underline cursor-pointer"
                     >
                       Autocompletar de prueba
                     </button>
@@ -457,7 +457,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                           ? 'border-amber-500 focus:border-amber-500'
                           : isOpCodeValid || isVoucherUploaded
                           ? 'border-emerald-500 focus:border-emerald-500'
-                          : 'border-[#cbd5e1] dark:border-[#353642] focus:border-[#ff5708]'
+                          : 'border-[#cbd5e1] dark:border-[#353642] focus:border-primary'
                       }`}
                     />
 
@@ -488,8 +488,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
                   {/* Subir archivo voucher */}
                   <div className="flex items-center gap-2">
-                    <label className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 min-h-[44px] rounded-xl bg-white dark:bg-[#121318] border border-dashed border-[#cbd5e1] dark:border-[#353642] text-[12px] text-[#475569] dark:text-[#a1a1aa] hover:border-[#ff5708] cursor-pointer transition-colors">
-                      <span className="material-symbols-outlined text-[18px] text-[#ff5708]">upload_file</span>
+                    <label className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 min-h-[44px] rounded-xl bg-white dark:bg-[#121318] border border-dashed border-[#cbd5e1] dark:border-[#353642] text-[12px] text-[#475569] dark:text-[#a1a1aa] hover:border-primary cursor-pointer transition-colors">
+                      <span className="material-symbols-outlined text-[18px] text-primary">upload_file</span>
                       <span className="truncate">{voucherFile ? '✓ Voucher adjuntado' : 'Subir captura de pago'}</span>
                       <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
                     </label>
@@ -497,7 +497,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     {voucherFile && (
                       <div className="flex items-center gap-2">
                         {voucherFile.startsWith('data:image') && (
-                          <div className="w-10 h-10 rounded-lg overflow-hidden border border-[#ff5708] flex-shrink-0">
+                          <div className="w-10 h-10 rounded-lg overflow-hidden border border-primary flex-shrink-0">
                             <img src={voucherFile} alt="Preview" className="w-full h-full object-cover" />
                           </div>
                         )}
@@ -519,7 +519,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             {/* Panel de Tarjeta POS */}
             {selectedMethod === 'tarjeta' && (
               <div className="p-4 rounded-2xl bg-[#f8fafc] dark:bg-[#1a1b22] border border-[#e2e8f0] dark:border-[#2a2b36] space-y-3 text-center">
-                <div className="flex items-center justify-center mx-auto text-[#ff5708]">
+                <div className="flex items-center justify-center mx-auto text-primary">
                   <span className="material-symbols-outlined text-[36px]">point_of_sale</span>
                 </div>
                 <h4 className="text-[14px] font-bold text-[#0f172a] dark:text-white">
@@ -657,7 +657,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 ((selectedMethod === 'yape' || selectedMethod === 'plin') && !isDigitalPaymentValid) ||
                 (selectedMethod === 'efectivo' && isCashInsufficient)
               }
-              className="w-full py-3 min-h-[44px] rounded-xl bg-[#ff5708] hover:bg-[#ff6924] text-[#2b0b00] font-bold text-[14px] flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(255,87,8,0.35)] transition-all cursor-pointer active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full py-3 min-h-[44px] rounded-xl bg-primary hover:brightness-110 text-on-primary font-bold text-[14px] flex items-center justify-center gap-2 shadow-[0_0_20px] shadow-primary/35 transition-all cursor-pointer active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span className="material-symbols-outlined text-[20px]">check_circle</span>
               <span>
@@ -684,7 +684,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             </div>
 
             <div>
-              <span className="text-[11px] font-mono-code text-[#c2410c] dark:text-[#ffb59c] font-bold uppercase tracking-wider">
+              <span className="text-[11px] font-mono-code text-primary font-bold uppercase tracking-wider">
                 ¡PAGO CONFIRMADO CON ÉXITO!
               </span>
               <h3 className="text-[18px] font-bold text-[#0f172a] dark:text-white mt-0.5">
@@ -722,7 +722,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 })}
               </div>
 
-              <div className="text-[13px] font-bold text-[#c2410c] dark:text-[#ffb59c] font-mono-code">
+              <div className="text-[13px] font-bold text-primary font-mono-code">
                 {getRatingLabel(hoverRating || rating)}
               </div>
             </div>
@@ -757,7 +757,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     }}
                     className={`py-2 min-h-[44px] rounded-xl text-[11px] font-bold border transition-colors cursor-pointer ${
                       selectedTip === item.val && !customTip
-                        ? 'bg-[#ff5708] text-[#2b0b00] border-[#ff5708]'
+                        ? 'bg-primary text-on-primary border-primary'
                         : 'bg-white dark:bg-[#1a1b22] text-[#475569] dark:text-[#a1a1aa] border-[#cbd5e1] dark:border-[#353642]'
                     }`}
                   >
@@ -777,7 +777,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 onChange={(e) => setComments(e.target.value)}
                 rows={3}
                 placeholder="El Arroz Chaufa Wok estuvo insuperable y el maridaje perfecto..."
-                className="w-full bg-white dark:bg-[#1a1b22] text-[#0f172a] dark:text-white p-3 rounded-xl text-[13px] border border-[#cbd5e1] dark:border-[#353642] focus:outline-none focus:border-[#ff5708] resize-none"
+                className="w-full bg-white dark:bg-[#1a1b22] text-[#0f172a] dark:text-white p-3 rounded-xl text-[13px] border border-[#cbd5e1] dark:border-[#353642] focus:outline-none focus:border-primary resize-none"
               />
             </div>
 
@@ -787,7 +787,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               type="button"
               onClick={handleSubmitReview}
               disabled={isSubmitting}
-              className="w-full py-3 min-h-[44px] rounded-xl bg-[#ff5708] hover:bg-[#ff6924] text-[#2b0b00] font-bold text-[14px] flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(255,87,8,0.35)] transition-all cursor-pointer active:scale-98 disabled:opacity-50"
+              className="w-full py-3 min-h-[44px] rounded-xl bg-primary hover:brightness-110 text-on-primary font-bold text-[14px] flex items-center justify-center gap-2 shadow-[0_0_20px] shadow-primary/35 transition-all cursor-pointer active:scale-98 disabled:opacity-50"
             >
               <span className="material-symbols-outlined text-[20px]">send</span>
               <span>{isSubmitting ? 'Guardando Reseña...' : 'Enviar Calificación y Finalizar'}</span>
@@ -800,8 +800,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         {/* ========================================================================= */}
         {step === 'completed' && (
           <div className="space-y-4 text-center py-4 animate-fadeIn">
-            <div className="flex items-center justify-center mx-auto text-[#ff5708]">
-              <span className="material-symbols-outlined text-[52px] drop-shadow-[0_0_16px_rgba(255,87,8,0.45)]">sentiment_very_satisfied</span>
+            <div className="flex items-center justify-center mx-auto text-primary">
+              <span className="material-symbols-outlined text-[52px] drop-shadow-[0_0_16px] shadow-primary/45">sentiment_very_satisfied</span>
             </div>
 
             <div className="space-y-1">
@@ -817,7 +817,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               id="btn-completed-close-modal"
               type="button"
               onClick={onClose}
-              className="px-6 py-2.5 min-h-[44px] rounded-xl bg-[#ff5708] text-[#2b0b00] font-bold text-[13px] shadow hover:bg-[#ff6924] transition-all cursor-pointer"
+              className="px-6 py-2.5 min-h-[44px] rounded-xl bg-primary text-on-primary font-bold text-[13px] shadow hover:brightness-110 transition-all cursor-pointer"
             >
               Cerrar y Volver a la Carta
             </button>

@@ -578,9 +578,9 @@ export const ThreeDView: React.FC<ThreeDViewProps> = ({
       {/* Indicador de carga sutil para modelos GLB */}
       {isLoadingModel && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 backdrop-blur-xs z-20 pointer-events-none transition-opacity duration-300">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#1c1b1d]/90 border border-[#ff5708]/50 shadow-xl">
-            <span className="w-3.5 h-3.5 border-2 border-[#ff5708] border-t-transparent rounded-full animate-spin" />
-            <span className="text-[10px] font-mono-code font-bold text-[#ffb59c] tracking-wide animate-pulse">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#1c1b1d]/90 border border-primary/50 shadow-xl">
+            <span className="w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            <span className="text-[10px] font-mono-code font-bold text-primary tracking-wide animate-pulse">
               Cargando modelo 3D...
             </span>
           </div>
@@ -601,7 +601,7 @@ export const ThreeDView: React.FC<ThreeDViewProps> = ({
               type="button"
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-sans font-medium transition-all cursor-pointer ${
                 currentAngle === 'iso'
-                  ? 'bg-[#ff5708] text-white font-bold shadow-md shadow-[#ff5708]/30'
+                  ? 'bg-primary text-white font-bold shadow-md shadow-primary/30'
                   : 'text-[#bcbbc5] hover:text-white hover:bg-white/5'
               }`}
               onClick={() => setAngle('iso')}
@@ -615,7 +615,7 @@ export const ThreeDView: React.FC<ThreeDViewProps> = ({
               type="button"
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-sans font-medium transition-all cursor-pointer ${
                 currentAngle === 'top'
-                  ? 'bg-[#ff5708] text-white font-bold shadow-md shadow-[#ff5708]/30'
+                  ? 'bg-primary text-white font-bold shadow-md shadow-primary/30'
                   : 'text-[#bcbbc5] hover:text-white hover:bg-white/5'
               }`}
               onClick={() => setAngle('top')}
@@ -629,7 +629,7 @@ export const ThreeDView: React.FC<ThreeDViewProps> = ({
               type="button"
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-sans font-medium transition-all cursor-pointer ${
                 currentAngle === 'side'
-                  ? 'bg-[#ff5708] text-white font-bold shadow-md shadow-[#ff5708]/30'
+                  ? 'bg-primary text-white font-bold shadow-md shadow-primary/30'
                   : 'text-[#bcbbc5] hover:text-white hover:bg-white/5'
               }`}
               onClick={() => setAngle('side')}
@@ -647,13 +647,13 @@ export const ThreeDView: React.FC<ThreeDViewProps> = ({
             onClick={toggleAutoRotate}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl backdrop-blur-md border text-[10px] sm:text-[11px] font-sans font-medium transition-all cursor-pointer shadow-xl active:scale-95 ${
               isAutoRotating
-                ? 'bg-[#ff5708]/20 border-[#ff5708]/60 text-[#ffb59c] hover:bg-[#ff5708]/30'
+                ? 'bg-primary/20 border-primary/60 text-primary hover:bg-primary/30'
                 : 'bg-[#121316]/95 border-[#2a2a2c] text-[#a1a1aa] hover:text-white'
             }`}
             title={isAutoRotating ? 'Pausar giro automático' : 'Reanudar giro automático'}
           >
             <svg
-              className={`w-3.5 h-3.5 text-[#ff5708] transition-transform ${isAutoRotating ? 'animate-spin' : ''}`}
+              className={`w-3.5 h-3.5 text-primary transition-transform ${isAutoRotating ? 'animate-spin' : ''}`}
               style={{ animationDuration: '4s' }}
               fill="none"
               stroke="currentColor"

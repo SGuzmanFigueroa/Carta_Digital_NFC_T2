@@ -35,7 +35,7 @@ export function MenuBottomNav({
     'min-h-[44px] min-w-[44px] rounded-xl px-1.5 py-1.5',
     'text-[10px] font-semibold leading-none tracking-tight',
     'transition-colors active:scale-95 cursor-pointer',
-    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5708] focus-visible:ring-inset'
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset'
   );
 
   const idleClass =
@@ -69,14 +69,14 @@ export function MenuBottomNav({
           className={cn(
             itemBaseClass,
             cartItemsCount > 0
-              ? 'text-[#c2410c] hover:bg-[#ffedd5] dark:text-[#ffb59c] dark:hover:bg-[#24252e]'
+              ? 'text-primary hover:bg-primary/10 dark:text-primary dark:hover:bg-[#24252e]'
               : idleClass
           )}
         >
           <span className="relative">
             <ShoppingBag aria-hidden="true" size={19} />
             {cartItemsCount > 0 && (
-              <span className="absolute -right-2 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#ff5708] px-1 text-[9px] font-bold text-[#2b0b00]">
+              <span className="absolute -right-2 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-on-primary">
                 {cartItemsCount}
               </span>
             )}
@@ -88,7 +88,7 @@ export function MenuBottomNav({
         <button
           type="button"
           onClick={onOpenPayment}
-          className={cn(itemBaseClass, idleClass, 'text-[#c2410c] dark:text-[#ffb59c]')}
+          className={cn(itemBaseClass, idleClass, 'text-primary')}
           title="Pedir la cuenta y pagar con Yape o Plin QR"
         >
           <QrCode aria-hidden="true" size={19} />
@@ -103,7 +103,7 @@ export function MenuBottomNav({
           className={cn(
             itemBaseClass,
             waiterCalled
-              ? 'text-[#c2410c] dark:text-[#ffb59c]'
+              ? 'text-primary'
               : idleClass
           )}
         >

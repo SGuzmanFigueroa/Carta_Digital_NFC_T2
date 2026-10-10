@@ -130,6 +130,7 @@ export function MenuThemeProvider({ children }: { children: React.ReactNode }) {
           var acc = ACCENT_PALETTE[p.colorAccent];
           document.documentElement.setAttribute('data-accent', p.colorAccent);
           document.documentElement.style.setProperty('--primary-accent', acc.hex);
+          document.documentElement.style.setProperty('--primary-accent-ink', acc.ink);
           document.documentElement.style.setProperty('--color-primary', acc.hex);
           document.documentElement.style.setProperty('--color-kinetic-amber', acc.hex);
         }

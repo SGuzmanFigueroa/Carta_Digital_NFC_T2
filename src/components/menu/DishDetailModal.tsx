@@ -89,7 +89,7 @@ export function DishDetailModal({ item, onClose }: DishDetailModalProps) {
                   <h2 id="dish-detail-title" className="text-2xl font-bold leading-tight text-white drop-shadow sm:text-3xl">
                     {item.name}
                   </h2>
-                  <span className="shrink-0 rounded-xl border border-white/20 bg-black/45 px-3 py-2 font-mono-code text-lg font-bold text-[#ffb59c] backdrop-blur">
+                  <span className="shrink-0 rounded-xl border border-white/20 bg-black/45 px-3 py-2 font-mono-code text-lg font-bold text-primary backdrop-blur">
                     S/ {item.price.toFixed(2)}
                   </span>
                 </div>
@@ -132,8 +132,8 @@ export function DishDetailModal({ item, onClose }: DishDetailModalProps) {
                 </section>
 
                 {item.pairing && (
-                  <section className="rounded-2xl border border-orange-200 bg-gradient-to-br from-orange-50 to-amber-50/70 p-4 sm:p-5 dark:border-[#ffb59c]/20 dark:from-[#ff5708]/15 dark:to-[#ffb59c]/5">
-                    <div className="mb-2 flex items-center gap-2 text-orange-800 dark:text-[#ffb59c]">
+                  <section className="rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/10 to-primary/5 p-4 sm:p-5 dark:border-primary/20 dark:from-primary/15 dark:to-primary/5">
+                    <div className="mb-2 flex items-center gap-2 text-primary">
                       <Wine size={18} />
                       <h3 className="text-xs font-bold uppercase tracking-[0.18em]">
                         Maridaje recomendado

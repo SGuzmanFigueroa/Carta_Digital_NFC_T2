@@ -133,9 +133,9 @@ export const ARTableViewer: React.FC<ARTableViewerProps> = ({
       {/* Surface Pattern Texture Fallback */}
       {!cameraActive && (
         <div className="absolute inset-0 z-0 bg-gradient-to-b from-[#111216] via-[#1a1c24] to-[#0e0f13] flex flex-col items-center justify-center">
-          <div className="w-80 h-80 rounded-full border border-dashed border-[#ff5708]/30 animate-pulse flex flex-col items-center justify-center text-center p-4">
-            <span className="material-symbols-outlined text-[#ff5708] text-[36px] mb-2">table_restaurant</span>
-            <span className="text-[12px] font-mono-code text-[#ffb59c] font-bold">Superficie de Mesa Detectada</span>
+          <div className="w-80 h-80 rounded-full border border-dashed border-primary/30 animate-pulse flex flex-col items-center justify-center text-center p-4">
+            <span className="material-symbols-outlined text-primary text-[36px] mb-2">table_restaurant</span>
+            <span className="text-[12px] font-mono-code text-primary font-bold">Superficie de Mesa Detectada</span>
             <span className="text-[10px] text-[#a1a1aa] mt-1">Mueve el plato con el dedo para ubicarlo</span>
           </div>
         </div>
@@ -144,7 +144,7 @@ export const ARTableViewer: React.FC<ARTableViewerProps> = ({
       {/* Top Floating Controls Bar */}
       <header className="relative z-30 px-4 pt-safe pt-3 pb-3 flex items-center justify-between bg-gradient-to-b from-black/85 via-black/50 to-transparent">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#ff5708] to-[#ff7b39] flex items-center justify-center text-[#2b0b00] font-bold shadow-lg shadow-[#ff5708]/30">
+          <div className="w-8 h-8 rounded-full bg-primary bg-gradient-to-br from-white/20 to-transparent flex items-center justify-center text-on-primary font-bold shadow-lg shadow-primary/30">
             <span className="material-symbols-outlined text-[18px]">view_in_ar</span>
           </div>
           <div className="flex flex-col">
@@ -208,8 +208,8 @@ export const ARTableViewer: React.FC<ARTableViewerProps> = ({
           </div>
 
           {/* Table Reticle Guideline */}
-          <div className="absolute -bottom-4 px-3 py-1 rounded-full bg-black/70 backdrop-blur-md border border-[#ff5708]/50 flex items-center gap-1.5 text-[10px] font-mono-code text-[#ffb59c] pointer-events-none">
-            <span className="material-symbols-outlined text-[13px] text-[#ff5708]">pan_tool</span>
+          <div className="absolute -bottom-4 px-3 py-1 rounded-full bg-black/70 backdrop-blur-md border border-primary/50 flex items-center gap-1.5 text-[10px] font-mono-code text-primary pointer-events-none">
+            <span className="material-symbols-outlined text-[13px] text-primary">pan_tool</span>
             <span>Arrastra para mover en la mesa</span>
           </div>
         </div>
@@ -229,7 +229,7 @@ export const ARTableViewer: React.FC<ARTableViewerProps> = ({
               }}
               className={`flex items-center gap-2 px-2.5 py-1.5 rounded-xl border backdrop-blur-md shrink-0 transition-all cursor-pointer ${
                 currentDish.id === dish.id
-                  ? 'bg-[#ff5708] border-[#ff5708] text-[#2b0b00] shadow-lg shadow-[#ff5708]/30 font-bold scale-105'
+                  ? 'bg-primary border-primary text-on-primary shadow-lg shadow-primary/30 font-bold scale-105'
                   : 'bg-black/60 border-white/15 text-white hover:bg-black/80'
               }`}
             >
@@ -251,7 +251,7 @@ export const ARTableViewer: React.FC<ARTableViewerProps> = ({
               >
                 -
               </button>
-              <span className="text-[#ff5708] font-bold">{(scale * 28).toFixed(0)} cm</span>
+              <span className="text-primary font-bold">{(scale * 28).toFixed(0)} cm</span>
               <button
                 type="button"
                 onClick={() => setScale((s) => Math.min(1.4, s + 0.1))}
@@ -280,7 +280,7 @@ export const ARTableViewer: React.FC<ARTableViewerProps> = ({
             <button
               type="button"
               onClick={handleSnapshot}
-              className="p-1 rounded bg-[#2a2b36] text-white hover:text-[#ff5708]"
+              className="p-1 rounded bg-[#2a2b36] text-white hover:text-primary"
               title="Tomar foto"
             >
               <span className="material-symbols-outlined text-[16px]">photo_camera</span>
@@ -291,7 +291,7 @@ export const ARTableViewer: React.FC<ARTableViewerProps> = ({
         {/* Primary Action Button: Order this dish */}
         <div className="flex items-center justify-between gap-3 pt-0.5">
           <div className="flex flex-col min-w-0">
-            <span className="text-[11px] font-mono-code text-[#ffb59c]">PRECIO CARTA</span>
+            <span className="text-[11px] font-mono-code text-primary">PRECIO CARTA</span>
             <span className="text-[17px] font-mono-code font-bold text-white">
               S/ {currentDish.price.toFixed(2)}
             </span>
@@ -303,7 +303,7 @@ export const ARTableViewer: React.FC<ARTableViewerProps> = ({
               onAddToCart(currentDish);
               onClose();
             }}
-            className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#ff5708] to-[#ff7b39] text-[#2b0b00] font-bold text-[13px] flex items-center justify-center gap-2 shadow-xl shadow-[#ff5708]/35 hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+            className="flex-1 py-2.5 px-4 rounded-xl bg-primary bg-gradient-to-r from-white/20 to-transparent text-on-primary font-bold text-[13px] flex items-center justify-center gap-2 shadow-xl shadow-primary/35 hover:brightness-110 active:scale-95 transition-all cursor-pointer"
           >
             <span className="material-symbols-outlined text-[18px]">add_shopping_cart</span>
             <span>Pedir este Plato • S/ {currentDish.price.toFixed(2)}</span>

@@ -89,7 +89,19 @@ export default function RootLayout({
                       titanium: '#94a3b8'
                     };
                     var hex = palette[p.colorAccent] || '#ff5708';
+                    var inks = {
+                      amber: '#2b0b00',
+                      emerald: '#052e16',
+                      cyan: '#083344',
+                      ruby: '#ffffff',
+                      champagne: '#422006',
+                      indigo: '#ffffff',
+                      terracotta: '#2b0b00',
+                      lavender: '#2e1065',
+                      titanium: '#0f172a'
+                    };
                     document.documentElement.style.setProperty('--primary-accent', hex);
+                    document.documentElement.style.setProperty('--primary-accent-ink', inks[p.colorAccent] || '#2b0b00');
                     document.documentElement.style.setProperty('--color-primary', hex);
                     document.documentElement.style.setProperty('--color-kinetic-amber', hex);
                   }

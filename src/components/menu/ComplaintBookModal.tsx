@@ -104,7 +104,7 @@ export function ComplaintBookModal({
         {/* Header */}
         <div className="px-5 py-4 bg-gradient-to-r from-[#0f172a] to-[#1e293b] dark:from-[#0d0e12] dark:to-[#161822] text-white flex items-center justify-between border-b border-white/10 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#ff5708] flex items-center justify-center text-[#2b0b00] font-bold shadow-md shadow-[#ff5708]/30">
+            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-on-primary font-bold shadow-md shadow-primary/30">
               <span className="material-symbols-outlined text-[22px]">menu_book</span>
             </div>
             <div>
@@ -112,7 +112,7 @@ export function ComplaintBookModal({
                 <h3 className="text-[15px] sm:text-[16px] font-bold tracking-tight">
                   Libro de Reclamaciones Virtual
                 </h3>
-                <span className="text-[9px] font-mono-code bg-white/10 text-[#ffb59c] px-2 py-0.5 rounded-full border border-white/15">
+                <span className="text-[9px] font-mono-code bg-white/10 text-primary px-2 py-0.5 rounded-full border border-white/15">
                   D.S. N° 011-2011-PCM
                 </span>
               </div>
@@ -136,8 +136,8 @@ export function ComplaintBookModal({
           {step === 'form' ? (
             <form onSubmit={handleSubmit} className="space-y-5">
               {/* Info Banner */}
-              <div className="bg-[#fff7ed] dark:bg-[#1a181e] border border-[#ff5708]/30 rounded-xl p-3 text-[12px] text-[#7c2d12] dark:text-[#ffb59c] leading-relaxed flex items-start gap-2.5">
-                <span className="material-symbols-outlined text-[#ff5708] text-[18px] shrink-0 mt-0.5">info</span>
+              <div className="bg-primary/10 dark:bg-[#1a181e] border border-primary/30 rounded-xl p-3 text-[12px] text-primary leading-relaxed flex items-start gap-2.5">
+                <span className="material-symbols-outlined text-primary text-[18px] shrink-0 mt-0.5">info</span>
                 <span>
                   Conforme a la ley de protección al consumidor de Perú (INDECOPI), el establecimiento dará respuesta formal a esta hoja en un plazo no mayor a <strong>15 días hábiles</strong> mediante el correo electrónico proporcionado.
                 </span>
@@ -145,7 +145,7 @@ export function ComplaintBookModal({
 
               {/* SECTION 1: DATOS DEL CONSUMIDOR */}
               <div className="space-y-3">
-                <h4 className="text-[12px] font-mono-code font-bold uppercase tracking-wider text-[#c2410c] dark:text-[#ff5708] flex items-center gap-1.5 border-b border-[#e2e8f0] dark:border-[#24252e] pb-1.5">
+                <h4 className="text-[12px] font-mono-code font-bold uppercase tracking-wider text-primary flex items-center gap-1.5 border-b border-[#e2e8f0] dark:border-[#24252e] pb-1.5">
                   <span className="material-symbols-outlined text-[16px]">person</span>
                   <span>1. Identificación del Consumidor Reclamante</span>
                 </h4>
@@ -161,7 +161,7 @@ export function ComplaintBookModal({
                       placeholder="Ej. Juan Pérez Quispe"
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
-                      className="w-full h-10 px-3 rounded-lg bg-[#f8fafc] dark:bg-[#1b1c24] border border-[#cbd5e1] dark:border-[#2d2e38] text-[12px] focus:outline-none focus:border-[#ff5708]"
+                      className="w-full h-10 px-3 rounded-lg bg-[#f8fafc] dark:bg-[#1b1c24] border border-[#cbd5e1] dark:border-[#2d2e38] text-[12px] focus:outline-none focus:border-primary"
                     />
                   </div>
 
@@ -173,7 +173,7 @@ export function ComplaintBookModal({
                       <select
                         value={docType}
                         onChange={(e: any) => setDocType(e.target.value)}
-                        className="w-full h-10 px-2 rounded-lg bg-[#f8fafc] dark:bg-[#1b1c24] border border-[#cbd5e1] dark:border-[#2d2e38] text-[12px] focus:outline-none focus:border-[#ff5708]"
+                        className="w-full h-10 px-2 rounded-lg bg-[#f8fafc] dark:bg-[#1b1c24] border border-[#cbd5e1] dark:border-[#2d2e38] text-[12px] focus:outline-none focus:border-primary"
                       >
                         <option value="DNI">DNI</option>
                         <option value="CE">C.E.</option>
@@ -191,7 +191,7 @@ export function ComplaintBookModal({
                         placeholder="N° documento"
                         value={docNumber}
                         onChange={(e) => setDocNumber(e.target.value)}
-                        className="w-full h-10 px-3 rounded-lg bg-[#f8fafc] dark:bg-[#1b1c24] border border-[#cbd5e1] dark:border-[#2d2e38] text-[12px] focus:outline-none focus:border-[#ff5708]"
+                        className="w-full h-10 px-3 rounded-lg bg-[#f8fafc] dark:bg-[#1b1c24] border border-[#cbd5e1] dark:border-[#2d2e38] text-[12px] focus:outline-none focus:border-primary"
                       />
                     </div>
                   </div>
@@ -206,7 +206,7 @@ export function ComplaintBookModal({
                       placeholder="correo@ejemplo.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="w-full h-10 px-3 rounded-lg bg-[#f8fafc] dark:bg-[#1b1c24] border border-[#cbd5e1] dark:border-[#2d2e38] text-[12px] focus:outline-none focus:border-[#ff5708]"
+                      className="w-full h-10 px-3 rounded-lg bg-[#f8fafc] dark:bg-[#1b1c24] border border-[#cbd5e1] dark:border-[#2d2e38] text-[12px] focus:outline-none focus:border-primary"
                     />
                   </div>
 
@@ -220,7 +220,7 @@ export function ComplaintBookModal({
                       placeholder="+51 999 888 777"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      className="w-full h-10 px-3 rounded-lg bg-[#f8fafc] dark:bg-[#1b1c24] border border-[#cbd5e1] dark:border-[#2d2e38] text-[12px] focus:outline-none focus:border-[#ff5708]"
+                      className="w-full h-10 px-3 rounded-lg bg-[#f8fafc] dark:bg-[#1b1c24] border border-[#cbd5e1] dark:border-[#2d2e38] text-[12px] focus:outline-none focus:border-primary"
                     />
                   </div>
 
@@ -234,7 +234,7 @@ export function ComplaintBookModal({
                       placeholder="Av. Principal 123, Distrito, Ciudad"
                       value={address}
                       onChange={(e) => setAddress(e.target.value)}
-                      className="w-full h-10 px-3 rounded-lg bg-[#f8fafc] dark:bg-[#1b1c24] border border-[#cbd5e1] dark:border-[#2d2e38] text-[12px] focus:outline-none focus:border-[#ff5708]"
+                      className="w-full h-10 px-3 rounded-lg bg-[#f8fafc] dark:bg-[#1b1c24] border border-[#cbd5e1] dark:border-[#2d2e38] text-[12px] focus:outline-none focus:border-primary"
                     />
                   </div>
                 </div>
@@ -245,7 +245,7 @@ export function ComplaintBookModal({
                       type="checkbox"
                       checked={isMinor}
                       onChange={(e) => setIsMinor(e.target.checked)}
-                      className="accent-[#ff5708] rounded"
+                      className="accent-primary rounded"
                     />
                     <span>El reclamante es menor de edad</span>
                   </label>
@@ -256,7 +256,7 @@ export function ComplaintBookModal({
                         placeholder="Nombre completo del padre, madre o apoderado"
                         value={parentName}
                         onChange={(e) => setParentName(e.target.value)}
-                        className="w-full h-10 px-3 rounded-lg bg-[#f8fafc] dark:bg-[#1b1c24] border border-[#cbd5e1] dark:border-[#2d2e38] text-[12px] focus:outline-none focus:border-[#ff5708]"
+                        className="w-full h-10 px-3 rounded-lg bg-[#f8fafc] dark:bg-[#1b1c24] border border-[#cbd5e1] dark:border-[#2d2e38] text-[12px] focus:outline-none focus:border-primary"
                       />
                     </div>
                   )}
@@ -265,7 +265,7 @@ export function ComplaintBookModal({
 
               {/* SECTION 2: BIEN CONTRATADO */}
               <div className="space-y-3">
-                <h4 className="text-[12px] font-mono-code font-bold uppercase tracking-wider text-[#c2410c] dark:text-[#ff5708] flex items-center gap-1.5 border-b border-[#e2e8f0] dark:border-[#24252e] pb-1.5">
+                <h4 className="text-[12px] font-mono-code font-bold uppercase tracking-wider text-primary flex items-center gap-1.5 border-b border-[#e2e8f0] dark:border-[#24252e] pb-1.5">
                   <span className="material-symbols-outlined text-[16px]">shopping_bag</span>
                   <span>2. Identificación del Bien Contratado</span>
                 </h4>
@@ -281,7 +281,7 @@ export function ComplaintBookModal({
                         onClick={() => setContractedGoodType('PRODUCTO')}
                         className={`flex-1 h-10 rounded-lg text-[12px] font-semibold border transition-all cursor-pointer ${
                           contractedGoodType === 'PRODUCTO'
-                            ? 'bg-[#ff5708] text-[#2b0b00] border-[#ff5708]'
+                            ? 'bg-primary text-on-primary border-primary'
                             : 'bg-[#f8fafc] dark:bg-[#1b1c24] border-[#cbd5e1] dark:border-[#2d2e38] text-[#64748b]'
                         }`}
                       >
@@ -292,7 +292,7 @@ export function ComplaintBookModal({
                         onClick={() => setContractedGoodType('SERVICIO')}
                         className={`flex-1 h-10 rounded-lg text-[12px] font-semibold border transition-all cursor-pointer ${
                           contractedGoodType === 'SERVICIO'
-                            ? 'bg-[#ff5708] text-[#2b0b00] border-[#ff5708]'
+                            ? 'bg-primary text-on-primary border-primary'
                             : 'bg-[#f8fafc] dark:bg-[#1b1c24] border-[#cbd5e1] dark:border-[#2d2e38] text-[#64748b]'
                         }`}
                       >
@@ -311,7 +311,7 @@ export function ComplaintBookModal({
                       placeholder="0.00"
                       value={claimedAmount}
                       onChange={(e) => setClaimedAmount(e.target.value)}
-                      className="w-full h-10 px-3 rounded-lg bg-[#f8fafc] dark:bg-[#1b1c24] border border-[#cbd5e1] dark:border-[#2d2e38] text-[12px] focus:outline-none focus:border-[#ff5708]"
+                      className="w-full h-10 px-3 rounded-lg bg-[#f8fafc] dark:bg-[#1b1c24] border border-[#cbd5e1] dark:border-[#2d2e38] text-[12px] focus:outline-none focus:border-primary"
                     />
                   </div>
 
@@ -323,7 +323,7 @@ export function ComplaintBookModal({
                       type="text"
                       value={goodDescription}
                       onChange={(e) => setGoodDescription(e.target.value)}
-                      className="w-full h-10 px-3 rounded-lg bg-[#f8fafc] dark:bg-[#1b1c24] border border-[#cbd5e1] dark:border-[#2d2e38] text-[12px] focus:outline-none focus:border-[#ff5708]"
+                      className="w-full h-10 px-3 rounded-lg bg-[#f8fafc] dark:bg-[#1b1c24] border border-[#cbd5e1] dark:border-[#2d2e38] text-[12px] focus:outline-none focus:border-primary"
                     />
                   </div>
                 </div>
@@ -331,7 +331,7 @@ export function ComplaintBookModal({
 
               {/* SECTION 3: DETALLE DE LA RECLAMACIÓN */}
               <div className="space-y-3">
-                <h4 className="text-[12px] font-mono-code font-bold uppercase tracking-wider text-[#c2410c] dark:text-[#ff5708] flex items-center gap-1.5 border-b border-[#e2e8f0] dark:border-[#24252e] pb-1.5">
+                <h4 className="text-[12px] font-mono-code font-bold uppercase tracking-wider text-primary flex items-center gap-1.5 border-b border-[#e2e8f0] dark:border-[#24252e] pb-1.5">
                   <span className="material-symbols-outlined text-[16px]">edit_note</span>
                   <span>3. Detalle de la Reclamación y Pedido</span>
                 </h4>
@@ -345,7 +345,7 @@ export function ComplaintBookModal({
                       onClick={() => setClaimType('RECLAMO')}
                       className={`p-3 rounded-xl border flex items-start gap-2.5 cursor-pointer transition-all ${
                         claimType === 'RECLAMO'
-                          ? 'bg-[#fff7ed] dark:bg-[#201d24] border-[#ff5708]'
+                          ? 'bg-primary/10 dark:bg-[#201d24] border-primary'
                           : 'bg-[#f8fafc] dark:bg-[#1b1c24] border-[#cbd5e1] dark:border-[#2d2e38]'
                       }`}
                     >
@@ -354,7 +354,7 @@ export function ComplaintBookModal({
                         name="claim_type"
                         checked={claimType === 'RECLAMO'}
                         onChange={() => setClaimType('RECLAMO')}
-                        className="accent-[#ff5708] mt-1"
+                        className="accent-primary mt-1"
                       />
                       <div>
                         <strong className="block text-[12px] text-[#0f172a] dark:text-white">RECLAMO</strong>
@@ -368,7 +368,7 @@ export function ComplaintBookModal({
                       onClick={() => setClaimType('QUEJA')}
                       className={`p-3 rounded-xl border flex items-start gap-2.5 cursor-pointer transition-all ${
                         claimType === 'QUEJA'
-                          ? 'bg-[#fff7ed] dark:bg-[#201d24] border-[#ff5708]'
+                          ? 'bg-primary/10 dark:bg-[#201d24] border-primary'
                           : 'bg-[#f8fafc] dark:bg-[#1b1c24] border-[#cbd5e1] dark:border-[#2d2e38]'
                       }`}
                     >
@@ -377,7 +377,7 @@ export function ComplaintBookModal({
                         name="claim_type"
                         checked={claimType === 'QUEJA'}
                         onChange={() => setClaimType('QUEJA')}
-                        className="accent-[#ff5708] mt-1"
+                        className="accent-primary mt-1"
                       />
                       <div>
                         <strong className="block text-[12px] text-[#0f172a] dark:text-white">QUEJA</strong>
@@ -399,7 +399,7 @@ export function ComplaintBookModal({
                     placeholder="Explica detalladamente lo ocurrido..."
                     value={detail}
                     onChange={(e) => setDetail(e.target.value)}
-                    className="w-full p-3 rounded-lg bg-[#f8fafc] dark:bg-[#1b1c24] border border-[#cbd5e1] dark:border-[#2d2e38] text-[12px] focus:outline-none focus:border-[#ff5708]"
+                    className="w-full p-3 rounded-lg bg-[#f8fafc] dark:bg-[#1b1c24] border border-[#cbd5e1] dark:border-[#2d2e38] text-[12px] focus:outline-none focus:border-primary"
                   />
                 </div>
 
@@ -413,7 +413,7 @@ export function ComplaintBookModal({
                     placeholder="Qué solución o medida solicita al restaurante (ej. Devolución, cambio de plato, disculpas)..."
                     value={consumerRequest}
                     onChange={(e) => setConsumerRequest(e.target.value)}
-                    className="w-full p-3 rounded-lg bg-[#f8fafc] dark:bg-[#1b1c24] border border-[#cbd5e1] dark:border-[#2d2e38] text-[12px] focus:outline-none focus:border-[#ff5708]"
+                    className="w-full p-3 rounded-lg bg-[#f8fafc] dark:bg-[#1b1c24] border border-[#cbd5e1] dark:border-[#2d2e38] text-[12px] focus:outline-none focus:border-primary"
                   />
                 </div>
               </div>
@@ -425,7 +425,7 @@ export function ComplaintBookModal({
                     type="checkbox"
                     checked={acceptTerms}
                     onChange={(e) => setAcceptTerms(e.target.checked)}
-                    className="accent-[#ff5708] mt-0.5"
+                    className="accent-primary mt-0.5"
                   />
                   <span>
                     Declaro bajo juramento que los datos ingresados son verídicos y autorizo al establecimiento a comunicarse conmigo al correo electrónico brindado conforme al Código de Protección al Consumidor (Ley N° 29571).
@@ -445,11 +445,11 @@ export function ComplaintBookModal({
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="flex-1 h-11 rounded-xl bg-[#ff5708] hover:bg-[#ff6924] text-[#2b0b00] font-bold text-[13px] flex items-center justify-center gap-2 shadow-lg shadow-[#ff5708]/25 cursor-pointer transition-all disabled:opacity-50"
+                  className="flex-1 h-11 rounded-xl bg-primary hover:brightness-110 text-on-primary font-bold text-[13px] flex items-center justify-center gap-2 shadow-lg shadow-primary/25 cursor-pointer transition-all disabled:opacity-50"
                 >
                   {isSubmitting ? (
                     <>
-                      <span className="w-4 h-4 border-2 border-[#2b0b00] border-t-transparent rounded-full animate-spin"></span>
+                      <span className="w-4 h-4 border-2 border-on-primary border-t-transparent rounded-full animate-spin"></span>
                       <span>Registrando...</span>
                     </>
                   ) : (
@@ -475,7 +475,7 @@ export function ComplaintBookModal({
                 <h3 className="text-[20px] font-bold text-[#0f172a] dark:text-white">
                   Hoja de Reclamación Registrada
                 </h3>
-                <div className="inline-block px-4 py-1.5 rounded-xl bg-[#ff5708]/15 border border-[#ff5708]/40 text-[#c2410c] dark:text-[#ffb59c] font-mono-code font-bold text-[16px] my-2">
+                <div className="inline-block px-4 py-1.5 rounded-xl bg-primary/15 border border-primary/40 text-primary font-mono-code font-bold text-[16px] my-2">
                   Código: {generatedClaimCode}
                 </div>
               </div>
@@ -491,7 +491,7 @@ export function ComplaintBookModal({
                 </div>
                 <div className="flex justify-between border-b border-[#e2e8f0] dark:border-[#24252e] pb-1.5">
                   <span className="text-[#64748b] dark:text-[#94a3b8]">Clasificación:</span>
-                  <span className="font-bold text-[#ff5708]">{claimType}</span>
+                  <span className="font-bold text-primary">{claimType}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-[#64748b] dark:text-[#94a3b8]">Plazo de respuesta:</span>
@@ -516,7 +516,7 @@ export function ComplaintBookModal({
                 <button
                   type="button"
                   onClick={resetAndClose}
-                  className="h-10 px-5 rounded-xl bg-[#ff5708] hover:bg-[#ff6924] text-[#2b0b00] font-bold text-[12px] flex items-center gap-1.5 shadow-md shadow-[#ff5708]/25 cursor-pointer"
+                  className="h-10 px-5 rounded-xl bg-primary hover:brightness-110 text-on-primary font-bold text-[12px] flex items-center gap-1.5 shadow-md shadow-primary/25 cursor-pointer"
                 >
                   <span>Volver a la Carta</span>
                 </button>

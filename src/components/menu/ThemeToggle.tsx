@@ -36,9 +36,11 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
       className={cn(
         'group relative flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center',
         'bg-transparent border-0 shadow-none outline-none',
-        'text-[#475569] dark:text-[#ffb59c] hover:text-[#0f172a] dark:hover:text-[#ff8c42]',
+        // El color de acento lo aportan los propios iconos (Sol = acento, Luna =
+        // neutro), así que el botón solo necesita un estado hover legible.
+        'text-[#475569] hover:text-[#0f172a] dark:text-primary',
         'cursor-pointer transition-transform duration-150 active:scale-85 select-none',
-        'focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5708] rounded-full',
+        'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-full',
         className
       )}
     >
@@ -50,7 +52,7 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
           size={22}
           className={cn(
             'absolute transition-all duration-300 ease-out transform',
-            'scale-0 rotate-90 opacity-0 dark:scale-100 dark:rotate-0 dark:opacity-100 text-[#ff8c42]',
+            'scale-0 rotate-90 opacity-0 dark:scale-100 dark:rotate-0 dark:opacity-100 text-primary',
             'group-hover:rotate-45 group-hover:scale-110'
           )}
         />

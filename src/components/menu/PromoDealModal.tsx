@@ -270,7 +270,7 @@ function PromoPhotoGallery({ images, altTexts, ariaLabel }: PromoPhotoGalleryPro
               key={`gallery-dot-${image}-${index}`}
               className={`h-1.5 rounded-full shadow-[0_0_0_1px_rgba(255,255,255,0.35)] dark:shadow-[0_0_0_1px_rgba(0,0,0,0.4)] transition-all duration-200 ${
                 index === activeIndex
-                  ? 'w-4 bg-[#ff5708] opacity-100'
+                  ? 'w-4 bg-primary opacity-100'
                   : 'w-1.5 bg-[#0f172a]/35 opacity-60 dark:bg-white/70'
               }`}
             />
@@ -307,10 +307,10 @@ const PromoFlashCountdown = React.memo(function PromoFlashCountdown({ seconds }:
   return (
     <span
       className={`pointer-events-none absolute bottom-2 left-1/2 z-10 inline-flex -translate-x-1/2 items-center gap-1.5 font-mono-code text-[12px] font-bold whitespace-nowrap drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] ${
-        isUrgent ? 'text-rose-400' : 'text-[#ffb59c]'
+        isUrgent ? 'text-rose-400' : 'text-primary'
       }`}
     >
-      <Clock size={13} strokeWidth={2.8} className={isUrgent ? 'text-rose-400' : 'text-[#ff5708]'} />
+      <Clock size={13} strokeWidth={2.8} className={isUrgent ? 'text-rose-400' : 'text-primary'} />
       <span>¡Termina en {formatPromoCountdown(remainingSeconds)}!</span>
     </span>
   );
@@ -418,7 +418,7 @@ const PromoDealSlide = React.memo(function PromoDealSlide({
 
         {/* Precio promocional y ahorro calculados desde el precio real del menú */}
         <div className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1.5">
-          <span className="font-mono-code text-[30px] leading-none font-black text-[#ff5708]">
+          <span className="font-mono-code text-[30px] leading-none font-black text-primary">
             {formatSoles(pricing.promoPrice)}
           </span>
           <span className="font-mono-code text-[14px] leading-none text-[#64748b] dark:text-[#71717a] line-through">
@@ -441,7 +441,7 @@ const PromoDealSlide = React.memo(function PromoDealSlide({
  *
  * Replica el diseño premium de referencia (backdrop desenfocado, tarjeta
  * redondeada, badge FLASH DEAL, cuenta regresiva, precio con ahorro real y CTA
- * naranja) pero alimentado 100% con platos reales del menú: nombre, rating,
+ * del acento) pero alimentado 100% con platos reales del menú: nombre, rating,
  * reseñas, descripción y precio se calculan dinámicamente.
  *
  * 🎠 CARRUSEL DE OFERTAS: todas las ofertas activas se pintan en un riel
@@ -709,7 +709,7 @@ export function PromoDealModal({
     >
       <div
         onClick={(event) => event.stopPropagation()}
-        className="animate-fadeIn relative my-auto flex w-full max-w-[384px] max-h-[92dvh] flex-col rounded-[28px] overflow-hidden bg-white dark:bg-[#131418] border border-[#ff5708]/35 shadow-[0_25px_60px_-15px_rgba(255,87,8,0.25)] dark:shadow-[0_25px_60px_-15px_rgba(255,87,8,0.45)]"
+        className="animate-fadeIn relative my-auto flex w-full max-w-[384px] max-h-[92dvh] flex-col rounded-[28px] overflow-hidden bg-white dark:bg-[#131418] border border-primary/35 shadow-[0_25px_60px_-15px] shadow-primary/25 dark:shadow-[0_25px_60px_-15px] dark:shadow-primary/45"
       >
         {/* ===================================================================== */}
         {/* 🎬 CHROME FIJO · BADGE FLASH DEAL Y CIERRE (✕)                        */}
@@ -769,7 +769,7 @@ export function PromoDealModal({
           <button
             type="button"
             onClick={() => onApply(deal, pricing.promoPrice)}
-            className="w-full h-12 min-h-[48px] rounded-2xl bg-[#ff5708] hover:bg-[#ff6924] text-white font-black text-[13.5px] uppercase tracking-[0.04em] flex items-center justify-center gap-2 shadow-[0_10px_30px_-8px_rgba(255,87,8,0.75)] active:scale-[0.98] transition-all cursor-pointer"
+            className="w-full h-12 min-h-[48px] rounded-2xl bg-primary hover:brightness-110 text-white font-black text-[13.5px] uppercase tracking-[0.04em] flex items-center justify-center gap-2 shadow-[0_10px_30px_-8px] shadow-primary/75 active:scale-[0.98] transition-all cursor-pointer"
           >
             <span>Aplicar Descuento</span>
             <ArrowRight size={17} strokeWidth={3} />
@@ -790,7 +790,7 @@ export function PromoDealModal({
                   >
                     <span
                       className={`block h-1.5 rounded-full transition-all ${
-                        index === currentIndex ? 'w-5 bg-[#ff5708]' : 'w-1.5 bg-[#0f172a]/15 group-hover:bg-[#0f172a]/30 dark:bg-white/25 dark:group-hover:bg-white/50'
+                        index === currentIndex ? 'w-5 bg-primary' : 'w-1.5 bg-[#0f172a]/15 group-hover:bg-[#0f172a]/30 dark:bg-white/25 dark:group-hover:bg-white/50'
                       }`}
                     />
                   </button>

@@ -34,13 +34,18 @@
   --font-sans: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
   --font-mono: var(--font-space-mono), 'Space Mono', monospace;
 
-  /* Figma Palette Tokens */
-  --color-primary: #ff5708;
-  --color-primary-container: #ff5708;
+  /* Figma Palette Tokens
+     `--color-primary` NO es un hex fijo: se resuelve desde `--primary-accent`,
+     la variable que el sistema de temas ya inyecta en <html> al cambiar de
+     paleta. Así toda utilidad `*-primary` (incluidos sus modificadores de
+     opacidad `bg-primary/10`, `shadow-primary/30`...) queda viva en runtime;
+     con un hex literal Tailwind v4 precalcularía esos alphas en build time. */
+  --color-primary: var(--primary-accent, #ff5708);
+  --color-primary-container: var(--primary-accent, #ff5708);
   --color-primary-fixed: #ffdbcf;
   --color-primary-fixed-dim: #ffb59c;
-  --color-on-primary: #ffffff;
-  --color-on-primary-container: #ffffff;
+  --color-on-primary: var(--primary-accent-ink, #2b0b00);
+  --color-on-primary-container: var(--primary-accent-ink, #2b0b00);
 
   --color-surface: #121317;
   --color-surface-dim: #0b0c0e;
@@ -629,7 +634,12 @@ html[data-theme="kds-high-contrast"] header {
   border-bottom: 2px solid #ffffff !important;
 }
 
-/* --- ACENTOS CROMÁTICOS OPERATIVOS (9 PALETAS EN VIVO) --- */
+/* --- ACENTOS CROMÁTICOS OPERATIVOS (9 PALETAS EN VIVO) ---
+   Capa de COMPATIBILIDAD: remapea clases con HEX LITERAL (`bg-[#ff5708]`,
+   `text-[#c2410c]`…) al acento vivo. La sigue usando el panel interno, que aún
+   declara el color a mano. La vista pública del comensal (/menu) ya NO depende
+   de este shim: usa los tokens `primary` / `on-primary` de Tailwind v4, que se
+   resuelven en runtime desde `--primary-accent` (ver el bloque `@theme`). --- */
 [data-accent] .bg-\[\#FF5A1F\],
 [data-accent] .bg-\[\#ff5708\],
 [data-accent] button.bg-\[\#FF5A1F\],

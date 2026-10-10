@@ -278,15 +278,15 @@ export const DishARViewer: React.FC<DishARViewerProps> = ({
 
       {isCameraActive && status !== 'anchored' && (
         <div className="pointer-events-none absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-3">
-          <div className="relative h-40 w-40 rounded-full border border-[#ff5708]/70 bg-[#ff5708]/5 shadow-[0_0_36px_rgba(255,87,8,0.26)]">
-            <span className="absolute left-1/2 top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#ff5708] shadow-[0_0_18px_rgba(255,87,8,0.9)]" />
+          <div className="relative h-40 w-40 rounded-full border border-primary/70 bg-primary/5 shadow-[0_0_36px] shadow-primary/26">
+            <span className="absolute left-1/2 top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary shadow-[0_0_18px] shadow-primary/90" />
             <span className="absolute inset-6 rounded-full border border-dashed border-white/35" />
-            <span className="absolute -left-5 top-1/2 h-px w-10 bg-[#ff5708]/70" />
-            <span className="absolute -right-5 top-1/2 h-px w-10 bg-[#ff5708]/70" />
-            <span className="absolute -top-5 left-1/2 h-10 w-px bg-[#ff5708]/70" />
-            <span className="absolute -bottom-5 left-1/2 h-10 w-px bg-[#ff5708]/70" />
+            <span className="absolute -left-5 top-1/2 h-px w-10 bg-primary/70" />
+            <span className="absolute -right-5 top-1/2 h-px w-10 bg-primary/70" />
+            <span className="absolute -top-5 left-1/2 h-10 w-px bg-primary/70" />
+            <span className="absolute -bottom-5 left-1/2 h-10 w-px bg-primary/70" />
           </div>
-          <div className="max-w-[280px] rounded-2xl border border-[#ff5708]/45 bg-black/72 px-4 py-3 text-center text-white shadow-2xl backdrop-blur-md">
+          <div className="max-w-[280px] rounded-2xl border border-primary/45 bg-black/72 px-4 py-3 text-center text-white shadow-2xl backdrop-blur-md">
             <p className="text-[12px] font-black leading-snug">{statusText}</p>
             <p className="mt-1 text-[10px] leading-snug text-white/65">
               {modelReady ? 'Toca una superficie plana para colocar el plato.' : 'Cargando plato 3D...'}
