@@ -40,6 +40,13 @@ function disposeObject(object: THREE.Object3D) {
   });
 }
 
+function normalizeAngleDelta(current: number, base: number) {
+  let delta = current - base;
+  while (delta > 180) delta -= 360;
+  while (delta < -180) delta += 360;
+  return delta;
+}
+
 function createSoftShadowTexture() {
   const canvas = document.createElement('canvas');
   canvas.width = 256;
@@ -74,7 +81,10 @@ export const DishARViewer: React.FC<DishARViewerProps> = ({
   const dishGroupRef = useRef<THREE.Group | null>(null);
   const anchorRef = useRef(false);
   const anchorOffsetRef = useRef({ x: 0, y: 0 });
-  const orientationRef = useRef({ beta: 0, gamma: 0 });
+  const orientationRef = useRef({ alpha: 0, beta: 0, gamma: 0, hasReading: false });
+  const anchorOrientationRef = useRef({ alpha: 0, beta: 0, gamma: 0, hasReading: false });
+  const manualOrbitRef = useRef({ x: 0, y: 0 });
+  const dragRef = useRef({ active: false, pointerId: -1, startX: 0, startY: 0, baseX: 0, baseY: 0 });
   const statusRef = useRef<ARStatus>('idle');
   const modelReadyRef = useRef(false);
   const [status, setStatus] = useState<ARStatus>('idle');
@@ -94,6 +104,7 @@ export const DishARViewer: React.FC<DishARViewerProps> = ({
     if (!isCameraActive) {
       anchorRef.current = false;
       anchorOffsetRef.current = { x: 0, y: 0 };
+      manualOrbitRef.current = { x: 0, y: 0 };
       updateStatus('idle');
       onAnchorChange?.(false);
       onStatusChange?.('Esperando cámara');
@@ -118,8 +129,10 @@ export const DishARViewer: React.FC<DishARViewerProps> = ({
   useEffect(() => {
     const onOrientation = (event: DeviceOrientationEvent) => {
       orientationRef.current = {
+        alpha: event.alpha ?? 0,
         beta: event.beta ?? 0,
         gamma: event.gamma ?? 0,
+        hasReading: event.alpha !== null || event.beta !== null || event.gamma !== null,
       };
     };
 
@@ -287,6 +300,10 @@ export const DishARViewer: React.FC<DishARViewerProps> = ({
     window.addEventListener('resize', resize);
 
     const targetScaleVector = new THREE.Vector3(1, 1, 1);
+    const defaultCameraPosition = new THREE.Vector3(0, 1.28, 3.25);
+    const defaultLookTarget = new THREE.Vector3(0, 0.18, 0);
+    const anchoredLookTarget = new THREE.Vector3();
+    const desiredCameraPosition = new THREE.Vector3();
 
     const animate = () => {
       if (!active) return;
@@ -294,20 +311,50 @@ export const DishARViewer: React.FC<DishARViewerProps> = ({
 
       const anchored = anchorRef.current;
       const anchorOffset = anchorOffsetRef.current;
-      const deviceTiltX = THREE.MathUtils.clamp(orientationRef.current.gamma / 45, -0.55, 0.55);
-      const deviceTiltY = THREE.MathUtils.clamp((orientationRef.current.beta - 55) / 55, -0.45, 0.45);
+      const currentOrientation = orientationRef.current;
+      const anchorOrientation = anchorOrientationRef.current;
       const targetScale = Math.max(0.48, Math.min(1.34, scale));
 
       targetScaleVector.set(targetScale, targetScale, targetScale);
       root.scale.lerp(targetScaleVector, 0.12);
 
-      const targetX = anchored ? anchorOffset.x * 1.08 - deviceTiltX * 0.13 : 0;
+      const targetX = anchored ? anchorOffset.x * 1.08 : 0;
       const targetY = anchored ? -0.7 : -0.68;
-      const targetZ = anchored ? -2.12 + anchorOffset.y * 0.42 + deviceTiltY * 0.14 : -2.12;
-      root.position.x += (targetX - root.position.x) * 0.065;
-      root.position.y += (targetY - root.position.y) * 0.06;
-      root.position.z += (targetZ - root.position.z) * 0.055;
-      root.rotation.y += ((anchored ? deviceTiltX * 0.08 : 0) - root.rotation.y) * 0.05;
+      const targetZ = anchored ? -2.12 + anchorOffset.y * 0.42 : -2.12;
+      root.position.x += (targetX - root.position.x) * 0.08;
+      root.position.y += (targetY - root.position.y) * 0.075;
+      root.position.z += (targetZ - root.position.z) * 0.075;
+      root.rotation.y += (0 - root.rotation.y) * 0.08;
+
+      if (anchored) {
+        const yawDelta = currentOrientation.hasReading && anchorOrientation.hasReading
+          ? normalizeAngleDelta(currentOrientation.alpha, anchorOrientation.alpha)
+          : 0;
+        const gammaDelta = currentOrientation.hasReading && anchorOrientation.hasReading
+          ? currentOrientation.gamma - anchorOrientation.gamma
+          : 0;
+        const betaDelta = currentOrientation.hasReading && anchorOrientation.hasReading
+          ? currentOrientation.beta - anchorOrientation.beta
+          : 0;
+        const sensorOrbitX = THREE.MathUtils.clamp((yawDelta * 0.65 + gammaDelta * 1.05) / 58, -0.95, 0.95);
+        const sensorOrbitY = THREE.MathUtils.clamp(betaDelta / 62, -0.42, 0.48);
+        const manualOrbit = manualOrbitRef.current;
+        const orbitX = THREE.MathUtils.clamp(sensorOrbitX + manualOrbit.x, -1.08, 1.08);
+        const orbitY = THREE.MathUtils.clamp(sensorOrbitY + manualOrbit.y, -0.52, 0.56);
+        const orbitRadius = 5.34;
+
+        anchoredLookTarget.set(root.position.x, root.position.y + 0.28, root.position.z + 0.02);
+        desiredCameraPosition.set(
+          anchoredLookTarget.x + Math.sin(orbitX) * orbitRadius,
+          anchoredLookTarget.y + 1.78 - orbitY * 0.92,
+          anchoredLookTarget.z + Math.cos(orbitX) * orbitRadius
+        );
+        camera.position.lerp(desiredCameraPosition, 0.075);
+        camera.lookAt(anchoredLookTarget);
+      } else {
+        camera.position.lerp(defaultCameraPosition, 0.08);
+        camera.lookAt(defaultLookTarget);
+      }
 
       if (!anchored) {
         anchorRing.visible = isCameraActive;
@@ -347,7 +394,7 @@ export const DishARViewer: React.FC<DishARViewerProps> = ({
   }, [dishId, scale, isCameraActive]);
 
   const anchorDish = (event: React.MouseEvent<HTMLButtonElement>) => {
-    if (!isCameraActive || status === 'idle') return;
+    if (!isCameraActive || status === 'idle' || status === 'anchored') return;
 
     const rect = event.currentTarget.getBoundingClientRect();
     const x = ((event.clientX - rect.left) / rect.width) - 0.5;
@@ -357,6 +404,8 @@ export const DishARViewer: React.FC<DishARViewerProps> = ({
       y: THREE.MathUtils.clamp(y, -0.22, 0.24),
     };
 
+    anchorOrientationRef.current = { ...orientationRef.current };
+    manualOrbitRef.current = { x: 0, y: 0 };
     anchorRef.current = true;
     updateStatus('anchored');
     onAnchorChange?.(true);
@@ -364,8 +413,43 @@ export const DishARViewer: React.FC<DishARViewerProps> = ({
     onShowToast?.('Plato colocado sobre la mesa', 'view_in_ar');
   };
 
+  const handlePointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (status !== 'anchored') return;
+    dragRef.current = {
+      active: true,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      baseX: manualOrbitRef.current.x,
+      baseY: manualOrbitRef.current.y,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handlePointerMove = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const drag = dragRef.current;
+    if (!drag.active || drag.pointerId !== event.pointerId) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const dx = (event.clientX - drag.startX) / Math.max(rect.width, 1);
+    const dy = (event.clientY - drag.startY) / Math.max(rect.height, 1);
+    manualOrbitRef.current = {
+      x: THREE.MathUtils.clamp(drag.baseX + dx * 1.95, -0.72, 0.72),
+      y: THREE.MathUtils.clamp(drag.baseY + dy * 1.35, -0.36, 0.36),
+    };
+  };
+
+  const handlePointerEnd = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const drag = dragRef.current;
+    if (drag.pointerId === event.pointerId) {
+      dragRef.current = { active: false, pointerId: -1, startX: 0, startY: 0, baseX: manualOrbitRef.current.x, baseY: manualOrbitRef.current.y };
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+    }
+  };
+
   const statusText = status === 'anchored'
-    ? 'Plato colocado: muévete alrededor para verlo'
+    ? 'Plato fijo en mesa: muévete alrededor o arrastra para verlo 360°'
     : status === 'surface-ready'
       ? 'Toca la mesa para colocar el plato'
       : status === 'scanning'
@@ -376,6 +460,10 @@ export const DishARViewer: React.FC<DishARViewerProps> = ({
     <button
       type="button"
       onClick={anchorDish}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerEnd}
+      onPointerCancel={handlePointerEnd}
       disabled={!isCameraActive || status === 'idle'}
       className="absolute inset-0 z-10 block h-full w-full cursor-crosshair overflow-hidden bg-transparent text-left disabled:cursor-default"
       aria-label="Detectar superficie y anclar plato 3D"

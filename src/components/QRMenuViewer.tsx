@@ -292,6 +292,32 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       throw new DOMException('Camera API is not available', 'NotFoundError');
     }
 
+    const requestWithTimeout = (constraints: MediaStreamConstraints, timeoutMs = 9000) => {
+      let settled = false;
+      let timeoutId = 0;
+      const streamPromise = navigator.mediaDevices.getUserMedia(constraints);
+
+      const timeoutPromise = new Promise<MediaStream>((_, reject) => {
+        timeoutId = window.setTimeout(() => {
+          settled = true;
+          reject(new DOMException('Camera permission request timed out', 'AbortError'));
+        }, timeoutMs);
+      });
+
+      streamPromise
+        .then((stream) => {
+          if (settled) {
+            stream.getTracks().forEach((track) => track.stop());
+          }
+        })
+        .catch(() => undefined);
+
+      return Promise.race([streamPromise, timeoutPromise]).finally(() => {
+        settled = true;
+        window.clearTimeout(timeoutId);
+      });
+    };
+
     const cameraAttempts: MediaStreamConstraints[] = [
       {
         video: {
@@ -318,7 +344,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
 
     for (const constraints of cameraAttempts) {
       try {
-        return await navigator.mediaDevices.getUserMedia(constraints);
+        return await requestWithTimeout(constraints);
       } catch (err) {
         lastCameraError = err;
         const errorName = err instanceof DOMException ? err.name : '';
@@ -366,6 +392,12 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     if (errorName === 'NotFoundError' || errorName === 'OverconstrainedError') {
       setArCameraMessage('No se encontró una cámara disponible.');
       setArCameraHelp('Cierra Zoom, Meet, OBS u otra app que esté usando la cámara y vuelve a intentar.');
+      return;
+    }
+
+    if (errorName === 'AbortError') {
+      setArCameraMessage('La cámara tardó demasiado en responder.');
+      setArCameraHelp('Reintenta y acepta el permiso de cámara apenas aparezca. Si otra app usa la cámara, ciérrala primero.');
       return;
     }
 
