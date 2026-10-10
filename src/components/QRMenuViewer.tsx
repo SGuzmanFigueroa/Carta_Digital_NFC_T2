@@ -19,6 +19,7 @@ const ThreeDView = dynamic(
 
 import { ARTableViewer } from './ARTableViewer';
 import { DishARViewer } from './DishARViewer';
+import { WebXRDishLauncher } from './WebXRDishLauncher';
 // CD-13 · Componentes del tema Claro/Oscuro y navegación inferior del comensal.
 import { ThemeToggle } from './menu/ThemeToggle';
 // CD-31 · Selector de idioma [ES | EN] de la carta del comensal.
@@ -150,7 +151,15 @@ const PROMO_DEAL_SEEN_KEY = 'gastropulse_promo_seen';
  */
 const IS_DEV = process.env.NODE_ENV !== 'production';
 
+const normalizeStr = (str: string) =>
+  str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
 
+const normalizeTable = (table: string) => normalizeStr(table).replace(/\s+/g, '-');
+
+
+
+
+type MenuCartItem = { item: MenuItem; quantity: number; notes?: string };
 
 interface QRMenuViewerProps {
   menuItems: MenuItem[];
@@ -200,6 +209,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isOrderHistoryOpen, setIsOrderHistoryOpen] = useState(false);
   const [selectedTable, setSelectedTable] = useState('MESA 04');
+  const [cartsByTable, setCartsByTable] = useState<Record<string, MenuCartItem[]>>({});
   const [isSplitBillModalOpen, setIsSplitBillModalOpen] = useState(false);
 
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -565,6 +575,13 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     }
   }, [attachArCameraStream, handleCameraError, requestArCameraStream, stopArCamera, t]);
 
+  const toggleDietaryFilter = (filter: DietaryPreference) => {
+    setSelectedDietaryFilters((previous) =>
+      previous.includes(filter)
+        ? previous.filter((selectedFilter) => selectedFilter !== filter)
+        : [...previous, filter]
+    );
+  };
   const searchIndexById = React.useMemo(() => {
     const index = new Map<string, string>();
     menuItems.forEach((item) => index.set(item.id, buildMenuSearchText(item)));
@@ -591,17 +608,15 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
           (item.tag && normalizeStr(item.tag).includes(query)) ||
           indexedText.includes(query) ||
           normalizeStr(getMenuCategoryLabel(item.category, language)).includes(query) ||
-          (item.ingredients &&
-            item.ingredients.some((ingredient) => normalizeStr(ingredient).includes(query)));
+          (Array.isArray(item.ingredients) &&
+            item.ingredients.some((ingredient: string) => normalizeStr(ingredient).includes(query))) ||
+          (typeof item.ingredients === 'string' && normalizeStr(item.ingredients).includes(query));
 
         const matchesDietary =
           selectedDietaryFilters.length === 0 ||
           selectedDietaryFilters.every((filter) => {
-            if (filter === 'vegano') return item.isVegan;
-            if (filter === 'sin-gluten') return item.isGlutenFree;
-            if (filter === 'sin-lactosa') return item.isDairyFree;
-            if (filter === 'picante') return item.isSpicy;
-            return true;
+            const preferences = getDietaryPreferences(item);
+            return preferences.includes(filter);
           });
 
         return matchesCategory && matchesSearch && matchesDietary;
@@ -609,8 +624,8 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       .map((item) => localizeMenuItem(item, language));
   }, [menuItems, selectedCategory, searchQuery, selectedDietaryFilters, searchIndexById, language]);
 
-  const cartTotal = cart.reduce((acc, curr) => acc + curr.item.price * curr.quantity, 0);
-  const cartItemsCount = cart.reduce((acc, curr) => acc + curr.quantity, 0);
+  const cartTotal = cart.reduce((acc: number, curr: MenuCartItem) => acc + curr.item.price * curr.quantity, 0);
+  const cartItemsCount = cart.reduce((acc: number, curr: MenuCartItem) => acc + curr.quantity, 0);
 
   const orderRounds: OrderRound[] = tableOrderRounds
     .filter((round) => normalizeTable(round.table) === selectedTableKey)
@@ -1238,20 +1253,6 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                   type="button"
                   onClick={handleOpenSplitBill}
                   className="px-2.5 py-1 min-h-[36px] rounded-lg bg-primary hover:brightness-110 text-on-primary font-bold text-[11px] flex items-center gap-1 shadow cursor-pointer transition-all active:scale-95"
-                <button
-                  type="button"
-                  onClick={() => setIsOrderHistoryOpen(true)}
-                  className="px-2.5 py-1 min-h-[36px] rounded-lg border border-[#cbd5e1] bg-white/70 font-bold text-[11px] text-[#334155] transition-colors hover:bg-white dark:border-[#3a3b46] dark:bg-[#24252e] dark:text-white dark:hover:bg-[#2d2e3a]"
-                  title="Consultar el historial de consumo de la mesa"
-                >
-                  <span className="material-symbols-outlined mr-1 align-middle text-[15px]">receipt_long</span>
-                  <span>Consumo de Mesa</span>
-                </button>
-                <span className="text-[#0f172a] dark:text-white font-bold">Total: S/ {consumptionTotal.toFixed(2)}</span>
-                <button
-                  type="button"
-                  onClick={handleOpenSplitBill}
-                  className="px-2.5 py-1 min-h-[36px] rounded-lg bg-[#ff5708] hover:bg-[#ff6924] text-[#2b0b00] font-bold text-[11px] flex items-center gap-1 shadow cursor-pointer transition-all active:scale-95"
                   title={t('tracker.requestBillTitle')}
                 >
                   <span className="material-symbols-outlined text-[15px]">qr_code_2</span>
@@ -2162,6 +2163,15 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
             />
           </div>
 
+          <WebXRDishLauncher
+            dishId={getModelId(arDish)}
+            scale={arScale}
+            isCameraActive={arCameraActive}
+            isAnchored={isArDishAnchored}
+            onStatusChange={setArTrackingStatus}
+            onShowToast={onShowToast}
+          />
+
           {/* Bottom Floating AR Controls */}
           <div className="relative z-20 px-4 pb-safe pb-5 bg-gradient-to-t from-black/90 via-black/60 to-transparent pt-4 space-y-3">
             {/* Scale controls */}
@@ -2235,7 +2245,43 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
             ? consumptionTotal
             : tblAmount > 0
             ? tblAmount
+            : Number(activeTicket?.total || (cartTotal > 0 ? cartTotal : 86.00));
+        const splitBillItems = (activeTicket?.items || [])
+          .map((item, index) => ({
+            id: `${item.id}-${index}`,
+            name: item.name,
+            quantity: item.quantity,
+            price: Number(item.price)
+          }))
+          .filter((item) => Number.isFinite(item.price) && item.price > 0);
+        const splitBillTotal = splitBillItems.length > 0
+          ? splitBillItems.reduce((total, item) => total + item.price, 0)
+          : consolidatedTotalAmount;
 
+        return (
+          <>
+            {isSplitBillModalOpen && (
+              <SplitBillModal
+                isOpen
+                totalAmount={splitBillTotal}
+                items={splitBillItems}
+                onClose={() => setIsSplitBillModalOpen(false)}
+                onConfirm={handleConfirmSplitBill}
+              />
+            )}
+            <PaymentModal
+              isOpen={isPaymentModalOpen}
+              onClose={() => {
+                setIsPaymentModalOpen(false);
+                setPaymentAmount(null);
+              }}
+              tableNumber={activeTicket?.table || selectedTable}
+              totalAmount={paymentAmount ?? consolidatedTotalAmount}
+              orderId={activeTicket?.id}
+              onRequestTableAccount={onRequestTableAccount}
+              onShowToast={onShowToast}
+            />
+          </>
         );
       })()}
 
@@ -2297,3 +2343,4 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     </div>
   );
 };
+

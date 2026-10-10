@@ -151,20 +151,6 @@ export default function MenuPage() {
                 if (cached && cached.length > 0) setMenuItems(cached);
               });
             }}
-            onRefreshDishes={() => {
-              fetchDishesFromDb()
-                .then((dishes) => {
-                  if (dishes && dishes.length > 0) {
-                    setMenuItems(dishes);
-                    cacheMenuItems(dishes);
-                  }
-                })
-                .catch((err) => {
-                  console.warn('Error refreshing dishes:', err);
-                  const cached = getCachedMenuItems();
-                  if (cached && cached.length > 0) setMenuItems(cached);
-                });
-            }}
           />
         </LanguageProvider>
 
