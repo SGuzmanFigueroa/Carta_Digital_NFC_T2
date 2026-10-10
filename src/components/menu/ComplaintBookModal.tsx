@@ -1,7 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
-import { submitComplaintToDb } from '@/services/complaintService';
+import React, { useState, useEffect, useRef } from 'react';
+import {submitComplaintToDb,fetchComplaintProvider,getLocalComplaints,retryPendingComplaint,type SubmissionResult} from '@/services/complaintService';
+import {validateComplaint,type ComplaintInput,type ComplaintReceipt,type ComplaintProvider,type ComplaintErrors} from '@/features/complaints/validation';
+import {ComplaintResult} from './ComplaintResult';
 
 interface ComplaintBookModalProps {
   isOpen: boolean;
@@ -16,9 +18,15 @@ export function ComplaintBookModal({
   currentTable,
   onShowToast
 }: ComplaintBookModalProps) {
-  const [step, setStep] = useState<'form' | 'success'>('form');
+  const [step, setStep] = useState<'form' | 'registered' | 'pending'>('form');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [generatedClaimCode, setGeneratedClaimCode] = useState('');
+  const [receipt,setReceipt]=useState<ComplaintReceipt|null>(null);
+  const [provider,setProvider]=useState<ComplaintProvider|null>(null);
+  const [submittedEntry,setSubmittedEntry]=useState<ComplaintInput|null>(null);
+  const [formErrors,setFormErrors]=useState<ComplaintErrors>({});
+  const [submitError,setSubmitError]=useState('');
+  const sendingRef=useRef(false);
+  const requestRef=useRef<{id:string;fingerprint:string}|null>(null);
 
   // Form State
   const [fullName, setFullName] = useState('');
@@ -39,54 +47,47 @@ export function ComplaintBookModal({
   const [consumerRequest, setConsumerRequest] = useState('');
   const [acceptTerms, setAcceptTerms] = useState(false);
 
+  useEffect(()=>{
+    if(!isOpen)return;
+    let alive=true;
+    fetchComplaintProvider().then(async data=>{
+      if(!alive)return;setProvider(data);
+      if(!data.configured)setSubmitError('El establecimiento debe completar la identificación del libro. Solicita asistencia o el libro físico.');
+      const pending=await getLocalComplaints(data.bookId).catch(()=>[]);
+      if(alive&&pending.length){const record=pending[0];setSubmittedEntry(record.entry);requestRef.current={id:record.requestId,fingerprint:JSON.stringify(record.entry)};
+        setSubmitError('Hay una hoja cifrada pendiente de confirmación. Puedes reintentar su envío.');setStep('pending');}
+    }).catch(error=>{if(alive)setSubmitError(error.message);});
+    return()=>{alive=false;};
+  },[isOpen]);
   if (!isOpen) return null;
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!fullName.trim() || !docNumber.trim() || !email.trim() || !detail.trim() || !consumerRequest.trim()) {
-      onShowToast('Por favor completa todos los campos obligatorios (*).', 'error');
-      return;
-    }
-
-    if (!acceptTerms) {
-      onShowToast('Debes aceptar la declaración jurada para registrar la hoja.', 'warning');
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      const res = await submitComplaintToDb({
-        fullName: fullName.trim(),
-        docType,
-        docNumber: docNumber.trim(),
-        phone: phone.trim(),
-        email: email.trim(),
-        address: address.trim(),
-        isMinor,
-        parentName: isMinor ? parentName.trim() : undefined,
-        contractedGoodType,
-        claimedAmount: parseFloat(claimedAmount) || 0.0,
-        goodDescription: goodDescription.trim(),
-        tableNumber: currentTable || undefined,
-        claimType,
-        detail: detail.trim(),
-        consumerRequest: consumerRequest.trim()
-      });
-
-      setGeneratedClaimCode(res.claimCode);
-      setStep('success');
-      onShowToast(`Hoja ${res.claimCode} registrada exitosamente.`, 'verified');
-    } catch (err) {
-      onShowToast('Ocurrió un error al procesar el registro.', 'error');
-    } finally {
-      setIsSubmitting(false);
-    }
+  const applyResult=(result:SubmissionResult)=>{
+    if(result.success){setReceipt(result.receipt);setSubmittedEntry(result.entry);setStep('registered');setSubmitError('');onShowToast(`Hoja ${result.receipt.claimCode} registrada. Guarda tu copia.`,'verified');}
+    else{setSubmitError(result.error);setFormErrors(result.errors||{});if(result.pending)setStep('pending');onShowToast(result.error,'warning');}
+  };
+  const handleSubmit=async(e:React.FormEvent)=>{
+    e.preventDefault();if(sendingRef.current)return;
+    const validation=validateComplaint({fullName,docType,docNumber,phone,email,address,isMinor,parentName,contractedGoodType,
+      claimedAmount:claimedAmount.trim()===''?0:Number(claimedAmount),goodDescription,tableNumber:currentTable,claimType,detail,consumerRequest,declarationAccepted:acceptTerms});
+    if(!validation.valid){setFormErrors(validation.errors);setSubmitError('Revisa los campos indicados.');return;}
+    setFormErrors({});setSubmittedEntry(validation.value);
+    const fingerprint=JSON.stringify(validation.value);
+    if(!requestRef.current||requestRef.current.fingerprint!==fingerprint)requestRef.current={id:crypto.randomUUID(),fingerprint};
+    sendingRef.current=true;setIsSubmitting(true);
+    try{applyResult(await submitComplaintToDb(validation.value,requestRef.current.id,provider?.bookId||'primary'));}
+    catch{setSubmitError('No se confirmó el registro. Conserva los datos y solicita el libro físico.');}
+    finally{sendingRef.current=false;setIsSubmitting(false);}
+  };
+  const retry=async()=>{
+    if(sendingRef.current||!requestRef.current)return;
+    sendingRef.current=true;setIsSubmitting(true);
+    try{applyResult(await retryPendingComplaint(requestRef.current.id,provider?.bookId||'primary'));}
+    catch{setSubmitError('No se pudo recuperar la hoja cifrada. Solicita asistencia o el libro físico.');}
+    finally{sendingRef.current=false;setIsSubmitting(false);}
   };
 
   const resetAndClose = () => {
-    setStep('form');
+    if(sendingRef.current)return;
+    setStep('form');setReceipt(null);setSubmittedEntry(null);setFormErrors({});setSubmitError('');requestRef.current=null;
     setFullName('');
     setDocNumber('');
     setPhone('');
@@ -94,7 +95,7 @@ export function ComplaintBookModal({
     setAddress('');
     setDetail('');
     setConsumerRequest('');
-    setAcceptTerms(false);
+    setAcceptTerms(false);setIsMinor(false);setParentName('');setClaimedAmount('');setDocType('DNI');
     onClose();
   };
 
@@ -117,7 +118,7 @@ export function ComplaintBookModal({
                 </span>
               </div>
               <p className="text-[11px] text-slate-300">
-                AUREA BISTRO S.A.C. • RUC: 20608945231
+                {provider?`${provider.name} • RUC: ${provider.ruc}`:'Identificación del establecimiento pendiente de cargar'}
               </p>
             </div>
           </div>
@@ -134,7 +135,10 @@ export function ComplaintBookModal({
         {/* Content Body */}
         <div className="p-5 overflow-y-auto flex-1 space-y-5 text-[13px]">
           {step === 'form' ? (
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} noValidate className="space-y-5">
+              <fieldset disabled={isSubmitting} className="space-y-5">
+              {(submitError||Object.keys(formErrors).length>0)&&<div role="alert" className="rounded-xl border border-red-500 p-3 text-red-600 dark:text-red-400">
+                {submitError}<ul>{Object.entries(formErrors).map(([field,message])=><li key={field}>{message}</li>)}</ul></div>}
               {/* Info Banner */}
               <div className="bg-[#fff7ed] dark:bg-[#1a181e] border border-[#ff5708]/30 rounded-xl p-3 text-[12px] text-[#7c2d12] dark:text-[#ffb59c] leading-relaxed flex items-start gap-2.5">
                 <span className="material-symbols-outlined text-[#ff5708] text-[18px] shrink-0 mt-0.5">info</span>
@@ -189,6 +193,9 @@ export function ComplaintBookModal({
                         type="text"
                         required
                         placeholder="N° documento"
+                        inputMode={docType==='DNI'||docType==='RUC'?'numeric':'text'}
+                        maxLength={docType==='DNI'?8:docType==='RUC'?11:20}
+                        aria-invalid={Boolean(formErrors.docNumber)}
                         value={docNumber}
                         onChange={(e) => setDocNumber(e.target.value)}
                         className="w-full h-10 px-3 rounded-lg bg-[#f8fafc] dark:bg-[#1b1c24] border border-[#cbd5e1] dark:border-[#2d2e38] text-[12px] focus:outline-none focus:border-[#ff5708]"
@@ -204,6 +211,8 @@ export function ComplaintBookModal({
                       type="email"
                       required
                       placeholder="correo@ejemplo.com"
+                      maxLength={254}
+                      aria-invalid={Boolean(formErrors.email)}
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       className="w-full h-10 px-3 rounded-lg bg-[#f8fafc] dark:bg-[#1b1c24] border border-[#cbd5e1] dark:border-[#2d2e38] text-[12px] focus:outline-none focus:border-[#ff5708]"
@@ -460,68 +469,11 @@ export function ComplaintBookModal({
                   )}
                 </button>
               </div>
+              </fieldset>
             </form>
           ) : (
-            /* SUCCESS VIEW */
-            <div className="py-6 px-2 text-center space-y-4 animate-fadeIn">
-              <div className="w-16 h-16 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-500 flex items-center justify-center mx-auto shadow-lg">
-                <span className="material-symbols-outlined text-[36px]">verified</span>
-              </div>
+            submittedEntry&&<ComplaintResult entry={submittedEntry} receipt={receipt} error={submitError} onRetry={retry} onClose={resetAndClose} busy={isSubmitting}/>
 
-              <div className="space-y-1">
-                <span className="text-[11px] font-mono-code font-bold uppercase text-emerald-600 dark:text-emerald-400">
-                  Constancia Legal de Registro
-                </span>
-                <h3 className="text-[20px] font-bold text-[#0f172a] dark:text-white">
-                  Hoja de Reclamación Registrada
-                </h3>
-                <div className="inline-block px-4 py-1.5 rounded-xl bg-[#ff5708]/15 border border-[#ff5708]/40 text-[#c2410c] dark:text-[#ffb59c] font-mono-code font-bold text-[16px] my-2">
-                  Código: {generatedClaimCode}
-                </div>
-              </div>
-
-              <div className="bg-[#f8fafc] dark:bg-[#1b1c24] border border-[#cbd5e1] dark:border-[#2d2e38] rounded-xl p-4 text-left space-y-2 text-[12px]">
-                <div className="flex justify-between border-b border-[#e2e8f0] dark:border-[#24252e] pb-1.5">
-                  <span className="text-[#64748b] dark:text-[#94a3b8]">Fecha de emisión:</span>
-                  <span className="font-mono-code font-semibold">{new Date().toLocaleString('es-PE')}</span>
-                </div>
-                <div className="flex justify-between border-b border-[#e2e8f0] dark:border-[#24252e] pb-1.5">
-                  <span className="text-[#64748b] dark:text-[#94a3b8]">Reclamante:</span>
-                  <span className="font-semibold">{fullName} ({docType} {docNumber})</span>
-                </div>
-                <div className="flex justify-between border-b border-[#e2e8f0] dark:border-[#24252e] pb-1.5">
-                  <span className="text-[#64748b] dark:text-[#94a3b8]">Clasificación:</span>
-                  <span className="font-bold text-[#ff5708]">{claimType}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[#64748b] dark:text-[#94a3b8]">Plazo de respuesta:</span>
-                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">Hasta 15 días hábiles</span>
-                </div>
-              </div>
-
-              <p className="text-[12px] text-[#64748b] dark:text-[#94a3b8] leading-relaxed max-w-md mx-auto">
-                Una copia de esta hoja ha sido generada para tu constancia. Puedes guardar una captura o imprimir esta constancia legal.
-              </p>
-
-              <div className="flex items-center gap-2 pt-2 justify-center">
-                <button
-                  type="button"
-                  onClick={() => window.print()}
-                  className="h-10 px-4 rounded-xl bg-[#f1f5f9] hover:bg-[#e2e8f0] text-[#334155] dark:bg-[#1e1f28] dark:hover:bg-[#282935] dark:text-[#e5e1e4] font-medium text-[12px] flex items-center gap-1.5 border border-[#cbd5e1] dark:border-[#353642] cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-[16px]">print</span>
-                  <span>Imprimir Constancia</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={resetAndClose}
-                  className="h-10 px-5 rounded-xl bg-[#ff5708] hover:bg-[#ff6924] text-[#2b0b00] font-bold text-[12px] flex items-center gap-1.5 shadow-md shadow-[#ff5708]/25 cursor-pointer"
-                >
-                  <span>Volver a la Carta</span>
-                </button>
-              </div>
-            </div>
           )}
         </div>
       </div>

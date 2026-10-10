@@ -1,93 +1,39 @@
-import { supabase } from '@/lib/supabase';
-
-export interface ComplaintEntry {
-  id?: string;
-  claimCode: string;
-  createdAt?: string;
-  fullName: string;
-  docType: 'DNI' | 'CE' | 'PASAPORTE' | 'RUC';
-  docNumber: string;
-  phone: string;
-  email: string;
-  address: string;
-  isMinor: boolean;
-  parentName?: string;
-  contractedGoodType: 'PRODUCTO' | 'SERVICIO';
-  claimedAmount: number;
-  goodDescription?: string;
-  tableNumber?: string;
-  claimType: 'RECLAMO' | 'QUEJA';
-  detail: string;
-  consumerRequest: string;
-  status?: 'PENDIENTE' | 'EN_PROCESO' | 'ATENDIDO';
+import {validateComplaint,type ComplaintInput,type ComplaintReceipt,type ComplaintProvider,type ComplaintErrors} from '@/features/complaints/validation';
+import {savePendingComplaint,getPendingComplaints,removePendingComplaint} from './complaintStorage';
+export type ComplaintEntry=ComplaintInput & Partial<ComplaintReceipt>;
+export type SubmissionResult = {success:true;receipt:ComplaintReceipt;entry:ComplaintInput;requestId:string}
+ | {success:false;pending:boolean;requestId:string;error:string;errors?:ComplaintErrors};
+export async function fetchComplaintProvider():Promise<ComplaintProvider> {
+  const response=await fetch('/api/complaints',{cache:'no-store'});
+  if(!response.ok)throw new Error('No se pudo cargar la identificación del establecimiento. Solicita asistencia o el Libro de Reclamaciones físico.');
+  return response.json();
 }
-
-const STORAGE_KEY_COMPLAINTS = 'gastropulse_complaint_book';
-
-export function generateClaimCode(): string {
-  const year = new Date().getFullYear();
-  const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-  return `LR-${year}-${randomSuffix}`;
-}
-
-export async function submitComplaintToDb(
-  entry: Omit<ComplaintEntry, 'id' | 'claimCode' | 'createdAt' | 'status'>
-): Promise<{ success: boolean; claimCode: string; error?: string }> {
-  const claimCode = generateClaimCode();
-
+export async function submitComplaintToDb(entry:ComplaintInput,requestId:string,bookId:string):Promise<SubmissionResult> {
+  const validation=validateComplaint(entry);
+  if(!validation.valid)return {success:false,pending:false,requestId,error:Object.values(validation.errors)[0]!,errors:validation.errors};
+  const normalized=validation.value;
+  let stored=false;
+  try{await savePendingComplaint({requestId,bookId,entry:normalized,savedAt:new Date().toISOString()});stored=true;}catch{/* Online submission may still succeed. Never claim a local save unless confirmed. */}
   try {
-    const { data, error } = await (supabase as any)
-      .from('complaint_book')
-      .insert({
-        claim_code: claimCode,
-        full_name: entry.fullName,
-        doc_type: entry.docType,
-        doc_number: entry.docNumber,
-        phone: entry.phone,
-        email: entry.email,
-        address: entry.address,
-        is_minor: entry.isMinor,
-        parent_name: entry.parentName || null,
-        contracted_good_type: entry.contractedGoodType,
-        claimed_amount: entry.claimedAmount,
-        good_description: entry.goodDescription || null,
-        table_number: entry.tableNumber || null,
-        claim_type: entry.claimType,
-        detail: entry.detail,
-        consumer_request: entry.consumerRequest,
-        status: 'PENDIENTE',
-        branch_id: 'primary'
-      })
-      .select('claim_code')
-      .single();
-
-    if (error) {
-      console.warn('[ComplaintService] Fallback to local storage:', error.message);
-      saveToLocalStorage({ ...entry, claimCode, createdAt: new Date().toISOString() });
+    const response=await fetch('/api/complaints',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({requestId,bookId,entry:normalized})});
+    const result=await response.json();
+    if(!response.ok){
+      return {success:false,pending:stored,requestId,error:result.error||'El registro no está disponible. Solicita el libro físico.',errors:result.errors};
     }
-
-    return { success: true, claimCode };
-  } catch (err: any) {
-    console.warn('[ComplaintService] Network or connection error, saving locally:', err);
-    saveToLocalStorage({ ...entry, claimCode, createdAt: new Date().toISOString() });
-    return { success: true, claimCode };
+    if(typeof result.claimCode!=='string'||!/^REC-\d{4}-\d{4,}$/.test(result.claimCode)||typeof result.createdAt!=='string'||!result.provider)
+      throw new Error('Respuesta de registro incompleta.');
+    try{await removePendingComplaint(requestId);}catch{/* Keep idempotency if cleanup fails. */}
+    return {success:true,receipt:result as ComplaintReceipt,entry:normalized,requestId};
+  }catch{
+    return {success:false,pending:stored,requestId,error:stored
+      ?'La hoja quedó cifrada en este dispositivo, pero el registro no está confirmado. Reintenta con conexión o solicita el libro físico.'
+      :'No se confirmó el registro ni se pudo guardar localmente. Conserva el formulario y solicita el libro físico.'};
   }
 }
-
-function saveToLocalStorage(record: any) {
-  try {
-    const existing = JSON.parse(localStorage.getItem(STORAGE_KEY_COMPLAINTS) || '[]');
-    existing.unshift(record);
-    localStorage.setItem(STORAGE_KEY_COMPLAINTS, JSON.stringify(existing));
-  } catch (e) {
-    console.error('Error saving complaint locally:', e);
-  }
-}
-
-export function getLocalComplaints(): any[] {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY_COMPLAINTS) || '[]');
-  } catch {
-    return [];
-  }
+export const getLocalComplaints=getPendingComplaints;
+export async function retryPendingComplaint(requestId:string,bookId:string):Promise<SubmissionResult> {
+  const entry=(await getPendingComplaints(bookId)).find(record=>record.requestId===requestId)?.entry;
+  if(!entry)return {success:false,pending:false,requestId,error:'No se encontró el borrador cifrado en este dispositivo.'};
+  return submitComplaintToDb(entry,requestId,bookId);
 }
