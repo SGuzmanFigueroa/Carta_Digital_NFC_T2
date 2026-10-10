@@ -11,27 +11,27 @@ import { cn } from '@/lib/utils';
  *
  * Cómo consigue 60 FPS sin re-renderizar nada:
  *
- * - 🌊 `requestAnimationFrame` escribe el texto DIRECTO en el nodo
+ * -  `requestAnimationFrame` escribe el texto DIRECTO en el nodo
  *   (`node.textContent`) dentro de un `useRef`. React no participa en ningún
  *   frame: cero renders, cero reconciliación, cero trabajo del árbol del
  *   carrito mientras corre el conteo. Es el mismo mecanismo que usan por dentro
  *   los `MotionValue` de framer-motion, sin traer el runtime de la librería a
  *   este punto de la pantalla.
- * - 📈 `easeOutCubic` (monótono): el importe acelera al principio y frena al
+ * -  `easeOutCubic` (monótono): el importe acelera al principio y frena al
  *   final, pero NUNCA sobrepasa el valor real. Un muelle/spring mostraría
  *   momentáneamente un precio más alto que el verdadero, que en dinero es un
  *   dato incorrecto en pantalla.
- * - 🔁 Ráfaga de toques: al cambiar el importe se cancela el frame pendiente y
+ * -  Ráfaga de toques: al cambiar el importe se cancela el frame pendiente y
  *   el nuevo conteo arranca desde el valor que el comensal está viendo
  *   (`displayedRef`), no desde el último prop, así que varios "+" seguidos se
  *   encadenan con suavidad en lugar de reiniciarse al valor viejo.
- * - 🎨 Sin parpadeo: `useLayoutEffect` (isomorfo) deja el nodo en el valor de
+ * -  Sin parpadeo: `useLayoutEffect` (isomorfo) deja el nodo en el valor de
  *   PARTIDA antes de que el navegador pinte el commit de React. Sin ese paso se
  *   vería un frame con el total final ya saltado.
- * - 🖥️ SSR: el primer render pinta el importe real desde el servidor (el texto
+ * - ️ SSR: el primer render pinta el importe real desde el servidor (el texto
  *   va como hijo de JSX), así que no hay parpadeo ni desajuste de hidratación;
  *   al montar, `from === to` y no se anima.
- * - ♿ `prefers-reduced-motion`: el número aparece ya en su valor final.
+ * -  `prefers-reduced-motion`: el número aparece ya en su valor final.
  */
 
 /** Duración por defecto del conteo (ms), en sintonía con el pop del badge. */

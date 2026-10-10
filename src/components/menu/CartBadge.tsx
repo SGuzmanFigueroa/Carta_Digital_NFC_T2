@@ -13,24 +13,24 @@ import { cn } from '@/lib/utils';
  *
  * Decisiones de aislamiento y rendimiento:
  *
- * - 🧩 Componente HOJA y `React.memo`: la animación no obliga a re-renderizar
+ * -  Componente HOJA y `React.memo`: la animación no obliga a re-renderizar
  *   el árbol del carrito. El padre vuelve a pintarse cuando cambia `count`
  *   (lo haría igual sin este componente), y como `CartBadge` solo depende de
  *   `count`, un render del padre con el mismo número NI siquiera lo atraviesa.
- * - 🎬 Disparo IMPERATIVO con `useAnimationControls` dentro de un `useEffect`
+ * -  Disparo IMPERATIVO con `useAnimationControls` dentro de un `useEffect`
  *   (nada de `<motion.span animate={{...}}>` dependiente del render): así el
  *   contador NO se re-monta (no se pierde el nodo, no se resetea el layout) y
  *   tampoco se provoca un `setState` en un efecto (render en cascada). El efecto
  *   compara el valor PREVIO con el NUEVO y solo anima cuando el número sube:
  *   bajar cantidades o vaciar el carrito no debe llamar la atención.
- * - ⚡ Solo `transform: scale()`: propiedad que el navegador resuelve en el hilo
+ * -  Solo `transform: scale()`: propiedad que el navegador resuelve en el hilo
  *   de composición (GPU). No hay `width`/`height`/`top` animados, así que no hay
  *   repintados ni *layout thrashing* en cada frame.
- * - ♿ `useReducedMotion`: con "reducir movimiento" activo el número cambia sin
+ * -  `useReducedMotion`: con "reducir movimiento" activo el número cambia sin
  *   animación (la información se transmite igual, sin el rebote).
- * - 💧 Sin riesgo de hidratación: el estado inicial deriva del `count` que ya
+ * -  Sin riesgo de hidratación: el estado inicial deriva del `count` que ya
  *   viene renderizado desde el servidor y el efecto nunca anima en el montaje.
- * - 📦 framer-motion ya viaja en el bundle de /menu (`menu/DishDetailModal`), así
+ * -  framer-motion ya viaja en el bundle de /menu (`menu/DishDetailModal`), así
  *   que esta animación no añade ni un byte a la primera carga.
  */
 
