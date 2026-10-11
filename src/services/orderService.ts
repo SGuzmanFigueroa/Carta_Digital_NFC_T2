@@ -254,7 +254,7 @@ export async function settleOrdersForTableInDb(tableNumber: string): Promise<boo
         updated_at: new Date().toISOString()
       })
       .or(`table_number.ilike.%${digits}%,table_number.ilike.%${tableNumber}%`)
-      .neq('status', 'cobrado');
+      .not('status', 'in', '(cobrado,cancelado)');
 
     return !error;
   } catch (err) {
