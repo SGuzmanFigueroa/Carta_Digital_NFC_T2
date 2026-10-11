@@ -13,6 +13,7 @@ interface WebXRDishLauncherProps {
   isAnchored: boolean;
   onStatusChange?: (label: string) => void;
   onShowToast?: (msg: string, icon?: string) => void;
+  onAvailabilityChange?: (available: boolean) => void;
 }
 
 const WEBXR_SCALE_BY_DISH: Record<string, number> = {
@@ -35,6 +36,7 @@ export const WebXRDishLauncher: React.FC<WebXRDishLauncherProps> = ({
   isAnchored,
   onStatusChange,
   onShowToast,
+  onAvailabilityChange,
 }) => {
   const modelViewerRef = useRef<ModelViewerElement | null>(null);
   const [webComponentReady, setWebComponentReady] = useState(false);
@@ -52,13 +54,16 @@ export const WebXRDishLauncher: React.FC<WebXRDishLauncherProps> = ({
       })
       .catch((error) => {
         console.warn('No se pudo cargar model-viewer para WebXR', error);
-        if (!cancelled) setWasUnsupported(true);
+        if (!cancelled) {
+          setWasUnsupported(true);
+          onAvailabilityChange?.(false);
+        }
       });
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [onAvailabilityChange]);
 
   useEffect(() => {
     let cancelled = false;
@@ -66,7 +71,10 @@ export const WebXRDishLauncher: React.FC<WebXRDishLauncherProps> = ({
     const detectWebXR = async () => {
       const xr = (navigator as Navigator & { xr?: { isSessionSupported?: (mode: string) => Promise<boolean> } }).xr;
       if (!xr?.isSessionSupported) {
-        if (!cancelled) setWasUnsupported(true);
+        if (!cancelled) {
+          setWasUnsupported(true);
+          onAvailabilityChange?.(false);
+        }
         return;
       }
 
@@ -75,9 +83,13 @@ export const WebXRDishLauncher: React.FC<WebXRDishLauncherProps> = ({
         if (!cancelled) {
           setWebXRSupported(supported);
           setWasUnsupported(!supported);
+          onAvailabilityChange?.(supported);
         }
       } catch {
-        if (!cancelled) setWasUnsupported(true);
+        if (!cancelled) {
+          setWasUnsupported(true);
+          onAvailabilityChange?.(false);
+        }
       }
     };
 
@@ -86,7 +98,7 @@ export const WebXRDishLauncher: React.FC<WebXRDishLauncherProps> = ({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [onAvailabilityChange]);
 
   useEffect(() => {
     const viewer = modelViewerRef.current;
@@ -98,6 +110,7 @@ export const WebXRDishLauncher: React.FC<WebXRDishLauncherProps> = ({
 
     const handleError = () => {
       setWasUnsupported(true);
+      onAvailabilityChange?.(false);
       onShowToast?.('No se pudo preparar el modelo para AR real', 'info');
     };
 
@@ -118,6 +131,7 @@ export const WebXRDishLauncher: React.FC<WebXRDishLauncherProps> = ({
       if (status === 'failed') {
         setIsLaunching(false);
         setWasUnsupported(true);
+        onAvailabilityChange?.(false);
         onStatusChange?.('Modo asistido listo');
         onShowToast?.('Este navegador no inició WebXR; usa el visor asistido', 'info');
       }
@@ -145,6 +159,7 @@ export const WebXRDishLauncher: React.FC<WebXRDishLauncherProps> = ({
     const viewer = modelViewerRef.current;
     if (!viewer?.activateAR) {
       setWasUnsupported(true);
+      onAvailabilityChange?.(false);
       onShowToast?.('AR real no está disponible en este navegador', 'info');
       return;
     }
@@ -158,6 +173,7 @@ export const WebXRDishLauncher: React.FC<WebXRDishLauncherProps> = ({
       console.warn('No se pudo iniciar WebXR real', error);
       setIsLaunching(false);
       setWasUnsupported(true);
+      onAvailabilityChange?.(false);
       onStatusChange?.('Modo asistido listo');
       onShowToast?.('Tu equipo no inició WebXR; puedes colocar el plato con el visor asistido', 'info');
     }

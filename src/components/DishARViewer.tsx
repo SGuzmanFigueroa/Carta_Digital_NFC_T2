@@ -11,6 +11,7 @@ interface DishARViewerProps {
   onStatusChange?: (label: string) => void;
   onAnchorChange?: (anchored: boolean) => void;
   onShowToast?: (msg: string, icon?: string) => void;
+  preferRealAR?: boolean;
 }
 
 type DishARProfile = {
@@ -216,6 +217,7 @@ export const DishARViewer: React.FC<DishARViewerProps> = ({
   onStatusChange,
   onAnchorChange,
   onShowToast,
+  preferRealAR = false,
 }) => {
   const mountRef = useRef<HTMLDivElement>(null);
   const dishGroupRef = useRef<THREE.Group | null>(null);
@@ -583,7 +585,7 @@ export const DishARViewer: React.FC<DishARViewerProps> = ({
   }, [dishId, scale, isCameraActive]);
 
   const anchorDish = (event: React.MouseEvent<HTMLButtonElement>) => {
-    if (!isCameraActive || status === 'idle' || status === 'anchored') return;
+    if (!isCameraActive || status === 'idle' || status === 'anchored' || preferRealAR) return;
 
     void requestDeviceOrientationAccess();
 
@@ -642,7 +644,9 @@ export const DishARViewer: React.FC<DishARViewerProps> = ({
 
   const statusText = status === 'anchored'
     ? 'Plato fijo: muévete alrededor o arrastra para verlo 360°'
-    : status === 'surface-ready'
+    : preferRealAR
+      ? 'AR real disponible: usa el botón de mesa para anclar con WebXR'
+      : status === 'surface-ready'
       ? 'Mesa detectada: toca donde quieres colocar el plato'
       : status === 'scanning'
         ? 'Apunta a la mesa y muévete lento'
@@ -656,7 +660,7 @@ export const DishARViewer: React.FC<DishARViewerProps> = ({
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerEnd}
       onPointerCancel={handlePointerEnd}
-      disabled={!isCameraActive || status === 'idle'}
+      disabled={!isCameraActive || status === 'idle' || (preferRealAR && status !== 'anchored')}
       className="absolute inset-0 z-10 block h-full w-full cursor-crosshair overflow-hidden bg-transparent text-left disabled:cursor-default"
       aria-label="Detectar superficie y anclar plato 3D"
     >

@@ -262,6 +262,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   const [arScale, setArScale] = useState(1.0);
   const [arTrackingStatus, setArTrackingStatus] = useState(() => t('ar.waiting'));
   const [isArDishAnchored, setIsArDishAnchored] = useState(false);
+  const [isRealArAvailable, setIsRealArAvailable] = useState(false);
   const [arDish, setArDish] = useState<MenuItem>(menuItems[0]); // default to Chaufa or current
 
   // Re-order / Welcome Back feature for returning diners
@@ -711,6 +712,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     setArDish(dish);
     setArTrackingStatus(t('ar.requestingPermission'));
     setIsArDishAnchored(false);
+    setIsRealArAvailable(false);
     setIsArModalOpen(true);
     setArCameraAttempted(true);
     setArCameraMessage(t('ar.requestingPermission'));
@@ -2317,6 +2319,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
               onStatusChange={setArTrackingStatus}
               onAnchorChange={setIsArDishAnchored}
               onShowToast={onShowToast}
+              preferRealAR={isRealArAvailable && !isArDishAnchored}
             />
           </div>
 
@@ -2327,6 +2330,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
             isAnchored={isArDishAnchored}
             onStatusChange={setArTrackingStatus}
             onShowToast={onShowToast}
+            onAvailabilityChange={setIsRealArAvailable}
           />
 
           {/* Bottom Floating AR Controls */}
@@ -2500,7 +2504,3 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     </div>
   );
 };
-
-
-
-
