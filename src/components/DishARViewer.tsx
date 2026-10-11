@@ -582,10 +582,10 @@ export const DishARViewer: React.FC<DishARViewerProps> = ({
     };
   }, [dishId, scale, isCameraActive]);
 
-  const anchorDish = async (event: React.MouseEvent<HTMLButtonElement>) => {
+  const anchorDish = (event: React.MouseEvent<HTMLButtonElement>) => {
     if (!isCameraActive || status === 'idle' || status === 'anchored') return;
 
-    await requestDeviceOrientationAccess();
+    void requestDeviceOrientationAccess();
 
     const rect = event.currentTarget.getBoundingClientRect();
     const x = ((event.clientX - rect.left) / rect.width) - 0.5;
@@ -686,4 +686,5 @@ export const DishARViewer: React.FC<DishARViewerProps> = ({
     </button>
   );
 };
+
 
