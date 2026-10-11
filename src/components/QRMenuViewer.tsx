@@ -317,6 +317,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const pendingArStreamRef = useRef<MediaStream | null>(null);
+  const arVideoFrameRef = useRef({ lastFrame: -1, lastTime: -1, stuckTicks: 0, reconnecting: false });
 
   const selectedTableKey = normalizeTable(selectedTable);
   const cart = cartsByTable[selectedTableKey] || [];
@@ -379,10 +380,73 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       pendingArStreamRef.current = null;
     }
     if (videoRef.current) {
+      videoRef.current.pause();
       videoRef.current.srcObject = null;
     }
+    arVideoFrameRef.current = { lastFrame: -1, lastTime: -1, stuckTicks: 0, reconnecting: false };
     setArCameraActive(false);
   }, []);
+
+  const configureArVideoElement = React.useCallback((video: HTMLVideoElement, stream: MediaStream) => {
+    video.muted = true;
+    video.autoplay = true;
+    video.playsInline = true;
+    video.setAttribute('playsinline', 'true');
+    video.setAttribute('webkit-playsinline', 'true');
+    if (video.srcObject !== stream) {
+      video.srcObject = stream;
+    }
+  }, []);
+
+  const waitForArVideoFrame = React.useCallback((video: HTMLVideoElement, timeoutMs = 4200) => {
+    if (!video.paused && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+      return Promise.resolve();
+    }
+
+    return new Promise<void>((resolve, reject) => {
+      let settled = false;
+      const cleanup = () => {
+        video.removeEventListener('playing', onReady);
+        video.removeEventListener('timeupdate', onReady);
+        video.removeEventListener('loadeddata', onReady);
+        video.removeEventListener('error', onError);
+        window.clearTimeout(timeoutId);
+      };
+      const finish = (callback: () => void) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        callback();
+      };
+      const onReady = () => finish(resolve);
+      const onError = () => finish(() => reject(new DOMException('Camera video element failed', 'AbortError')));
+      const timeoutId = window.setTimeout(
+        () => finish(() => reject(new DOMException('Camera video did not render frames', 'AbortError'))),
+        timeoutMs
+      );
+
+      video.addEventListener('playing', onReady, { once: true });
+      video.addEventListener('timeupdate', onReady, { once: true });
+      video.addEventListener('loadeddata', onReady, { once: true });
+      video.addEventListener('error', onError, { once: true });
+    });
+  }, []);
+
+  const playArVideoStream = React.useCallback(async (stream: MediaStream) => {
+    const video = videoRef.current;
+    if (!video) return false;
+
+    configureArVideoElement(video, stream);
+    try {
+      await video.play();
+      await waitForArVideoFrame(video);
+      arVideoFrameRef.current = { lastFrame: -1, lastTime: -1, stuckTicks: 0, reconnecting: false };
+      return true;
+    } catch (error) {
+      console.warn('AR camera stream was granted but video playback did not start:', error);
+      return false;
+    }
+  }, [configureArVideoElement, waitForArVideoFrame]);
 
   const requestArCameraStream = React.useCallback(async () => {
     if (typeof window === 'undefined') {
@@ -473,17 +537,23 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     pendingArStreamRef.current = stream;
     mediaStreamRef.current = stream;
 
-    if (videoRef.current) {
-      videoRef.current.srcObject = stream;
-      await videoRef.current.play().catch(() => undefined);
-      pendingArStreamRef.current = null;
+    if (!videoRef.current) {
+      setArCameraMessage(t('ar.activatingCamera'));
+      setArCameraHelp(null);
+      return;
     }
 
+    const started = await playArVideoStream(stream);
+    if (!started) {
+      throw new DOMException('Camera stream could not be attached to live video', 'AbortError');
+    }
+
+    pendingArStreamRef.current = null;
     setArCameraActive(true);
     setArCameraMessage(null);
     setArCameraHelp(null);
     onShowToast(t('toast.cameraOn'), 'view_in_ar');
-  }, [onShowToast, t]);
+  }, [onShowToast, playArVideoStream, t]);
 
   const handleCameraError = React.useCallback((err: unknown) => {
     console.warn('Camera access error or denied:', err);
@@ -539,12 +609,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
 
     if (pendingArStreamRef.current && videoRef.current) {
       const stream = pendingArStreamRef.current;
-      videoRef.current.srcObject = stream;
-      videoRef.current.play().catch(() => undefined);
-      pendingArStreamRef.current = null;
-      setArCameraActive(true);
-      setArCameraMessage(null);
-      setArCameraHelp(null);
+      attachArCameraStream(stream).catch(handleCameraError);
       return;
     }
 
@@ -552,7 +617,95 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       setArCameraMessage(t('ar.tapToActivate'));
       setArCameraHelp(t('ar.permissionOnce'));
     }
-  }, [arCameraActive, arCameraMessage, isArCameraRequesting, isArModalOpen, t]);
+  }, [arCameraActive, arCameraMessage, attachArCameraStream, handleCameraError, isArCameraRequesting, isArModalOpen, t]);
+
+  useEffect(() => {
+    if (!isArModalOpen || !arCameraActive) return;
+
+    const getVideoFrameCount = (video: HTMLVideoElement) => {
+      if (typeof video.getVideoPlaybackQuality === 'function') {
+        return video.getVideoPlaybackQuality().totalVideoFrames;
+      }
+      return Math.floor(video.currentTime * 10);
+    };
+
+    const reconnectLiveVideo = async () => {
+      if (arVideoFrameRef.current.reconnecting) return;
+      const video = videoRef.current;
+      const stream = mediaStreamRef.current;
+      if (!video || !stream) return;
+
+      arVideoFrameRef.current.reconnecting = true;
+      setArTrackingStatus('Reactivando cámara');
+      try {
+        video.pause();
+        video.srcObject = null;
+        await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+        const restarted = await playArVideoStream(stream);
+        if (restarted) {
+          setArCameraMessage(null);
+          setArCameraHelp(null);
+          setArTrackingStatus('Cámara activa');
+        }
+      } finally {
+        arVideoFrameRef.current.reconnecting = false;
+        arVideoFrameRef.current.lastFrame = -1;
+        arVideoFrameRef.current.lastTime = -1;
+        arVideoFrameRef.current.stuckTicks = 0;
+      }
+    };
+
+    const verifyLiveCamera = () => {
+      const video = videoRef.current;
+      const stream = mediaStreamRef.current;
+      if (!video || !stream) return;
+
+      const hasLiveTrack = stream.getVideoTracks().some((track) => track.readyState === 'live');
+      if (!hasLiveTrack) {
+        setArCameraActive(false);
+        setArCameraMessage(t('ar.blocked'));
+        setArCameraHelp(t('ar.failedHelp'));
+        return;
+      }
+
+      configureArVideoElement(video, stream);
+      if (video.paused || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+        void playArVideoStream(stream);
+        return;
+      }
+
+      const frameCount = getVideoFrameCount(video);
+      const currentTime = video.currentTime;
+      const last = arVideoFrameRef.current;
+      const sameFrame = frameCount === last.lastFrame && Math.abs(currentTime - last.lastTime) < 0.04;
+
+      last.stuckTicks = sameFrame ? last.stuckTicks + 1 : 0;
+      last.lastFrame = frameCount;
+      last.lastTime = currentTime;
+
+      if (last.stuckTicks >= 3) {
+        void reconnectLiveVideo();
+      }
+    };
+
+    const intervalId = window.setInterval(verifyLiveCamera, 1200);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        arVideoFrameRef.current.lastFrame = -1;
+        arVideoFrameRef.current.lastTime = -1;
+        arVideoFrameRef.current.stuckTicks = 0;
+        verifyLiveCamera();
+      }
+    };
+
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    verifyLiveCamera();
+
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [arCameraActive, configureArVideoElement, isArModalOpen, playArVideoStream, t]);
 
   const openArViewer = React.useCallback(async (dish: MenuItem) => {
     setArDish(dish);
@@ -2098,7 +2251,11 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
             playsInline
             muted
             aria-hidden={!arCameraActive}
-            onLoadedMetadata={() => videoRef.current?.play().catch(() => {})}
+            onLoadedMetadata={() => mediaStreamRef.current && void playArVideoStream(mediaStreamRef.current)}
+            onCanPlay={() => mediaStreamRef.current && void playArVideoStream(mediaStreamRef.current)}
+            onPause={() => mediaStreamRef.current && void playArVideoStream(mediaStreamRef.current)}
+            onStalled={() => mediaStreamRef.current && void playArVideoStream(mediaStreamRef.current)}
+            onSuspend={() => mediaStreamRef.current && void playArVideoStream(mediaStreamRef.current)}
             className={`absolute inset-0 w-full h-full object-cover z-0 transition-opacity duration-200 ${arCameraActive ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
           />
 
@@ -2343,4 +2500,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     </div>
   );
 };
+
+
+
 
