@@ -2331,6 +2331,16 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
             onStatusChange={setArTrackingStatus}
             onShowToast={onShowToast}
             onAvailabilityChange={setIsRealArAvailable}
+            onBeforeStart={() => {
+              stopArCamera();
+              setArCameraMessage(null);
+              setArCameraHelp(null);
+              setArTrackingStatus('AR real iniciando');
+            }}
+            onSessionEnd={() => {
+              setArCameraMessage(t('ar.tapToActivate'));
+              setArCameraHelp(t('ar.permissionOnce'));
+            }}
           />
 
           {/* Bottom Floating AR Controls */}

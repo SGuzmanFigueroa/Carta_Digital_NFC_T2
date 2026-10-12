@@ -555,14 +555,12 @@ export const DishARViewer: React.FC<DishARViewerProps> = ({
         tableGlowMaterial.opacity += ((surfaceReady ? 0.08 : 0.025) - tableGlowMaterial.opacity) * 0.12;
       } else {
         dishGroup.visible = modelReadyRef.current;
-        anchorRing.visible = true;
-        innerRing.visible = true;
-        anchorRing.scale.setScalar(1 + (1 - entrance) * 0.24);
-        innerRing.scale.setScalar(1 + (1 - entrance) * 0.18);
-        anchorRingMaterial.opacity += (0.035 - anchorRingMaterial.opacity) * 0.14;
-        innerRingMaterial.opacity += (0.022 - innerRingMaterial.opacity) * 0.14;
+        anchorRing.visible = false;
+        innerRing.visible = false;
+        anchorRingMaterial.opacity += (0 - anchorRingMaterial.opacity) * 0.22;
+        innerRingMaterial.opacity += (0 - innerRingMaterial.opacity) * 0.22;
         contactShadowMaterial.opacity += (profile.shadowOpacity * entrance - contactShadowMaterial.opacity) * 0.12;
-        tableGlowMaterial.opacity += (0.025 - tableGlowMaterial.opacity) * 0.12;
+        tableGlowMaterial.opacity += (0 - tableGlowMaterial.opacity) * 0.18;
       }
 
       renderer.render(scene, camera);
@@ -643,7 +641,7 @@ export const DishARViewer: React.FC<DishARViewerProps> = ({
   };
 
   const statusText = status === 'anchored'
-    ? 'Plato fijo: muévete alrededor o arrastra para verlo 360°'
+    ? 'Plato fijo: muévete alrededor para verlo 360°'
     : preferRealAR
       ? 'AR real disponible: usa el botón de mesa para anclar con WebXR'
       : status === 'surface-ready'
@@ -668,9 +666,9 @@ export const DishARViewer: React.FC<DishARViewerProps> = ({
 
       {isCameraActive && status !== 'anchored' && (
         <div className="pointer-events-none absolute left-1/2 top-[52%] flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-4">
-          <div className="relative h-24 w-24 rounded-full border border-[#ff6a1a]/40 bg-[#ff6a1a]/6 shadow-[0_0_38px_rgba(255,106,26,0.18)] backdrop-blur-[1px]">
+          <div className="relative h-20 w-20 rounded-full border border-[#ff6a1a]/32 bg-[#ff6a1a]/5 shadow-[0_0_30px_rgba(255,106,26,0.14)] backdrop-blur-[1px]">
             <span className="absolute left-1/2 top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#ff6a1a] shadow-[0_0_20px_rgba(255,106,26,0.9)]" />
-            <span className="absolute inset-6 rounded-full border border-dashed border-white/24" />
+            <span className="absolute inset-5 rounded-full border border-dashed border-white/20" />
             <span className="absolute inset-2 rounded-full border border-white/8" />
           </div>
           <div className="max-w-[300px] rounded-full border border-white/12 bg-black/48 px-4 py-2.5 text-center text-white shadow-2xl backdrop-blur-md">
