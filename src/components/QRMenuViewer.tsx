@@ -1699,30 +1699,32 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
             />
 
             {/* Main Action Buttons */}
-            <div className="pt-2 flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setSelectedDishDetails(heroItem)}
-                className="h-11 px-3 rounded-xl bg-white hover:bg-[#f1f5f9] text-[#334155] border border-[#cbd5e1] text-[12px] sm:text-[13px] font-semibold flex items-center justify-center gap-1.5 dark:bg-[#1e1f28] dark:hover:bg-[#282935] dark:text-[#e5e1e4] dark:border-[#353642] transition-colors cursor-pointer shrink-0 whitespace-nowrap active:scale-95"
-                aria-label={t('dish.openHeroHd', { dish: heroItem.name })}
-              >
-                <span className="material-symbols-outlined text-[17px] text-primary">photo</span>
-                <span>{t('dish.hdSheet')}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => openArViewer(heroItem)}
-                className="h-11 px-3.5 rounded-xl bg-[#f1f5f9] hover:bg-[#e2e8f0] text-[#334155] hover:text-[#0f172a] dark:bg-[#1e1f28] dark:hover:bg-[#282935] dark:text-[#e5e1e4] text-[13px] font-medium flex items-center justify-center gap-1.5 border border-[#cbd5e1] dark:border-[#353642] transition-colors cursor-pointer shrink-0 whitespace-nowrap active:scale-95"
-                title={t('dish.projectArTableTitle')}
-              >
-                <span className="material-symbols-outlined text-[18px] text-primary">view_in_ar</span>
-                <span>{t('dish.arViewer')}</span>
-              </button>
+            <div className="pt-2 flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
+              <div className="flex w-full flex-row gap-x-2 sm:w-auto">
+                <button
+                  type="button"
+                  onClick={() => setSelectedDishDetails(heroItem)}
+                  className="h-11 min-w-0 flex-1 px-3 rounded-xl bg-white hover:bg-[#f1f5f9] text-[#334155] border border-[#cbd5e1] text-[12px] sm:text-[13px] font-semibold flex items-center justify-center gap-1.5 dark:bg-[#1e1f28] dark:hover:bg-[#282935] dark:text-[#e5e1e4] dark:border-[#353642] transition-colors cursor-pointer whitespace-nowrap sm:flex-none active:scale-95"
+                  aria-label={t('dish.openHeroHd', { dish: heroItem.name })}
+                >
+                  <span className="material-symbols-outlined text-[17px] text-primary">photo</span>
+                  <span>{t('dish.hdSheet')}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openArViewer(heroItem)}
+                  className="h-11 min-w-0 flex-1 px-3.5 rounded-xl bg-[#f1f5f9] hover:bg-[#e2e8f0] text-[#334155] hover:text-[#0f172a] dark:bg-[#1e1f28] dark:hover:bg-[#282935] dark:text-[#e5e1e4] text-[13px] font-medium flex items-center justify-center gap-1.5 border border-[#cbd5e1] dark:border-[#353642] transition-colors cursor-pointer whitespace-nowrap sm:flex-none active:scale-95"
+                  title={t('dish.projectArTableTitle')}
+                >
+                  <span className="material-symbols-outlined text-[18px] text-primary">view_in_ar</span>
+                  <span>{t('dish.arViewer')}</span>
+                </button>
+              </div>
 
               <button
                 type="button"
                 onClick={() => handleAddToCart(heroItem)}
-                className="flex-1 h-11 px-3.5 rounded-xl bg-primary hover:brightness-110 text-on-primary font-bold text-[13px] sm:text-[14px] flex items-center justify-center gap-2 shadow-[0_0_20px] shadow-primary/35 active:scale-98 transition-all cursor-pointer whitespace-nowrap"
+                className="w-full h-11 px-3.5 rounded-xl bg-primary hover:brightness-110 text-on-primary font-bold text-[13px] sm:text-[14px] flex items-center justify-center gap-2 shadow-[0_0_20px] shadow-primary/35 active:scale-98 transition-all cursor-pointer whitespace-nowrap sm:w-auto sm:flex-1"
               >
                 <span className="material-symbols-outlined text-[18px]">add_shopping_cart</span>
                 <span>{t('dish.addPrice', { price: `S/ ${heroItem.price.toFixed(2)}` })}</span>
