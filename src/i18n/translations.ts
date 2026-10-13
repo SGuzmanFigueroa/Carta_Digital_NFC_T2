@@ -154,6 +154,8 @@ export const es = {
   'ar.realScale': 'Escala Real en Mesa:',
   'ar.requestingPermission': 'Solicitando permiso de cámara...',
   'ar.tapToActivate': 'Toca Activar cámara para ver el plato en tu mesa.',
+  'ar.nativeFallbackTitle': 'Si el AR nativo no detectó la mesa, usa el modo asistido.',
+  'ar.nativeFallbackHelp': 'Activa la cámara, apunta a la mesa y toca donde quieres colocar el plato.',
   'ar.permissionOnce': 'El navegador puede pedir permiso de cámara una sola vez.',
   'ar.blocked': 'No se pudo activar la cámara.',
   'ar.blockedHelp':
@@ -357,6 +359,7 @@ export const es = {
   'toast.inspecting': 'Inspeccionando {dish}',
   'toast.cameraOn': 'Cámara AR activada: apunta hacia la mesa',
   'toast.cameraNotActivated': 'La cámara no se activó; puedes reintentar',
+  'toast.nativeArFallbackReady': 'Modo asistido listo si el AR nativo no detectó la mesa',
   'toast.geofenceVerified': 'Ubicación verificada en mesa (±{accuracy}m)',
   'toast.waiterNotified': 'Mozo notificado para asistir tu mesa',
   'toast.waiterAlerted': '¡Garzón alertado! Un miembro del salón se acerca a tu mesa.',
@@ -509,6 +512,8 @@ export const en: Record<TranslationKey, string> = {
   'ar.realScale': 'Real Scale at Table:',
   'ar.requestingPermission': 'Requesting camera permission...',
   'ar.tapToActivate': 'Tap Activate camera to see the dish on your table.',
+  'ar.nativeFallbackTitle': 'If native AR did not detect the table, use assisted mode.',
+  'ar.nativeFallbackHelp': 'Activate the camera, point at the table, and tap where you want to place the dish.',
   'ar.permissionOnce': 'Your browser may ask for camera permission only once.',
   'ar.blocked': 'The camera could not be activated.',
   'ar.blockedHelp':
@@ -713,6 +718,7 @@ export const en: Record<TranslationKey, string> = {
   'toast.inspecting': 'Inspecting {dish}',
   'toast.cameraOn': 'AR camera on: point it at your table',
   'toast.cameraNotActivated': 'The camera did not start; you can retry',
+  'toast.nativeArFallbackReady': 'Assisted mode is ready if native AR did not detect the table',
   'toast.geofenceVerified': 'Location verified at your table (±{accuracy}m)',
   'toast.waiterNotified': 'Waiter notified to assist your table',
   'toast.waiterAlerted': 'Waiter alerted! A member of the floor team is on the way to your table.',

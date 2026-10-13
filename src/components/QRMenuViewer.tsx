@@ -152,6 +152,7 @@ const PROMO_DEAL_SEEN_KEY = 'gastropulse_promo_seen';
 const IS_DEV = process.env.NODE_ENV !== 'production';
 const DEFAULT_AR_DISH_DIAMETER_CM = 40;
 const DEFAULT_AR_SCALE = DEFAULT_AR_DISH_DIAMETER_CM / 28;
+const NATIVE_AR_RETURN_KEY = 'gastropulse_native_ar_return';
 
 const canLaunchAndroidSceneViewer = () => {
   if (typeof window === 'undefined') return false;
@@ -166,7 +167,7 @@ const buildAndroidSceneViewerIntent = (dish: MenuItem, modelId: string) => {
   fallbackUrl.searchParams.set('arFallback', modelId);
   fallbackUrl.searchParams.set('arName', dish.name);
 
-  const title = `${dish.name} · ${DEFAULT_AR_DISH_DIAMETER_CM} cm`;
+  const title = `${dish.name} · ${DEFAULT_AR_DISH_DIAMETER_CM} cm · mueve lento`;
   return `intent://arvr.google.com/scene-viewer/1.0?file=${encodeURIComponent(modelUrl)}&mode=ar_preferred&title=${encodeURIComponent(title)}&resizable=false#Intent;scheme=https;package=com.google.android.googlequicksearchbox;action=android.intent.action.VIEW;S.browser_fallback_url=${encodeURIComponent(fallbackUrl.href)};end;`;
 };
 
@@ -338,6 +339,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const pendingArStreamRef = useRef<MediaStream | null>(null);
   const arVideoFrameRef = useRef({ lastFrame: -1, lastTime: -1, stuckTicks: 0, reconnecting: false });
+  const nativeArReturnHandledRef = useRef(false);
 
   const selectedTableKey = normalizeTable(selectedTable);
   const cart = cartsByTable[selectedTableKey] || [];
@@ -727,26 +729,20 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     };
   }, [arCameraActive, configureArVideoElement, isArModalOpen, playArVideoStream, t]);
 
-  const openArViewer = React.useCallback(async (dish: MenuItem) => {
-    const modelId = getModelId(dish);
+  const openAssistedArViewer = React.useCallback(async (dish: MenuItem, autoStartCamera = true) => {
     setArDish(dish);
     setArScale(DEFAULT_AR_SCALE);
-    setArTrackingStatus(t('ar.openingNative', { dish: dish.name }));
+    setArTrackingStatus(t('ar.waiting'));
     setIsArDishAnchored(false);
     setIsRealArAvailable(false);
-
-    if (canLaunchAndroidSceneViewer()) {
-      onShowToast(t('ar.openingNative', { dish: dish.name }), 'view_in_ar');
-      window.location.href = buildAndroidSceneViewerIntent(dish, modelId);
-      return;
-    }
-
     setIsArModalOpen(true);
-    setArCameraAttempted(true);
-    setArCameraMessage(t('ar.requestingPermission'));
-    setArCameraHelp(null);
-    setIsArCameraRequesting(true);
+    setArCameraAttempted(autoStartCamera);
+    setArCameraMessage(autoStartCamera ? t('ar.requestingPermission') : t('ar.nativeFallbackTitle'));
+    setArCameraHelp(autoStartCamera ? null : t('ar.nativeFallbackHelp'));
 
+    if (!autoStartCamera) return;
+
+    setIsArCameraRequesting(true);
     try {
       stopArCamera();
       const stream = await requestArCameraStream();
@@ -756,7 +752,68 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     } finally {
       setIsArCameraRequesting(false);
     }
-  }, [attachArCameraStream, handleCameraError, onShowToast, requestArCameraStream, stopArCamera, t]);
+  }, [attachArCameraStream, handleCameraError, requestArCameraStream, stopArCamera, t]);
+
+  const openArViewer = React.useCallback(async (dish: MenuItem) => {
+    const modelId = getModelId(dish);
+    setArDish(dish);
+    setArScale(DEFAULT_AR_SCALE);
+    setArTrackingStatus(t('ar.openingNative', { dish: dish.name }));
+    setIsArDishAnchored(false);
+    setIsRealArAvailable(false);
+
+    if (canLaunchAndroidSceneViewer()) {
+      try {
+        nativeArReturnHandledRef.current = false;
+        sessionStorage.setItem(NATIVE_AR_RETURN_KEY, JSON.stringify({ dishId: modelId, launchedAt: Date.now() }));
+      } catch {}
+      onShowToast(t('ar.openingNative', { dish: dish.name }), 'view_in_ar');
+      window.location.href = buildAndroidSceneViewerIntent(dish, modelId);
+      return;
+    }
+
+    await openAssistedArViewer(dish);
+  }, [onShowToast, openAssistedArViewer, t]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const openFallbackIfNeeded = () => {
+      if (document.visibilityState !== 'visible' || isArModalOpen || nativeArReturnHandledRef.current) return;
+
+      let stored: { dishId?: string; launchedAt?: number } | null = null;
+      try {
+        const raw = sessionStorage.getItem(NATIVE_AR_RETURN_KEY);
+        stored = raw ? JSON.parse(raw) : null;
+      } catch {
+        stored = null;
+      }
+
+      if (!stored?.dishId || !stored.launchedAt) return;
+      const elapsed = Date.now() - stored.launchedAt;
+      if (elapsed < 3000 || elapsed > 180000) return;
+
+      const fallbackDish = menuItems.find((item) => getModelId(item) === stored.dishId);
+      if (!fallbackDish) return;
+
+      nativeArReturnHandledRef.current = true;
+      try {
+        sessionStorage.removeItem(NATIVE_AR_RETURN_KEY);
+      } catch {}
+      void openAssistedArViewer(fallbackDish, false);
+      onShowToast(t('toast.nativeArFallbackReady'), 'view_in_ar');
+    };
+
+    window.addEventListener('focus', openFallbackIfNeeded);
+    window.addEventListener('pageshow', openFallbackIfNeeded);
+    document.addEventListener('visibilitychange', openFallbackIfNeeded);
+
+    return () => {
+      window.removeEventListener('focus', openFallbackIfNeeded);
+      window.removeEventListener('pageshow', openFallbackIfNeeded);
+      document.removeEventListener('visibilitychange', openFallbackIfNeeded);
+    };
+  }, [isArModalOpen, menuItems, onShowToast, openAssistedArViewer, t]);
 
   const toggleDietaryFilter = (filter: DietaryPreference) => {
     setSelectedDietaryFilters((previous) =>
