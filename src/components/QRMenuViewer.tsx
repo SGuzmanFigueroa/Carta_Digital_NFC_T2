@@ -1707,7 +1707,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                   className="h-11 min-w-0 flex-1 px-3 rounded-xl bg-white hover:bg-[#f1f5f9] text-[#334155] border border-[#cbd5e1] text-[12px] sm:text-[13px] font-semibold flex items-center justify-center gap-1.5 dark:bg-[#1e1f28] dark:hover:bg-[#282935] dark:text-[#e5e1e4] dark:border-[#353642] transition-colors cursor-pointer whitespace-nowrap sm:flex-none active:scale-95"
                   aria-label={t('dish.openHeroHd', { dish: heroItem.name })}
                 >
-                  <span className="material-symbols-outlined text-[17px] text-primary">photo</span>
+                  <span className="material-symbols-outlined text-[17px] text-primary">description</span>
                   <span>{t('dish.hdSheet')}</span>
                 </button>
                 <button
