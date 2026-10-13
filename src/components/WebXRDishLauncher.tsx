@@ -264,6 +264,8 @@ export const WebXRDishLauncher: React.FC<WebXRDishLauncherProps> = ({
     let hitTestSource: XRHitTestSource | null = null;
     let hitTestSourceRequested = false;
     let placed = false;
+    let surfaceDetected = false;
+    let scanFallbackTimer: number | null = null;
     let disposed = false;
 
     try {
@@ -342,6 +344,10 @@ export const WebXRDishLauncher: React.FC<WebXRDishLauncherProps> = ({
         if (disposed) return;
         disposed = true;
         renderer?.setAnimationLoop(null);
+        if (scanFallbackTimer !== null) {
+          window.clearTimeout(scanFallbackTimer);
+          scanFallbackTimer = null;
+        }
         hitTestSource?.cancel?.();
         disposeObject(scene);
         shadowTexture.dispose();
@@ -362,6 +368,10 @@ export const WebXRDishLauncher: React.FC<WebXRDishLauncherProps> = ({
 
       session = await xr.requestSession('immersive-ar', sessionInit);
       session.addEventListener('end', () => {
+        if (scanFallbackTimer !== null) {
+          window.clearTimeout(scanFallbackTimer);
+          scanFallbackTimer = null;
+        }
         cleanupRef.current?.();
         cleanupRef.current = null;
         setIsPresenting(false);
@@ -390,6 +400,15 @@ export const WebXRDishLauncher: React.FC<WebXRDishLauncherProps> = ({
       onStatusChange?.('Busca una mesa');
       onShowToast?.('Mueve el celular hasta detectar la mesa y toca para colocar', 'view_in_ar');
 
+      scanFallbackTimer = window.setTimeout(() => {
+        if (placed || surfaceDetected || !session) return;
+        setWasUnsupported(true);
+        onAvailabilityChange?.(false);
+        onStatusChange?.('Modo asistido listo');
+        onShowToast?.('No se detectó la mesa con AR real; usa el modo asistido', 'info');
+        void session.end();
+      }, 12000);
+
       renderer.setAnimationLoop((_, frame) => {
         if (!frame || !renderer) return;
 
@@ -417,6 +436,11 @@ export const WebXRDishLauncher: React.FC<WebXRDishLauncherProps> = ({
             const hit = hitTestResults[0];
             const pose = hit.getPose(referenceSpace);
             if (pose) {
+              surfaceDetected = true;
+              if (scanFallbackTimer !== null) {
+                window.clearTimeout(scanFallbackTimer);
+                scanFallbackTimer = null;
+              }
               reticle.group.visible = true;
               reticle.group.matrix.fromArray(pose.transform.matrix);
               reticle.group.matrix.decompose(reticle.group.position, reticle.group.quaternion, reticle.group.scale);
