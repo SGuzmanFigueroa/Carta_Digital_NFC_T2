@@ -150,6 +150,25 @@ const PROMO_DEAL_SEEN_KEY = 'gastropulse_promo_seen';
  * ("una vez por sesión").
  */
 const IS_DEV = process.env.NODE_ENV !== 'production';
+const DEFAULT_AR_DISH_DIAMETER_CM = 40;
+const DEFAULT_AR_SCALE = DEFAULT_AR_DISH_DIAMETER_CM / 28;
+
+const canLaunchAndroidSceneViewer = () => {
+  if (typeof window === 'undefined') return false;
+  return /android/i.test(window.navigator.userAgent);
+};
+
+const getModelId = (dish: MenuItem) => dish.id;
+
+const buildAndroidSceneViewerIntent = (dish: MenuItem, modelId: string) => {
+  const modelUrl = new URL(`/models-ar/${modelId}.glb`, window.location.origin).href;
+  const fallbackUrl = new URL(window.location.href);
+  fallbackUrl.searchParams.set('arFallback', modelId);
+  fallbackUrl.searchParams.set('arName', dish.name);
+
+  const title = `${dish.name} · ${DEFAULT_AR_DISH_DIAMETER_CM} cm`;
+  return `intent://arvr.google.com/scene-viewer/1.0?file=${encodeURIComponent(modelUrl)}&mode=ar_preferred&title=${encodeURIComponent(title)}&resizable=false#Intent;scheme=https;package=com.google.android.googlequicksearchbox;action=android.intent.action.VIEW;S.browser_fallback_url=${encodeURIComponent(fallbackUrl.href)};end;`;
+};
 
 const normalizeStr = (str: string) =>
   str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
@@ -259,7 +278,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   const [arCameraHelp, setArCameraHelp] = useState<string | null>(null);
   const [isArCameraRequesting, setIsArCameraRequesting] = useState(false);
   const [arCameraAttempted, setArCameraAttempted] = useState(false);
-  const [arScale, setArScale] = useState(1.0);
+  const [arScale, setArScale] = useState(DEFAULT_AR_SCALE);
   const [arTrackingStatus, setArTrackingStatus] = useState(() => t('ar.waiting'));
   const [isArDishAnchored, setIsArDishAnchored] = useState(false);
   const [isRealArAvailable, setIsRealArAvailable] = useState(false);
@@ -709,10 +728,19 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   }, [arCameraActive, configureArVideoElement, isArModalOpen, playArVideoStream, t]);
 
   const openArViewer = React.useCallback(async (dish: MenuItem) => {
+    const modelId = getModelId(dish);
     setArDish(dish);
-    setArTrackingStatus(t('ar.requestingPermission'));
+    setArScale(DEFAULT_AR_SCALE);
+    setArTrackingStatus(t('ar.openingNative', { dish: dish.name }));
     setIsArDishAnchored(false);
     setIsRealArAvailable(false);
+
+    if (canLaunchAndroidSceneViewer()) {
+      onShowToast(t('ar.openingNative', { dish: dish.name }), 'view_in_ar');
+      window.location.href = buildAndroidSceneViewerIntent(dish, modelId);
+      return;
+    }
+
     setIsArModalOpen(true);
     setArCameraAttempted(true);
     setArCameraMessage(t('ar.requestingPermission'));
@@ -728,7 +756,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     } finally {
       setIsArCameraRequesting(false);
     }
-  }, [attachArCameraStream, handleCameraError, requestArCameraStream, stopArCamera, t]);
+  }, [attachArCameraStream, handleCameraError, onShowToast, requestArCameraStream, stopArCamera, t]);
 
   const toggleDietaryFilter = (filter: DietaryPreference) => {
     setSelectedDietaryFilters((previous) =>
@@ -1239,8 +1267,6 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     }));
   }, [tables, language]);
 
-  // Extrae el ID del modelo desde la URL de la imagen (ej: /images/smoked-old-fashioned.jpg -> smoked-old-fashioned)
-  const getModelId = (dish: MenuItem) => dish.id;
   return (
     <div className="w-full min-h-screen bg-[#f4f5f7] text-[#0f172a] dark:bg-[#0b0c0e] dark:text-[#e5e1e4] pb-44 sm:pb-36 selection:bg-primary selection:text-white transition-colors duration-300">
       {/* ========================================================================= */}
@@ -1737,16 +1763,23 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
         {/* 📖 SPECIALTY DISHES GRID */}
         {/* ========================================================================= */}
         <section className="space-y-3.5 pt-1">
-          <div className="flex items-center justify-between">
-            <h3 className="text-[16px] sm:text-[18px] font-bold text-[#0f172a] dark:text-white flex items-center gap-2">
-              <span className="material-symbols-outlined text-primary text-[20px]">menu_book</span>
-              <span>{t('grid.title')}</span>
-            </h3>
-            <span className="font-mono-code text-[11px] text-[#64748b] dark:text-[#71717a]">
-              {t(filteredItems.length === 1 ? 'grid.countOne' : 'grid.countOther', {
-                count: filteredItems.length
-              })}
-            </span>
+          <div className="rounded-2xl border border-[#e2e8f0] bg-white/80 px-3.5 py-3 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-white/[0.045]">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <h3 className="flex items-center gap-2 text-[17px] font-black tracking-tight text-[#0f172a] dark:text-white sm:text-[20px]">
+                  <span className="material-symbols-outlined text-primary text-[22px]">menu_book</span>
+                  <span>{t('grid.title')}</span>
+                </h3>
+                <p className="mt-0.5 text-[11px] font-medium text-[#64748b] dark:text-[#a1a1aa]">
+                  {t('grid.nativeArSubhead')}
+                </p>
+              </div>
+              <span className="shrink-0 rounded-full border border-primary/25 bg-primary/10 px-2.5 py-1 font-mono-code text-[11px] font-bold text-primary">
+                {t(filteredItems.length === 1 ? 'grid.countOne' : 'grid.countOther', {
+                  count: filteredItems.length
+                })}
+              </span>
+            </div>
           </div>
 
           <DietaryFilters
@@ -1846,10 +1879,11 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                         <button
                           type="button"
                           onClick={() => openArViewer(dish)}
-                          className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl bg-[#f1f5f9] hover:bg-[#e2e8f0] text-[#1d4ed8] border border-[#cbd5e1] dark:bg-[#1e1f28] dark:hover:bg-[#282935] dark:text-[#a1c9ff] dark:border-[#353642] transition-colors cursor-pointer"
-                          title={t('dish.projectArTitle')}
+                          className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl bg-primary/10 px-3 text-primary border border-primary/30 dark:bg-primary/15 dark:text-primary transition-colors cursor-pointer active:scale-95 sm:min-w-[44px] sm:px-0"
+                          title={t('dish.openNativeArAndroid')}
                         >
                           <span className="material-symbols-outlined text-[16px]">view_in_ar</span>
+                          <span className="text-[11px] font-black sm:hidden">AR</span>
                         </button>
                       )}
                       <button
@@ -2332,7 +2366,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                 <button
                   type="button"
                   aria-label={t('ar.scaleUp')}
-                  onClick={() => setArScale((s) => Math.min(1.4, s + 0.1))}
+                  onClick={() => setArScale((s) => Math.min(1.8, s + 0.1))}
                   className="w-11 h-11 min-h-[44px] min-w-[44px] rounded bg-[#2a2b36] text-white flex items-center justify-center font-bold cursor-pointer"
                 >
                   +

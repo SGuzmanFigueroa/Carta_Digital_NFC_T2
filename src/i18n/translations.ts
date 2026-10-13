@@ -43,6 +43,7 @@ export const es = {
   'grid.title': 'Nuestra Carta de Especialidades',
   'grid.countOne': '{count} opción',
   'grid.countOther': '{count} opciones',
+  'grid.nativeArSubhead': 'AR nativo en Android · modelos GLB listos para mesa',
   'grid.emptyTitle': 'No se encontraron platos',
   'grid.emptyBody':
     'No encontramos ningún resultado para "{query}". Prueba con otro ingrediente o limpia los filtros.',
@@ -62,6 +63,7 @@ export const es = {
   'dish.viewIn3dTitle': 'Ver plato en 3D interactivo',
   'dish.projectArTitle': 'Proyectar con cámara AR',
   'dish.projectArTableTitle': 'Proyectar plato con cámara en tu mesa',
+  'dish.openNativeArAndroid': 'Abrir AR nativo Android',
   'dish.openDetails': 'Ver ficha técnica de {dish}',
   'dish.openHeroDetails': 'Abrir ficha técnica de {dish}',
   'dish.openHeroHd': 'Abrir descripción de {dish}',
@@ -146,6 +148,7 @@ export const es = {
   // ── Visor AR en mesa ────────────────────────────────────────────────────────
   'ar.title': 'Visor AR en Mesa',
   'ar.waiting': 'Esperando cámara',
+  'ar.openingNative': 'Abriendo AR nativo: {dish}',
   'ar.activating': 'Activando cámara',
   'ar.anchored': 'Plato fijado en mesa:',
   'ar.realScale': 'Escala Real en Mesa:',
@@ -395,6 +398,7 @@ export const en: Record<TranslationKey, string> = {
   'grid.title': 'Our Signature Menu',
   'grid.countOne': '{count} option',
   'grid.countOther': '{count} options',
+  'grid.nativeArSubhead': 'Native AR on Android · GLB models ready for the table',
   'grid.emptyTitle': 'No dishes found',
   'grid.emptyBody': 'We found no results for "{query}". Try another ingredient or clear the filters.',
   'grid.emptyAction': 'View the full menu',
@@ -413,6 +417,7 @@ export const en: Record<TranslationKey, string> = {
   'dish.viewIn3dTitle': 'View this dish in interactive 3D',
   'dish.projectArTitle': 'Project with the AR camera',
   'dish.projectArTableTitle': 'Project this dish with the camera on your table',
+  'dish.openNativeArAndroid': 'Open native Android AR',
   'dish.openDetails': 'View details for {dish}',
   'dish.openHeroDetails': 'Open details for {dish}',
   'dish.openHeroHd': 'Open description for {dish}',
@@ -498,6 +503,7 @@ export const en: Record<TranslationKey, string> = {
   // ── Table AR viewer ─────────────────────────────────────────────────────────
   'ar.title': 'Table AR Viewer',
   'ar.waiting': 'Waiting for camera',
+  'ar.openingNative': 'Opening native AR: {dish}',
   'ar.activating': 'Activating camera',
   'ar.anchored': 'Dish anchored to table:',
   'ar.realScale': 'Real Scale at Table:',

@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 const MODEL_VIEWER_SCRIPT_ID = 'google-model-viewer-runtime';
-const MODEL_VIEWER_SRC = 'https://cdn.jsdelivr.net/npm/@google/model-viewer@4.3.1/dist/model-viewer.min.js';
+const MODEL_VIEWER_SRC = 'https://cdn.jsdelivr.net/npm/@google/model-viewer@4.4.0/dist/model-viewer.min.js';
 
 interface NativeARModelViewerProps {
   modelSrc: string;
@@ -14,30 +14,28 @@ interface NativeARModelViewerProps {
 export const NativeARModelViewer: React.FC<NativeARModelViewerProps> = ({
   modelSrc,
   title,
-  diameterCm = 28
+  diameterCm = 40
 }) => {
-  const [isReady, setIsReady] = useState(false);
+  const [isReady, setIsReady] = useState(() =>
+    typeof window !== 'undefined' && !!window.customElements?.get('model-viewer')
+  );
   const [loadFailed, setLoadFailed] = useState(false);
-  const [androidSceneViewerUrl, setAndroidSceneViewerUrl] = useState<string | null>(null);
   const modelViewerRef = useRef<HTMLElement | null>(null);
+
+  const androidSceneViewerUrl = useMemo(() => {
+    if (typeof window === 'undefined') return null;
+    const userAgent = window.navigator.userAgent.toLowerCase();
+    if (!userAgent.includes('android')) return null;
+
+    const absoluteModelUrl = new URL(modelSrc, window.location.origin).href;
+    const fallbackUrl = window.location.href;
+    return `intent://arvr.google.com/scene-viewer/1.0?file=${encodeURIComponent(absoluteModelUrl)}&mode=ar_preferred&title=${encodeURIComponent(title)}&resizable=false#Intent;scheme=https;package=com.google.android.googlequicksearchbox;action=android.intent.action.VIEW;S.browser_fallback_url=${encodeURIComponent(fallbackUrl)};end;`;
+  }, [modelSrc, title]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const userAgent = window.navigator.userAgent.toLowerCase();
-    if (userAgent.includes('android')) {
-      const absoluteModelUrl = new URL(modelSrc, window.location.origin).href;
-      const fallbackUrl = window.location.href;
-      const intentUrl = `intent://arvr.google.com/scene-viewer/1.0?file=${encodeURIComponent(absoluteModelUrl)}&mode=ar_preferred&title=${encodeURIComponent(title)}#Intent;scheme=https;package=com.google.android.googlequicksearchbox;action=android.intent.action.VIEW;S.browser_fallback_url=${encodeURIComponent(fallbackUrl)};end;`;
-      setAndroidSceneViewerUrl(intentUrl);
-    } else {
-      setAndroidSceneViewerUrl(null);
-    }
-
-    if (window.customElements?.get('model-viewer')) {
-      setIsReady(true);
-      return;
-    }
+    if (window.customElements?.get('model-viewer')) return;
 
     const existingScript = document.getElementById(MODEL_VIEWER_SCRIPT_ID) as HTMLScriptElement | null;
     if (existingScript) {
@@ -70,7 +68,8 @@ export const NativeARModelViewer: React.FC<NativeARModelViewerProps> = ({
     modelViewer.setAttribute('src', modelSrc);
     modelViewer.setAttribute('alt', `Modelo 3D de ${title}`);
     modelViewer.setAttribute('ar', '');
-    modelViewer.setAttribute('ar-modes', 'scene-viewer webxr quick-look');
+    modelViewer.setAttribute('ar-modes', 'scene-viewer quick-look webxr');
+    modelViewer.setAttribute('ar-scale', 'fixed');
     modelViewer.setAttribute('camera-controls', '');
     modelViewer.setAttribute('auto-rotate', '');
     modelViewer.setAttribute('shadow-intensity', '0.75');
@@ -84,7 +83,8 @@ export const NativeARModelViewer: React.FC<NativeARModelViewerProps> = ({
       src: modelSrc,
       alt: `Modelo 3D de ${title}`,
       ar: true,
-      'ar-modes': 'scene-viewer webxr quick-look',
+      'ar-modes': 'scene-viewer quick-look webxr',
+      'ar-scale': 'fixed',
       'camera-controls': true,
       'auto-rotate': true,
       'shadow-intensity': '0.75',
