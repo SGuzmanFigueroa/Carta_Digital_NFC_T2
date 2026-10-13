@@ -1789,7 +1789,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                   transitionDelay: `${Math.min(index * 30, 240)}ms`
                 }}
               >
-                {/* Image & Badges */}
+                {/* Image */}
                 <div className="relative h-44 sm:h-48 overflow-hidden bg-[#e2e8f0] dark:bg-[#0e0e10]">
                   <button
                     type="button"
@@ -1804,38 +1804,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                       decoding="async"
                       className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                     />
-                    <span className="absolute inset-0 bg-gradient-to-t from-white dark:from-[#15161c] via-transparent to-black/30" />
                   </button>
-
-                  {dish.badge && (
-                    <span className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-full bg-primary text-on-primary font-mono-code text-[9px] font-bold shadow">
-                      {dish.badge}
-                    </span>
-                  )}
-
-                  {dish.has3D && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedDishForModal(dish);
-                        onShowToast(t('toast.opening3d', { dish: dish.name }), 'view_in_ar');
-                      }}
-                      className="absolute top-2.5 right-2.5 px-2.5 py-1.5 min-h-[44px] rounded-full bg-black/80 backdrop-blur-md text-primary border border-primary/50 font-mono-code text-[10px] font-bold flex items-center gap-1 cursor-pointer hover:bg-primary hover:text-on-primary transition-colors shadow-lg"
-                      title={t('dish.viewIn3dTitle')}
-                    >
-                      <span className="material-symbols-outlined text-[14px]">view_in_ar</span>
-                      <span>{t('dish.viewIn3d')}</span>
-                    </button>
-                  )}
-
-                  <div className="absolute bottom-2 left-2.5 right-2.5 flex items-center justify-between text-[10px] sm:text-[11px] font-mono-code">
-                    <span className="text-primary bg-black/75 backdrop-blur-md px-1.5 py-0.5 rounded">
-                      ★ {dish.rating} ({dish.reviewsCount})
-                    </span>
-                    <span className="text-[#a1a1aa] bg-black/75 backdrop-blur-md px-1.5 py-0.5 rounded">
-                      {dish.prepTime}
-                    </span>
-                  </div>
                 </div>
 
                 {/* Content Details */}
