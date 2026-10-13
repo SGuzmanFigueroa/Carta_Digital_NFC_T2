@@ -393,7 +393,7 @@ const PromoDealSlide = React.memo(function PromoDealSlide({
           ariaLabel={t('promo.photosAria', { dish: deal.name })}
         />
 
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-white via-white/25 to-black/45 dark:from-[#131418] dark:via-[#131418]/25 dark:to-black/45" />
+        
 
         {/* ⏱️ Cuenta regresiva del flash deal, anclada al borde inferior de SU foto */}
         <PromoFlashCountdown key={countdownSeconds} seconds={countdownSeconds} />

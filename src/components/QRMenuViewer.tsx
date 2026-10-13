@@ -1633,7 +1633,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                     className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
                   />
                 </button>
-                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-white dark:from-[#15161c] via-transparent to-black/40" />
+                
 
                                 <button
                   type="button"
