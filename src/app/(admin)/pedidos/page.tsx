@@ -6,10 +6,14 @@ import { Header } from '@/components/Header';
 import { useRestaurant } from '@/context/RestaurantContext';
 import { OrderTicket } from '@/types';
 import { useRouter } from 'next/navigation';
+import { usePaidOrderHistory } from '@/hooks/usePaidOrderHistory';
+import { mergePaymentOrders } from '@/features/orders/paymentFilter';
 
 export default function PedidosPage() {
   const router = useRouter();
   const { orders, updateOrderStatus, addOrderNote, toast, showToast } = useRestaurant();
+  const history = usePaidOrderHistory();
+  const accountOrders = mergePaymentOrders(orders, history.paidOrders);
 
   const handleUpdateStatus = (orderId: string, newStatus: OrderTicket['status']) => {
     updateOrderStatus(orderId, newStatus);
@@ -34,7 +38,9 @@ export default function PedidosPage() {
       />
       <main className="w-full pt-16 min-h-screen">
         <OrdersCentral
-          orders={orders}
+          orders={accountOrders}
+          paymentHistoryLoading={history.loading}
+          paymentHistoryError={history.error}
           onUpdateOrderStatus={handleUpdateStatus}
           onShowToast={showToast}
           onAddOrderNote={addOrderNote}

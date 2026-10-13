@@ -94,6 +94,8 @@ export interface OrderItem {
 
 export interface OrderTicket {
   id: string;
+  /** Derived from orders.status; absent on legacy local tickets means pending. */
+  paymentStatus?: 'pending' | 'paid';
   table: string;
   pax: number;
   timeAgo: string;

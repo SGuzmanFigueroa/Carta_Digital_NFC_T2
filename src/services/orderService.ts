@@ -3,24 +3,47 @@ import { queuePendingOrder } from './offlineSyncService';
 import { OrderTicket, OrderItem, MenuItem } from '@/types';
 import { isTemporaryPairingItem } from '@/features/menu/pairing';
 import { updateTableStateInDb } from './tableService';
+import type { Database } from '@/types/database.types';
 
-export async function fetchOrdersFromDb(): Promise<OrderTicket[]> {
+export async function fetchOrdersFromDb(options: { paymentStatus?: 'paid'; throwOnError?: boolean } = {}): Promise<OrderTicket[]> {
   try {
-    const { data: ordersData, error: ordersError } = await supabase
-      .from('orders')
-      .select('*')
-      .neq('status', 'cobrado')
-      .order('created_at', { ascending: false });
+    const queryOrders = (offset = 0) => {
+      const query = supabase.from('orders').select('*').order('created_at', { ascending: false });
+      return options.paymentStatus === 'paid'
+        ? query.eq('status', 'cobrado').order('id').range(offset, offset + 499)
+        : query.neq('status', 'cobrado');
+    };
+    const { data: ordersData, error: ordersError } = await queryOrders();
 
     if (ordersError || !ordersData) {
+      if (options.throwOnError) throw ordersError ?? new Error('Orders unavailable');
       return [];
     }
+    if (options.paymentStatus === 'paid') {
+      let pageLength = ordersData.length;
+      while (pageLength === 500) {
+        const { data, error } = await queryOrders(ordersData.length);
+        if (error || !data) throw error ?? new Error('History unavailable');
+        pageLength = data.length;
+        ordersData.push(...data);
+      }
+    }
+    if (!ordersData.length) return [];
 
     const orderIds = ordersData.map((o) => o.id);
-    const { data: itemsData } = await supabase
-      .from('order_items')
-      .select('*')
-      .in('order_id', orderIds);
+    const itemsData: Database['public']['Tables']['order_items']['Row'][] = [];
+    const chunkSize = options.paymentStatus === 'paid' ? 100 : orderIds.length;
+    for (let index = 0; index < orderIds.length; index += chunkSize) {
+      let offset = 0;
+      while (true) {
+        const query = supabase.from('order_items').select('*').in('order_id', orderIds.slice(index, index + chunkSize));
+        const { data, error } = await (options.paymentStatus === 'paid' ? query.order('id').range(offset, offset + 999) : query);
+        if (error && options.throwOnError) throw error;
+        itemsData.push(...(data ?? []));
+        if (options.paymentStatus !== 'paid' || (data?.length ?? 0) < 1000) break;
+        offset += 1000;
+      }
+    }
 
     const itemsByOrder: Record<string, OrderItem[]> = {};
     (itemsData || []).forEach((item) => {
@@ -48,7 +71,8 @@ export async function fetchOrdersFromDb(): Promise<OrderTicket[]> {
       createdTime: new Date(o.created_at || Date.now()).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }),
       origin: (o.origin as OrderTicket['origin']) || 'QR COMENSAL',
       waiter: o.waiter || undefined,
-      status: (o.status as OrderTicket['status']) || 'por-validar',
+      status: o.status === 'cobrado' ? 'entregado' : (o.status as OrderTicket['status']) || 'por-validar',
+      paymentStatus: o.status === 'cobrado' ? 'paid' : 'pending',
       isCritical: Boolean(o.is_critical),
       preparationPercent: o.preparation_percent || 0,
       items: itemsByOrder[o.id] || [],
@@ -60,6 +84,7 @@ export async function fetchOrdersFromDb(): Promise<OrderTicket[]> {
       stationTarget: (o as any).station_target || undefined
     }));
   } catch (err) {
+    if (options.throwOnError) throw err;
     console.error('Error fetching orders from DB:', err);
     return [];
   }
