@@ -1,3 +1,4 @@
+import { MENU_THEME_BOOTSTRAP } from "@/utils/menuTheme";
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Space_Mono } from "next/font/google";
 import "./globals.css";
@@ -118,33 +119,7 @@ export default function RootLayout({
             panel de administración, por lo que no se altera su diseño. */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){
-              try {
-                var path = window.location.pathname;
-                var isDinerView = path === '/' || path === '/menu' || path.indexOf('/menu/') === 0;
-                if (!isDinerView) return;
-
-                var KEY = 'gastropulse_menu_theme';
-                var stored = null;
-                try { stored = localStorage.getItem(KEY); } catch(e) {}
-                var theme = (stored === 'light' || stored === 'dark') ? stored : null;
-                if (!theme) {
-                  theme = (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches)
-                    ? 'light'
-                    : 'dark';
-                }
-
-                var root = document.documentElement;
-                root.setAttribute('data-menu-theme', theme);
-                if (theme === 'light') {
-                  root.classList.remove('dark');
-                  root.classList.add('light');
-                } else {
-                  root.classList.remove('light');
-                  root.classList.add('dark');
-                }
-              } catch(e) {}
-            })()`,
+            __html: MENU_THEME_BOOTSTRAP,
           }}
         />
 
