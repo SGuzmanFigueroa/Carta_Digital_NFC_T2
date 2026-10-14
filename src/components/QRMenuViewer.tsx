@@ -63,6 +63,7 @@ import { formatSoles } from '@/utils/promo';
 import { INITIAL_ACTIVE_PROMO_OFFERS } from '@/data/mockData';
 import { DietaryFilters, DIETARY_FILTERS, getDietaryPreferences } from './menu/DietaryFilters';
 import type { DietaryPreference } from '../types';
+import { getArDishDimensionCm } from '@/config/arDishProfiles';
 
 /**
  * CD-31 · Fallback del visor 3D: componente propio (y no un literal dentro de
@@ -150,8 +151,7 @@ const PROMO_DEAL_SEEN_KEY = 'gastropulse_promo_seen';
  * ("una vez por sesión").
  */
 const IS_DEV = process.env.NODE_ENV !== 'production';
-const DEFAULT_AR_DISH_DIAMETER_CM = 40;
-const DEFAULT_AR_SCALE = DEFAULT_AR_DISH_DIAMETER_CM / 28;
+const DEFAULT_AR_SCALE = 1;
 const NATIVE_AR_RETURN_KEY = 'gastropulse_native_ar_return';
 
 const canLaunchAndroidSceneViewer = () => {
@@ -167,7 +167,7 @@ const buildAndroidSceneViewerIntent = (dish: MenuItem, modelId: string) => {
   fallbackUrl.searchParams.set('arFallback', modelId);
   fallbackUrl.searchParams.set('arName', dish.name);
 
-  const title = `${dish.name} · ${DEFAULT_AR_DISH_DIAMETER_CM} cm · mueve lento`;
+  const title = `${dish.name} · ${getArDishDimensionCm(modelId)} cm · mueve lento`;
   return `intent://arvr.google.com/scene-viewer/1.0?file=${encodeURIComponent(modelUrl)}&mode=ar_preferred&title=${encodeURIComponent(title)}&resizable=false#Intent;scheme=https;package=com.google.android.googlequicksearchbox;action=android.intent.action.VIEW;S.browser_fallback_url=${encodeURIComponent(fallbackUrl.href)};end;`;
 };
 
@@ -2336,16 +2336,18 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                 <button
                   type="button"
                   aria-label={t('ar.scaleDown')}
-                  onClick={() => setArScale((s) => Math.max(0.6, s - 0.1))}
+                  onClick={() => setArScale((s) => Math.max(0.7, s - 0.1))}
                   className="w-11 h-11 min-h-[44px] min-w-[44px] rounded bg-[#2a2b36] text-white flex items-center justify-center font-bold cursor-pointer"
                 >
                   -
                 </button>
-                <span className="text-primary font-bold">{(arScale * 28).toFixed(0)} cm Ø</span>
+                <span className="text-primary font-bold">
+                  {(getArDishDimensionCm(getModelId(arDish)) * arScale).toFixed(0)} cm
+                </span>
                 <button
                   type="button"
                   aria-label={t('ar.scaleUp')}
-                  onClick={() => setArScale((s) => Math.min(1.8, s + 0.1))}
+                  onClick={() => setArScale((s) => Math.min(1.3, s + 0.1))}
                   className="w-11 h-11 min-h-[44px] min-w-[44px] rounded bg-[#2a2b36] text-white flex items-center justify-center font-bold cursor-pointer"
                 >
                   +

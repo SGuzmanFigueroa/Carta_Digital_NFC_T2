@@ -34,7 +34,7 @@ const DEFAULT_MODEL_PROFILE: DishARProfile = {
 
 const MODEL_PROFILES: Record<string, DishARProfile> = {
   'smoked-old-fashioned': {
-    targetSize: 1.0,
+    targetSize: 0.64,
     heightBias: 0,
     shadowScale: [0.84, 0.5],
     shadowOpacity: 0.46,
@@ -42,7 +42,7 @@ const MODEL_PROFILES: Record<string, DishARProfile> = {
     cameraHeight: 1.42,
   },
   'aji-de-gallina': {
-    targetSize: 1.62,
+    targetSize: 1.38,
     heightBias: 0,
     shadowScale: [1.48, 0.56],
     shadowOpacity: 0.58,
@@ -50,7 +50,7 @@ const MODEL_PROFILES: Record<string, DishARProfile> = {
     cameraHeight: 1.62,
   },
   'causa-limena': {
-    targetSize: 1.62,
+    targetSize: 1.08,
     heightBias: 0.01,
     shadowScale: [1.34, 0.5],
     shadowOpacity: 0.52,
@@ -58,7 +58,7 @@ const MODEL_PROFILES: Record<string, DishARProfile> = {
     cameraHeight: 1.55,
   },
   'esfera-chocolate': {
-    targetSize: 1.35,
+    targetSize: 0.98,
     heightBias: 0,
     shadowScale: [1.18, 0.48],
     shadowOpacity: 0.5,
@@ -66,7 +66,7 @@ const MODEL_PROFILES: Record<string, DishARProfile> = {
     cameraHeight: 1.5,
   },
   'tartar-nikkei': {
-    targetSize: 1.45,
+    targetSize: 1.08,
     heightBias: 0,
     shadowScale: [1.3, 0.5],
     shadowOpacity: 0.54,
@@ -74,7 +74,7 @@ const MODEL_PROFILES: Record<string, DishARProfile> = {
     cameraHeight: 1.54,
   },
   'chaufa-wok': {
-    targetSize: 1.66,
+    targetSize: 1.42,
     heightBias: 0,
     shadowScale: [1.52, 0.58],
     shadowOpacity: 0.58,
@@ -82,7 +82,7 @@ const MODEL_PROFILES: Record<string, DishARProfile> = {
     cameraHeight: 1.64,
   },
   'risotto-porcini': {
-    targetSize: 1.58,
+    targetSize: 1.36,
     heightBias: 0,
     shadowScale: [1.44, 0.54],
     shadowOpacity: 0.56,
@@ -90,7 +90,7 @@ const MODEL_PROFILES: Record<string, DishARProfile> = {
     cameraHeight: 1.58,
   },
   'lomo-saltado': {
-    targetSize: 1.66,
+    targetSize: 1.46,
     heightBias: 0,
     shadowScale: [1.54, 0.58],
     shadowOpacity: 0.6,
@@ -98,7 +98,7 @@ const MODEL_PROFILES: Record<string, DishARProfile> = {
     cameraHeight: 1.62,
   },
   'pulpo-brasa': {
-    targetSize: 1.58,
+    targetSize: 1.4,
     heightBias: 0,
     shadowScale: [1.48, 0.55],
     shadowOpacity: 0.58,
@@ -106,7 +106,7 @@ const MODEL_PROFILES: Record<string, DishARProfile> = {
     cameraHeight: 1.6,
   },
   'wagyu-a5': {
-    targetSize: 1.66,
+    targetSize: 1.48,
     heightBias: 0,
     shadowScale: [1.56, 0.57],
     shadowOpacity: 0.6,
@@ -490,7 +490,7 @@ export const DishARViewer: React.FC<DishARViewerProps> = ({
       const anchorOffset = anchorOffsetRef.current;
       const currentOrientation = orientationRef.current;
       const anchorOrientation = anchorOrientationRef.current;
-      const targetScale = Math.max(0.48, Math.min(1.34, scale));
+      const targetScale = Math.max(0.7, Math.min(1.3, scale));
 
       anchorProgressRef.current = anchored
         ? Math.min(1, anchorProgressRef.current + 0.045)

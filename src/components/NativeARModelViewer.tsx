@@ -14,7 +14,7 @@ interface NativeARModelViewerProps {
 export const NativeARModelViewer: React.FC<NativeARModelViewerProps> = ({
   modelSrc,
   title,
-  diameterCm = 40
+  diameterCm = 24
 }) => {
   const [isReady, setIsReady] = useState(() =>
     typeof window !== 'undefined' && !!window.customElements?.get('model-viewer')

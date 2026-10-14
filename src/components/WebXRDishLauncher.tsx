@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { getArDishDimensionCm } from '@/config/arDishProfiles';
 
 type XRNavigator = Navigator & {
   xr?: XRSystem;
@@ -21,25 +22,24 @@ interface WebXRDishLauncherProps {
 }
 
 type WebXRProfile = {
-  modelSize: number;
   yBias: number;
   shadow: [number, number, number];
 };
 
 const WEBXR_PROFILE_BY_DISH: Record<string, WebXRProfile> = {
-  'smoked-old-fashioned': { modelSize: 0.26, yBias: 0, shadow: [0.34, 0.2, 0.42] },
-  'aji-de-gallina': { modelSize: 0.42, yBias: 0, shadow: [0.5, 0.24, 0.54] },
-  'causa-limena': { modelSize: 0.4, yBias: 0.004, shadow: [0.46, 0.22, 0.5] },
-  'esfera-chocolate': { modelSize: 0.34, yBias: 0, shadow: [0.4, 0.2, 0.48] },
-  'tartar-nikkei': { modelSize: 0.36, yBias: 0, shadow: [0.42, 0.2, 0.5] },
-  'chaufa-wok': { modelSize: 0.44, yBias: 0, shadow: [0.54, 0.25, 0.56] },
-  'risotto-porcini': { modelSize: 0.42, yBias: 0, shadow: [0.5, 0.23, 0.54] },
-  'lomo-saltado': { modelSize: 0.44, yBias: 0, shadow: [0.54, 0.25, 0.58] },
-  'pulpo-brasa': { modelSize: 0.42, yBias: 0, shadow: [0.5, 0.24, 0.56] },
-  'wagyu-a5': { modelSize: 0.44, yBias: 0, shadow: [0.54, 0.25, 0.58] },
+  'smoked-old-fashioned': { yBias: 0, shadow: [0.16, 0.1, 0.32] },
+  'aji-de-gallina': { yBias: 0, shadow: [0.3, 0.15, 0.48] },
+  'causa-limena': { yBias: 0.004, shadow: [0.24, 0.12, 0.44] },
+  'esfera-chocolate': { yBias: 0, shadow: [0.22, 0.11, 0.42] },
+  'tartar-nikkei': { yBias: 0, shadow: [0.24, 0.12, 0.44] },
+  'chaufa-wok': { yBias: 0, shadow: [0.31, 0.15, 0.5] },
+  'risotto-porcini': { yBias: 0, shadow: [0.3, 0.14, 0.48] },
+  'lomo-saltado': { yBias: 0, shadow: [0.32, 0.15, 0.52] },
+  'pulpo-brasa': { yBias: 0, shadow: [0.31, 0.15, 0.5] },
+  'wagyu-a5': { yBias: 0, shadow: [0.33, 0.16, 0.52] },
 };
 
-const DEFAULT_WEBXR_PROFILE: WebXRProfile = { modelSize: 0.4, yBias: 0, shadow: [0.48, 0.22, 0.52] };
+const DEFAULT_WEBXR_PROFILE: WebXRProfile = { yBias: 0, shadow: [0.28, 0.14, 0.46] };
 
 function disposeObject(object: THREE.Object3D) {
   object.traverse((child) => {
@@ -121,7 +121,8 @@ function createWebXRReticle() {
 
 function loadDishModel(dishId: string, profile: WebXRProfile, scale: number) {
   const loader = new GLTFLoader();
-  const calibratedScale = THREE.MathUtils.clamp(scale, 0.62, 1.38);
+  const calibratedScale = THREE.MathUtils.clamp(scale, 0.7, 1.3);
+  const modelSizeMeters = getArDishDimensionCm(dishId) / 100;
 
   return new Promise<THREE.Group>((resolve, reject) => {
     loader.load(
@@ -160,7 +161,7 @@ function loadDishModel(dishId: string, profile: WebXRProfile, scale: number) {
         const box = new THREE.Box3().setFromObject(model);
         const size = box.getSize(new THREE.Vector3());
         const maxDim = Math.max(size.x, size.y, size.z) || 1;
-        model.scale.setScalar((profile.modelSize * calibratedScale) / maxDim);
+        model.scale.setScalar((modelSizeMeters * calibratedScale) / maxDim);
 
         box.setFromObject(model);
         const center = box.getCenter(new THREE.Vector3());
@@ -386,7 +387,6 @@ export const WebXRDishLauncher: React.FC<WebXRDishLauncherProps> = ({
         dishRoot.visible = true;
         dishRoot.matrix.copy(reticle.group.matrix);
         dishRoot.matrix.decompose(dishRoot.position, dishRoot.quaternion, dishRoot.scale);
-        dishRoot.scale.multiplyScalar(THREE.MathUtils.clamp(scale, 0.62, 1.38));
         reticle.group.visible = false;
         setPhase('placed');
         onStatusChange?.('Plato colocado en AR real');
