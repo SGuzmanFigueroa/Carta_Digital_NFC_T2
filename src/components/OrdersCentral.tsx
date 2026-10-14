@@ -1,8 +1,12 @@
 import React, { useState } from 'react';
 import { OrderTicket } from '../types';
+import { OrderPaymentFilters } from '@/components/OrderPaymentFilters';
+import { filterOrdersByPayment, paymentFilterCounts, orderPaymentStatus, type PaymentFilter } from '@/features/orders/paymentFilter';
 
 interface OrdersCentralProps {
   orders: OrderTicket[];
+  paymentHistoryLoading?: boolean;
+  paymentHistoryError?: boolean;
   onUpdateOrderStatus: (id: string, newStatus: OrderTicket['status']) => void;
   onShowToast: (msg: string, icon?: string) => void;
   onOpenKitchenNoteModal?: (orderId: string) => void;
@@ -13,7 +17,9 @@ export const OrdersCentral: React.FC<OrdersCentralProps> = ({
   orders,
   onUpdateOrderStatus,
   onShowToast,
-  onAddOrderNote
+  onAddOrderNote,
+  paymentHistoryLoading = false,
+  paymentHistoryError = false
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTicketId, setSelectedTicketId] = useState<string>('cmd-0482');
@@ -22,8 +28,9 @@ export const OrdersCentral: React.FC<OrdersCentralProps> = ({
   const [activeStationFilter, setActiveStationFilter] = useState<'all' | 'parrilla' | 'wok' | 'barra'>('all');
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [noteInput, setNoteInput] = useState('');
+  const [activePaymentFilter, setActivePaymentFilter] = useState<PaymentFilter>('all');
 
-  const filteredOrders = orders.filter((o) => {
+  const matchingOrders = orders.filter((o) => {
     const matchesSearch =
       o.table.toLowerCase().includes(searchTerm.toLowerCase()) ||
       o.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -42,14 +49,17 @@ export const OrdersCentral: React.FC<OrdersCentralProps> = ({
     }
     return true;
   });
+  const paymentCounts = paymentFilterCounts(matchingOrders);
+  const filteredOrders = filterOrdersByPayment(matchingOrders, activePaymentFilter);
 
-  const porValidar = filteredOrders.filter((o) => o.status === 'por-validar');
-  const enCocina = filteredOrders.filter((o) => o.status === 'en-cocina');
-  const paseListo = filteredOrders.filter((o) => o.status === 'pase-listo');
+  const porValidar = filteredOrders.filter((o) => o.status === 'por-validar' && orderPaymentStatus(o) === 'pending');
+  const enCocina = filteredOrders.filter((o) => o.status === 'en-cocina' && orderPaymentStatus(o) === 'pending');
+  const paseListo = filteredOrders.filter((o) => o.status === 'pase-listo' && orderPaymentStatus(o) === 'pending');
+  const closedOrDining = filteredOrders.filter(o => o.status === 'entregado' || orderPaymentStatus(o) === 'paid');
 
   // Contadores por partida / estación para feedback operacional en vivo
   const activeOrders = orders.filter((o) =>
-    o.status === 'por-validar' || o.status === 'en-cocina' || o.status === 'pase-listo'
+    orderPaymentStatus(o) === 'pending' && (o.status === 'por-validar' || o.status === 'en-cocina' || o.status === 'pase-listo')
   );
   const countAll = activeOrders.length;
   const countParrilla = activeOrders.filter((o) =>
@@ -62,26 +72,10 @@ export const OrdersCentral: React.FC<OrdersCentralProps> = ({
     o.items.some((i) => i.station?.toLowerCase().includes('bar') || o.stationTarget?.toLowerCase().includes('bar'))
   ).length;
 
-  const fallbackTicket: OrderTicket = {
-    id: 'cmd-0482',
-    table: 'MESA 04',
-    pax: 2,
-    timeAgo: '00:48 min',
-    createdTime: '20:42:15',
-    origin: 'GARZÓN',
-    status: 'en-cocina',
-    items: [
-      { id: 'i-1', name: '1x Wagyu Ribeye A5 250g', quantity: 1, price: 115.00, notes: 'Término: 3/4 sellado', station: 'Parrilla' },
-      { id: 'i-2', name: '1x Tartar Nikkei Trufa', quantity: 1, price: 42.50, allergen: 'Sésamo', station: 'Wok' },
-      { id: 'i-3', name: '1x Copa Gran Malbec Reserva', quantity: 1, price: 21.00, station: 'Barra' }
-    ],
-    subtotal: 178.50,
-    total: 178.50
-  };
-
-  const activeTicket = orders.find((o) => o.id === selectedTicketId) || filteredOrders[0] || orders[0] || fallbackTicket;
+  const activeTicket = filteredOrders.find(o => o.id === selectedTicketId) || filteredOrders[0];
 
   const handleTestPrint = () => {
+    if (!activeTicket) return;
     setIsPrinting(true);
     setTimeout(() => {
       setIsPrinting(false);
@@ -99,6 +93,7 @@ export const OrdersCentral: React.FC<OrdersCentralProps> = ({
   };
 
   const handleSaveKitchenNote = (presetNote?: string) => {
+    if (!activeTicket || orderPaymentStatus(activeTicket) === 'paid') return;
     const finalNote = (presetNote || noteInput).trim();
     if (!finalNote) return;
 
@@ -132,7 +127,7 @@ export const OrdersCentral: React.FC<OrdersCentralProps> = ({
             <span className="material-symbols-outlined text-[#c6c5cf] text-[18px]">payments</span>
             <span className="text-[13px] text-[#c6c5cf]">Facturación Turno:</span>
             <span className="font-label-code text-[13px] text-[#ff5708] font-bold">
-              S/ {(4215 + orders.reduce((sum, o) => sum + o.total, 0)).toLocaleString('es-PE', { minimumFractionDigits: 2 })}
+              S/ {(4215 + orders.filter(o => orderPaymentStatus(o) === 'pending').reduce((sum, o) => sum + o.total, 0)).toLocaleString('es-PE', { minimumFractionDigits: 2 })}
             </span>
           </div>
 
@@ -228,6 +223,13 @@ export const OrdersCentral: React.FC<OrdersCentralProps> = ({
         </div>
       </section>
 
+      <OrderPaymentFilters value={activePaymentFilter} counts={paymentCounts} onChange={value => {
+        setActivePaymentFilter(value); setIsNoteModalOpen(false);
+      }} />
+      {paymentHistoryLoading && <p role="status" className="text-[12px] text-[#c6c5cf] mb-3">Cargando cuentas cobradas…</p>}
+      {paymentHistoryError && <p role="status" className="text-[12px] text-[#ffb59c] mb-3">No se pudo actualizar el historial de cobros. Las comandas activas siguen disponibles.</p>}
+      {filteredOrders.length === 0 && <p role="status" className="text-[13px] text-[#c6c5cf] mb-4">No hay comandas que coincidan con estos filtros.</p>}
+
       {/* Main Kanban Grid + ESC/POS Inspector */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
         {/* Kanban Board Columns (1 to 9) */}
@@ -237,7 +239,7 @@ export const OrdersCentral: React.FC<OrdersCentralProps> = ({
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-amber-400 text-[20px]">info</span>
                 <span>
-                  No hay comandas activas pendientes para la partida <strong className="text-[#ff5708] capitalize">{activeStationFilter}</strong>.
+                  No hay comandas para la partida <strong className="text-[#ff5708] capitalize">{activeStationFilter}</strong> con el estado de cuenta seleccionado.
                 </span>
               </div>
               <button
@@ -249,6 +251,7 @@ export const OrdersCentral: React.FC<OrdersCentralProps> = ({
               </button>
             </div>
           )}
+          {activePaymentFilter !== 'paid' && <>
           {/* COLUMN 1: POR VALIDAR */}
           <section className="flex flex-col bg-[#0e0e10] rounded-xl p-2.5 gap-3 border border-[#2a2a2c]">
             <div className="flex items-center justify-between px-2.5 py-1.5 bg-[#1c1b1d] rounded-lg">
@@ -591,10 +594,28 @@ export const OrdersCentral: React.FC<OrdersCentralProps> = ({
               ))
             )}
           </section>
+          </>}
+          {closedOrDining.length > 0 && (
+            <section aria-label="Comandas en consumo o finalizadas" className="md:col-span-3 space-y-2">
+              <h3 className="font-label-code text-[12px] text-[#c6c5cf] uppercase tracking-wider mb-2">
+                {activePaymentFilter === 'paid' ? 'Cobradas / Finalizadas' : 'En consumo / Finalizadas'}
+              </h3>
+              {closedOrDining.map(ticket => (
+                <button key={ticket.id} type="button" onClick={() => setSelectedTicketId(ticket.id)}
+                  aria-label={`Ver comanda ${ticket.id}, ${ticket.table}, ${orderPaymentStatus(ticket) === 'paid' ? 'cobrada' : 'por cobrar'}`}
+                  className={`w-full flex flex-wrap items-center justify-between gap-2 py-3 px-2 text-left bg-transparent border-b cursor-pointer ${activeTicket?.id === ticket.id ? 'border-[#ff5708]' : 'border-[#353437]/40'}`}>
+                  <span className="text-[13px] text-[#e5e1e4] font-semibold">{ticket.table} · {ticket.id}</span>
+                  <span className="text-[12px] text-[#c6c5cf]">{ticket.createdTime} · {ticket.items.reduce((sum, item) => sum + item.quantity, 0)} platos</span>
+                  <span className="text-[12px] text-[#ffb59c]">{orderPaymentStatus(ticket) === 'paid' ? 'Cobrada' : 'Por cobrar · En consumo'}</span>
+                  <span className="font-label-code text-[13px]">S/ {ticket.total.toFixed(2)}</span>
+                </button>
+              ))}
+            </section>
+          )}
         </div>
 
         {/* Right Sidebar: ESC/POS Thermal Live Inspector & Station Load (10 to 12) */}
-        <aside className="lg:col-span-4 xl:col-span-3 flex flex-col gap-4 sticky top-20">
+        {activeTicket && <aside className="lg:col-span-4 xl:col-span-3 flex flex-col gap-4 sticky top-20">
           {/* Thermal Ticket Viewer Card */}
           <div className="bg-[#201f22] p-4 rounded-xl shadow-xl flex flex-col border border-[#353437]/40">
             <div className="flex items-center justify-between pb-2 border-b border-[#353437]/30">
@@ -685,6 +706,7 @@ export const OrdersCentral: React.FC<OrdersCentralProps> = ({
               <button
                 type="button"
                 onClick={handleOpenAddNote}
+                disabled={orderPaymentStatus(activeTicket) === 'paid'}
                 className="w-full py-2 bg-transparent hover:bg-[#1c1b1d] text-[#c6c5cf] hover:text-[#e5e1e4] font-medium rounded-lg text-[13px] flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-[#353437]/20"
               >
                 <span className="material-symbols-outlined text-[17px]">edit_note</span>
@@ -736,11 +758,11 @@ export const OrdersCentral: React.FC<OrdersCentralProps> = ({
               </div>
             </div>
           </div>
-        </aside>
+        </aside>}
       </div>
 
       {/* MODAL NATIVO: AGREGAR NOTA ESPECIAL DE COCINA */}
-      {isNoteModalOpen && (
+      {isNoteModalOpen && activeTicket && orderPaymentStatus(activeTicket) === 'pending' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn">
           <div className="bg-[#1c1b1d] border border-[#353437] rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-150">
             {/* Header */}
