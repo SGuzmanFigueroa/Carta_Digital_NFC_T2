@@ -221,22 +221,21 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   onDishCreated,
   onRefreshDishes
 }) => {
-  const [selectedCategory, setSelectedCategory] = useState<string>('todos');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedDietaryFilters, setSelectedDietaryFilters] = useState<DietaryPreference[]>([]);
-  const [heroViewMode, setHeroViewMode] = useState<'photo' | '3d'>('photo');
-  const [isTableModalOpen, setIsTableModalOpen] = useState(false);
-  const [isCartOpen, setIsCartOpen] = useState(false);
-  const [isOrderHistoryOpen, setIsOrderHistoryOpen] = useState(false);
-  const [selectedTable, setSelectedTable] = useState('MESA 04');
-  const [cartsByTable, setCartsByTable] = useState<Record<string, MenuCartItem[]>>({});
-  const [isSplitBillModalOpen, setIsSplitBillModalOpen] = useState(false);
+   const [selectedCategory, setSelectedCategory] = useState<string>('todos');
+   const [searchQuery, setSearchQuery] = useState('');
+   const [selectedDietaryFilters, setSelectedDietaryFilters] = useState<DietaryPreference[]>([]);
+   const [heroViewMode, setHeroViewMode] = useState<'photo' | '3d'>('photo');
+   const [isCartOpen, setIsCartOpen] = useState(false);
+   const [isOrderHistoryOpen, setIsOrderHistoryOpen] = useState(false);
+   const [selectedTable, setSelectedTable] = useState('MESA 04');
+   const [cartsByTable, setCartsByTable] = useState<Record<string, MenuCartItem[]>>({});
+   const [isSplitBillModalOpen, setIsSplitBillModalOpen] = useState(false);
 
-  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
-  const [paymentAmount, setPaymentAmount] = useState<number | null>(null);
-  const [isComplaintModalOpen, setIsComplaintModalOpen] = useState(false);
-  const [isPromoModalOpen, setIsPromoModalOpen] = useState(false);
-  /** Oferta con la que debe abrir el pop-up (la que se veía en la tira flash). */
+   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+   const [paymentAmount, setPaymentAmount] = useState<number | null>(null);
+   const [isComplaintModalOpen, setIsComplaintModalOpen] = useState(false);
+   const [isPromoModalOpen, setIsPromoModalOpen] = useState(false);
+   /** Oferta con la que debe abrir el pop-up (la que se veía en la tira flash). */
   const [promoInitialDealId, setPromoInitialDealId] = useState<string | null>(null);
   const [selectedDishDetails, setSelectedDishDetails] = useState<MenuItem | null>(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'Efectivo' | 'Tarjeta POS (Visa/MC)' | 'Yape / Plin'>('Tarjeta POS (Visa/MC)');
@@ -1345,18 +1344,11 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
               </div>
               <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => setIsTableModalOpen(true)}
-                  className="group inline-flex min-h-[44px] min-w-[44px] items-center justify-center cursor-pointer"
-                  title={t('header.changeTable')}
-                  aria-label={t('header.changeTableAria', { table: localizeTableLabel(selectedTable, language) })}
-                >
-                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#f1f5f9] group-hover:bg-[#e2e8f0] border border-[#cbd5e1] text-primary dark:bg-[#1c1d23] dark:group-hover:bg-[#282932] dark:border-[#353642] dark:text-primary text-[10px] sm:text-[11px] font-mono-code font-semibold transition-colors">
-                    <span>{localizeTableLabel(selectedTable, language)}</span>
-                    <span className="material-symbols-outlined text-[12px] text-primary">expand_more</span>
-                  </span>
-                </button>
+                   <div className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center">
+                     <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-[#f1f5f9] border border-[#cbd5e1] text-primary dark:bg-[#1c1d23] dark:border-[#353642] dark:text-primary text-[10px] sm:text-[11px] font-mono-code font-semibold">
+                       {localizeTableLabel(selectedTable, language)}
+                     </span>
+                   </div>
                 <span className="text-[10px] text-emerald-400 font-medium hidden xs:inline flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>{t('header.autoOrderActive')}</span>
               </div>
             </div>
@@ -2035,66 +2027,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       {/* ========================================================================= */}
       {/* 🪑 TABLE SELECTOR MODAL */}
       {/* ========================================================================= */}
-      {isTableModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
-          <div className="bg-white dark:bg-[#15161c] w-full max-w-md rounded-t-3xl sm:rounded-2xl border border-[#e2e8f0] dark:border-[#2d2e38] shadow-2xl p-5 space-y-4">
-            <div className="flex items-center justify-between pb-2 border-b border-[#e2e8f0] dark:border-[#24252e]">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary text-[20px]">table_restaurant</span>
-                <h3 className="text-[16px] font-bold text-[#0f172a] dark:text-white">{t('table.title')}</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsTableModalOpen(false)}
-                className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-[#475569] dark:text-[#a1a1aa] hover:text-[#0f172a] dark:hover:text-white cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[20px]">close</span>
-              </button>
-            </div>
 
-            <p className="text-[12px] text-[#475569] dark:text-[#a1a1aa]">
-              {t('table.help')}
-            </p>
-
-            <div className="grid grid-cols-3 gap-2.5 max-h-60 overflow-y-auto pr-1">
-              {tableOptions.map(({ value, label }) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => {
-                    setSelectedTable(value);
-                    try {
-                      sessionStorage.setItem('gastropulse_active_table', value);
-                      localStorage.setItem('gastropulse_active_table', value);
-                    } catch (error) {
-                      console.warn('Could not save selected table:', error);
-                    }
-                    setIsTableModalOpen(false);
-                    onShowToast(t('toast.tableSet', { table: label }), 'check_circle');
-                  }}
-                  className={`py-2.5 px-2 min-h-[44px] rounded-xl text-[12px] font-mono-code font-bold transition-colors border text-center cursor-pointer ${
-                    selectedTable === value
-                      ? 'bg-primary text-on-primary border-primary shadow-lg shadow-primary/30'
-                      : 'bg-[#f1f5f9] text-[#0f172a] border-[#cbd5e1] hover:border-primary/60 dark:bg-[#1e1f28] dark:text-white dark:border-[#2e2f3a] dark:hover:border-primary/40'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-
-            <div className="pt-2">
-              <button
-                type="button"
-                onClick={() => setIsTableModalOpen(false)}
-                className="w-full py-2.5 min-h-[44px] rounded-xl bg-[#f1f5f9] hover:bg-[#e2e8f0] text-[#0f172a] dark:bg-[#24252e] dark:hover:bg-[#2e2f3a] dark:text-white text-[13px] font-medium cursor-pointer"
-              >
-                {t('table.confirm')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ========================================================================= */}
       {/* 🛍️ CART DRAWER / REVIEW MODAL */}
