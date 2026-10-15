@@ -115,7 +115,7 @@ function localizeGeofenceMessage(
 }
 
 // =============================================================================
-// 🎯 CD-16 · CONFIGURACIÓN DE LA OFERTA FLASH (POP-UP PROMOCIONAL DEL COMENSAL)
+//  CD-16 · CONFIGURACIÓN DE LA OFERTA FLASH (POP-UP PROMOCIONAL DEL COMENSAL)
 // =============================================================================
 /** Porcentaje de descuento aplicado a los platos promocionados. */
 const PROMO_DEAL_DISCOUNT = 15;
@@ -294,7 +294,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   const [lastOrder, setLastOrder] = useState<LastOrderRecord | null>(null);
   const [showWelcomeBack, setShowWelcomeBack] = useState(false);
 
-  // 🛡️ CD-19 · Estado de Validación de Geocerca GPS Antifraude
+  // ️ CD-19 · Estado de Validación de Geocerca GPS Antifraude
   const [geofenceModalState, setGeofenceModalState] = useState<{
     isOpen: boolean;
     distance: number;
@@ -946,7 +946,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   };
 
   // ==========================================================================
-  // 🎯 CD-16 · OFERTA FLASH: platos reales + estado del pop-up promocional
+  //  CD-16 · OFERTA FLASH: platos reales + estado del pop-up promocional
   // ==========================================================================
   const [activeStoredOffers, setActiveStoredOffers] = useState<any[]>(INITIAL_ACTIVE_PROMO_OFFERS);
 
@@ -1135,7 +1135,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     // CD-12 · Inicializar contexto de audio para campana KDS
     kitchenAudio.prepareForPlayback();
 
-    // 🛡️ CD-19 · Validación Antifraude por GPS y Geocerca
+    // ️ CD-19 · Validación Antifraude por GPS y Geocerca
     setIsVerifyingGeofence(true);
     try {
       const geoCheck = await validateDinerGeofence();
@@ -1249,7 +1249,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     setIsWaiterCallModalOpen(false);
     setWaiterCalled(true);
     if (onCallWaiter) {
-      // 🔴 FIX CD-28 · AQUÍ ESTABA EL BUG: se llamaba `onCallWaiter(reason)` SIN la mesa,
+      //  FIX CD-28 · AQUÍ ESTABA EL BUG: se llamaba `onCallWaiter(reason)` SIN la mesa,
       // así que RestaurantContext caía en su fallback estático `'MESA 04'` e ignoraba la
       // mesa elegida por el comensal. Ahora se envía la MISMA variable (`selectedTable`)
       // que usa `handleSendOrder` para crear la comanda.
@@ -1300,33 +1300,10 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
 
   const heroItem: LocalizedMenuItem = localizeMenuItem(menuItems[0], language);
 
-  /**
-   * CD-31 · Opciones del selector de mesa. El VALOR se mantiene canónico ("MESA 04")
-   * para casar con pedidos/KDS, pero el RÓTULO visible se localiza ("Mesa 04" en ES,
-   * "Table 04" en EN) y sin prefijos duplicados ("MESA Mesa 01" → "Table 01").
-   */
-  const tableOptions = React.useMemo(() => {
-    const rawValues =
-      tables && tables.length > 0
-        ? tables.map((table) => {
-            const digits = table.number.toString().replace(/\D/g, '');
-            return digits ? `MESA ${digits.padStart(2, '0')}` : table.number.toString();
-          })
-        : [
-            'MESA 01', 'MESA 02', 'MESA 03', 'MESA 04',
-            'MESA 05', 'MESA 06', 'MESA 07', 'MESA 08',
-            'MESA 09', 'MESA 10', 'MESA 11', 'MESA 12'
-          ];
-    return Array.from(new Set(rawValues)).map((value) => ({
-      value,
-      label: localizeTableLabel(value, language)
-    }));
-  }, [tables, language]);
-
   return (
     <div className="w-full min-h-screen bg-[#f4f5f7] text-[#0f172a] dark:bg-[#0b0c0e] dark:text-[#e5e1e4] pb-44 sm:pb-36 selection:bg-primary selection:text-white transition-colors duration-300">
       {/* ========================================================================= */}
-      {/* 📱 ULTRA-CLEAN MOBILE-FIRST TOP APP BAR */}
+      {/*  ULTRA-CLEAN MOBILE-FIRST TOP APP BAR */}
       {/* ========================================================================= */}
       <header className="sticky top-0 z-40 bg-white/95 dark:bg-[#0e0e10]/95 backdrop-blur-xl border-b border-[#e2e8f0] dark:border-[#24252c] px-3.5 sm:px-6 py-2.5 transition-colors duration-300">
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-2">
@@ -1495,7 +1472,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       )}
 
       {/* ========================================================================= */}
-      {/* ✨ RE-ORDER / WELCOME BACK VIP BANNER */}
+      {/*  RE-ORDER / WELCOME BACK VIP BANNER */}
       {/* ========================================================================= */}
       {showWelcomeBack && lastOrder && !activeTableTicket && (
         <div className="max-w-4xl mx-auto px-3.5 sm:px-6 pt-3.5 animate-fadeIn">
@@ -1564,7 +1541,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       {/* Main Container */}
       <main className="max-w-4xl mx-auto px-3.5 sm:px-6 py-4 space-y-5">
         {/* ========================================================================= */}
-        {/* 🔍 SEARCH & CATEGORIES */}
+        {/*  SEARCH & CATEGORIES */}
         {/* ========================================================================= */}
         <div className="space-y-2.5">
           <div className="relative">
@@ -1656,7 +1633,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
         />
 
         {/* ========================================================================= */}
-        {/* ⭐ HERO FEATURED DISH (DUAL VIEW: 📸 FOTO HD / 🧊 3D 360°) */}
+        {/*  HERO FEATURED DISH (DUAL VIEW:  FOTO HD /  3D 360°) */}
         {/* ========================================================================= */}
         <section className="bg-white dark:bg-[#15161c] rounded-2xl overflow-hidden border border-primary/35 shadow-[0_4px_30px] shadow-primary/15 transition-colors duration-300">
           <div className="relative">
@@ -1798,7 +1775,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
         </section>
 
         {/* ========================================================================= */}
-        {/* 📖 SPECIALTY DISHES GRID */}
+        {/*  SPECIALTY DISHES GRID */}
         {/* ========================================================================= */}
         <section className="space-y-3.5 pt-1">
           <div className="rounded-2xl border border-[#e2e8f0] bg-white/80 px-3.5 py-3 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-white/[0.045]">
@@ -1950,7 +1927,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
         />
 
         {/* ========================================================================= */}
-        {/* 🏛️ RESTAURANT FOOTER & LEGAL BAR (INDECOPI) */}
+        {/* ️ RESTAURANT FOOTER & LEGAL BAR (INDECOPI) */}
         {/* ========================================================================= */}
         <footer className="pt-10 pb-28 sm:pb-12 border-t border-[#e2e8f0] dark:border-[#24252e] space-y-4 text-center">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-[12px] text-[#64748b] dark:text-[#94a3b8]">
@@ -1979,7 +1956,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       </main>
 
       {/* ========================================================================= */}
-      {/* 🛒 PERSISTENT FLOATING BOTTOM ORDER BAR */}
+      {/*  PERSISTENT FLOATING BOTTOM ORDER BAR */}
       {/* ========================================================================= */}
       {cart.length > 0 && (
         <div className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] sm:bottom-3 left-3 right-3 max-w-md mx-auto z-40">
@@ -2025,12 +2002,12 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       )}
 
       {/* ========================================================================= */}
-      {/* 🪑 TABLE SELECTOR MODAL */}
+      {/*  TABLE SELECTOR MODAL */}
       {/* ========================================================================= */}
 
 
       {/* ========================================================================= */}
-      {/* 🛍️ CART DRAWER / REVIEW MODAL */}
+      {/* ️ CART DRAWER / REVIEW MODAL */}
       {/* ========================================================================= */}
       {isCartOpen && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
@@ -2155,7 +2132,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       )}
 
       {/* ========================================================================= */}
-      {/* 🧊 SPECIFIC DISH 3D INSPECTOR MODAL */}
+      {/*  SPECIFIC DISH 3D INSPECTOR MODAL */}
       {/* ========================================================================= */}
       {selectedDishForModal && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
@@ -2226,7 +2203,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       )}
 
       {/* ========================================================================= */}
-      {/* 🚀 REAL CAMERA AUGMENTED REALITY (AR) VISOR OVERLAY */}
+      {/*  REAL CAMERA AUGMENTED REALITY (AR) VISOR OVERLAY */}
       {/* ========================================================================= */}
       {isArModalOpen && (
         <div className="fixed inset-0 z-50 bg-black flex flex-col justify-between animate-fadeIn overflow-hidden">
@@ -2378,7 +2355,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
         </div>
       )}
       {/* ========================================================================= */}
-      {/* 📱 CD-13 · BARRA DE NAVEGACIÓN INFERIOR MÓVIL (touch targets de 44px)      */}
+      {/*  CD-13 · BARRA DE NAVEGACIÓN INFERIOR MÓVIL (touch targets de 44px)      */}
       {/* ========================================================================= */}
       <MenuBottomNav
         cartItemsCount={cartItemsCount}
@@ -2391,7 +2368,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       />
 
       {/* ========================================================================= */}
-      {/* 💳 CD-10 · MODAL PASARELA DE PAGO DIGITAL QR Y RESEÑAS POST-PAGO          */}
+      {/*  CD-10 · MODAL PASARELA DE PAGO DIGITAL QR Y RESEÑAS POST-PAGO          */}
       {/* ========================================================================= */}
       {(() => {
         const cleanTblNum = selectedTable.replace(/\D/g, '');
@@ -2442,7 +2419,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
         );
       })()}
 
-      {/* 📖 LIBRO DE RECLAMACIONES VIRTUAL (INDECOPI) */}
+      {/*  LIBRO DE RECLAMACIONES VIRTUAL (INDECOPI) */}
       <ComplaintBookModal
         isOpen={isComplaintModalOpen}
         onClose={() => setIsComplaintModalOpen(false)}
@@ -2458,7 +2435,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       />
 
       {/* ========================================================================= */}
-      {/* 🔔 CD-28 · BOTTOM SHEET "ASISTENCIA EN MESA" (MOTIVOS DEL LLAMADO)         */}
+      {/*  CD-28 · BOTTOM SHEET "ASISTENCIA EN MESA" (MOTIVOS DEL LLAMADO)         */}
       {/* ========================================================================= */}
       <WaiterCallModal
         isOpen={isWaiterCallModalOpen}
@@ -2482,7 +2459,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
         onApply={handleApplyPromoDeal}
       />
 
-      {/* 🛡️ CD-19 · MODAL DE ADVERTENCIA DE GEOCERCA GPS ANTIFRAUDE */}
+      {/* ️ CD-19 · MODAL DE ADVERTENCIA DE GEOCERCA GPS ANTIFRAUDE */}
       <GeofenceWarningModal
         isOpen={geofenceModalState.isOpen}
         distanceMeters={geofenceModalState.distance}
