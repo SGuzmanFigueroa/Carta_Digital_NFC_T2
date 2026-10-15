@@ -242,6 +242,8 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   const [waiterCalled, setWaiterCalled] = useState(false);
   // CD-28 · Controla el Bottom Sheet de motivos de asistencia en mesa.
   const [isWaiterCallModalOpen, setIsWaiterCallModalOpen] = useState(false);
+  // CD-36 · Despliegue individual del campo de nota de cocina por plato
+  const [activeNoteItemId, setActiveNoteItemId] = useState<Record<string, boolean>>({});
   const observedOrderStatus = useRef<{ id: string; status: OrderTicket['status'] } | null>(null);
   /** CD-31 · Idioma de la carta (ES/EN) con persistencia en localStorage. */
   const { language, t } = useLanguage();
@@ -2066,13 +2068,51 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                     </div>
                   </div>
 
-                  <input
-                    type="text"
-                    placeholder={t('cart.notePlaceholder')}
-                    value={c.notes || ''}
-                    onChange={(e) => handleUpdateNotes(c.item.id, e.target.value)}
-                    className="w-full bg-white dark:bg-[#15161c] text-[#0f172a] dark:text-[#e5e1e4] px-2.5 py-2 min-h-[44px] rounded-lg text-[11px] placeholder:text-[#94a3b8] dark:placeholder:text-[#71717a] border border-[#e2e8f0] dark:border-[#2d2e38] focus:outline-none focus:border-primary"
-                  />
+                  {Boolean(activeNoteItemId[c.item.id] || (c.notes && c.notes.trim().length > 0)) ? (
+                    <div className="relative flex items-center">
+                      <input
+                        type="text"
+                        maxLength={60}
+                        placeholder={t('cart.notePlaceholder')}
+                        value={c.notes || ''}
+                        onChange={(e) => handleUpdateNotes(c.item.id, e.target.value)}
+                        className="w-full bg-white dark:bg-[#15161c] text-[#0f172a] dark:text-[#e5e1e4] pl-2.5 pr-8 py-2 min-h-[44px] rounded-lg text-[11px] placeholder:text-[#94a3b8] dark:placeholder:text-[#71717a] border border-[#e2e8f0] dark:border-[#2d2e38] focus:outline-none focus:border-primary"
+                        autoFocus={Boolean(activeNoteItemId[c.item.id] && !c.notes)}
+                      />
+                      {(!c.notes || c.notes.length === 0) ? (
+                        <button
+                          type="button"
+                          onClick={() => setActiveNoteItemId((prev) => ({ ...prev, [c.item.id]: false }))}
+                          aria-label={t('cart.closeNote')}
+                          className="absolute right-2 text-[#94a3b8] hover:text-[#475569] dark:hover:text-white p-1 cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-[16px]">close</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleUpdateNotes(c.item.id, '');
+                            setActiveNoteItemId((prev) => ({ ...prev, [c.item.id]: false }));
+                          }}
+                          title={t('cart.removeNote')}
+                          aria-label={t('cart.removeNote')}
+                          className="absolute right-2 text-[#94a3b8] hover:text-rose-500 p-1 cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-[16px]">delete</span>
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setActiveNoteItemId((prev) => ({ ...prev, [c.item.id]: true }))}
+                      className="w-full flex items-center justify-start gap-1.5 px-2.5 py-1.5 text-[11px] font-medium text-[#64748b] dark:text-[#94a3b8] hover:text-primary dark:hover:text-primary hover:bg-[#f1f5f9] dark:hover:bg-[#181920] rounded-lg border border-dashed border-[#cbd5e1] dark:border-[#2a2b36] transition-colors cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-[15px]">edit_note</span>
+                      <span>{t('cart.addNote')}</span>
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
