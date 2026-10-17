@@ -4,6 +4,10 @@ import { Geist, Geist_Mono, Space_Mono } from "next/font/google";
 import "./globals.css";
 import { RestaurantProvider } from "@/context/RestaurantContext";
 
+// Versión del service worker = commit del deploy (Netlify: COMMIT_REF). Cambia en
+// cada deploy y así el SW renueva la caché de modelos 3D e imágenes.
+const SW_VERSION = encodeURIComponent((process.env.COMMIT_REF || process.env.GITHUB_SHA || "dev").slice(0, 12));
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -128,7 +132,7 @@ export default function RootLayout({
             __html: `(function(){
               if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
                 window.addEventListener('load', function() {
-                  navigator.serviceWorker.register('/sw.js').then(function(reg) {
+                  navigator.serviceWorker.register('/sw.js?v=${SW_VERSION}').then(function(reg) {
                     console.log('ServiceWorker registered:', reg.scope);
                   }).catch(function(err) {
                     console.warn('ServiceWorker registration failed:', err);
