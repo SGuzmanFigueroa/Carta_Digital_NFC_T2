@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { setAuthSessionCookie, AuditLogger, sanitizeText } from '../utils/security';
 import { kitchenAudio } from '../utils/audio';
 import { AuthUser, StaffMember } from '../types';
-import { getPersistedStaffList, sendPasswordResetEmail, loginStaffWithCredentials, loginStaffWithPin } from '../services/authService';
+import { getPersistedStaffList, sendPasswordResetEmail, loginStaffWithCredentials, loginStaffWithPin, getSafeLoginRedirect } from '../services/authService';
 import { INITIAL_STAFF } from '../data/mockData';
 
 interface LoginScreenProps {
@@ -102,14 +102,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
   const executeRoleRedirection = (user: AuthUser) => {
     const role = `${user.role} ${user.roleTitle}`.toLowerCase();
-    const destination = redirectTo || (
+    const destination = redirectTo !== undefined ? getSafeLoginRedirect(redirectTo) : (
       role.includes('admin') ? '/dashboard' :
       role.includes('kitchen') || role.includes('chef') || role.includes('cocina') ? '/kds' :
       role.includes('floor') || role.includes('waiter') || role.includes('mozo') || role.includes('mesero') || role.includes('sala') ? '/pedidos' :
       '/dashboard'
     );
 
-    router.replace(destination);
+    router.replace(getSafeLoginRedirect(destination));
   };
 
   const handleCredentialsLogin = async (e: React.FormEvent) => {

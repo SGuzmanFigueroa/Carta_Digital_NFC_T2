@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { LoginScreen } from '@/components/LoginScreen';
 import { INITIAL_STAFF } from '@/data/mockData';
 import { AuthUser, StaffMember } from '@/types';
-import { getPersistedStaffList } from '@/services/authService';
+import { getPersistedStaffList, getSafeLoginRedirect } from '@/services/authService';
 
 function LoginContent() {
   const router = useRouter();
@@ -40,9 +40,7 @@ function LoginContent() {
   };
 
   const redirectParam = searchParams.get('redirect');
-  const redirectTo = redirectParam?.startsWith('/') && !redirectParam.startsWith('//')
-    ? redirectParam
-    : undefined;
+  const redirectTo = redirectParam === null ? undefined : getSafeLoginRedirect(redirectParam);
 
   const handleExploreAsGuest = () => {
     router.push('/menu');

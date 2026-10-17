@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { AuthUser, StaffMember, RolePermissionItem, StaffAuditLogItem, PermissionState } from '@/types';
+export { getSafeLoginRedirect } from '@/utils/loginRedirect';
 
 export async function loginStaffWithPin(pin: string): Promise<AuthUser | null> {
   try {
