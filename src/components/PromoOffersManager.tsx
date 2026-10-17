@@ -5,6 +5,8 @@ import type { ActivePromoOffer, MenuItem, PromoMechanic, PromoOfferDraft } from 
 import { INITIAL_MENU_ITEMS } from '@/data/mockData';
 import { createPromoOffer, fetchPromoOffers, rowToPromoOffer, setPromoOfferActive } from '@/services/promoService';
 import { formatSoles } from '@/utils/promo';
+import { buildSafePromoPreview } from '@/utils/promoPreview';
+import { LanguageProvider } from '@/hooks/useLanguage';
 import {
   PROMO_DISCOUNT_TYPES,
   PROMO_MECHANICS,
@@ -12,14 +14,12 @@ import {
   PROMO_PRIORITY_OPTIONS,
   PROMO_WEEKDAYS,
   buildActiveOffer,
-  buildPreviewDish,
   buildSuggestedFlashWindow,
   calculateDraftOfferTotals,
   createInitialOfferForm,
   describeWeekdays,
   getPromoMechanic,
   isOfferDraftValid,
-  resolveDraftSubtitleCopy,
   toggleWeekday
 } from '@/utils/promoOffers';
 import { PromoDealModal } from './menu/PromoDealModal';
@@ -56,11 +56,11 @@ export function PromoOffersManager({
   sectionHeaderBorder,
   onShowToast
 }: PromoOffersManagerProps) {
-  // 📦 Estado centralizado del formulario (listo para persistir en Supabase).
+  //  Estado centralizado del formulario (listo para persistir en Supabase).
   const [offerForm, setOfferForm] = useState<PromoOfferDraft>(createInitialOfferForm);
-  // 📱 Modal de vista previa con el pop-up real del comensal.
+  //  Modal de vista previa con el pop-up real del comensal.
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  // 🗂️ Ofertas en curso (public.promo_offers). La carta del comensal y el
+  //  Ofertas en curso (public.promo_offers). La carta del comensal y el
   // servidor de pedidos leen la misma tabla, así el descuento se respeta al cobrar.
   const [offerRows, setOfferRows] = useState<Awaited<ReturnType<typeof fetchPromoOffers>>>([]);
   const [isSavingOffer, setIsSavingOffer] = useState(false);
@@ -104,7 +104,7 @@ export function PromoOffersManager({
   const labelColor = isLight ? 'text-[#475569]' : 'text-gray-500';
   const mutedSurface = isLight ? 'bg-[#f1f5f9] border-[#cbd5e1] text-[#475569]' : 'bg-[#1A1A1A] border-[#333] text-gray-300';
 
-  // 🍽️ Carta disponible: datos reales de Supabase o catálogo demo offline.
+  //  Carta disponible: datos reales de Supabase o catálogo demo offline.
   const dishOptions = useMemo(() => (dishes.length > 0 ? dishes : INITIAL_MENU_ITEMS), [dishes]);
   const activeOffers = useMemo<ActivePromoOffer[]>(
     () => offerRows.map((row) => rowToPromoOffer(row, dishOptions)),
@@ -123,7 +123,7 @@ export function PromoOffersManager({
   const mechanic = getPromoMechanic(offerForm.mechanic);
   const liveOffersCount = activeOffers.filter((offer) => offer.isActive).length;
 
-  // 🧮 Motor único de la matemática promocional: se recalcula automáticamente al
+  //  Motor único de la matemática promocional: se recalcula automáticamente al
   // cambiar de mecánica, los platos o el valor del descuento, y es la fuente de
   // verdad tanto del texto de ayuda como del pop-up de vista previa móvil.
   const offerTotals = useMemo(
@@ -131,33 +131,10 @@ export function PromoOffersManager({
     [offerForm, mainDish, complementDish]
   );
 
-  // 🔎 Datos derivados que alimentan el pop-up de vista previa.
-  const previewDish = useMemo(
-    () => buildPreviewDish(offerForm, mainDish, complementDish),
+  // La previa usa el mismo motor; un borrador incompleto muestra solo un ejemplo.
+  const preview = useMemo(
+    () => buildSafePromoPreview(offerForm, mainDish, complementDish),
     [offerForm, mainDish, complementDish]
-  );
-  // El precio de lista del plato de vista previa es el ORIGINAL TOTAL del pack
-  // (2x1 = 2 unidades · Combo y 2da unidad = ambos platos): así el tachado y el
-  // ahorro que ve el comensal son reales.
-  const previewDeals = useMemo(
-    () => [{ ...previewDish, price: offerTotals.precioOriginalTotal }],
-    [previewDish, offerTotals.precioOriginalTotal]
-  );
-  // Montos exactos del motor: el pop-up los respeta tal cual (no los re-deriva).
-  const previewPricing = useMemo(
-    () => ({
-      originalPrice: offerTotals.precioOriginalTotal,
-      promoPrice: offerTotals.precioFinalTotal,
-      savings: offerTotals.ahorroTotal,
-      discountPercent: Math.round(offerTotals.effectiveDiscountPercent)
-    }),
-    [offerTotals]
-  );
-  // 📣 Copy del pop-up por MECÁNICA: la 2da unidad habla de la segunda unidad, el
-  // combo nombra ambos platos y el 2x1 no menciona porcentajes.
-  const previewSubtitleCopy = useMemo(
-    () => resolveDraftSubtitleCopy(offerForm, mainDish, complementDish, offerTotals.declaredDiscountPercent),
-    [offerForm, mainDish, complementDish, offerTotals.declaredDiscountPercent]
   );
 
   /** Actualización genérica y tipada del borrador (mantiene valores entre pestañas). */
@@ -177,14 +154,10 @@ export function PromoOffersManager({
   };
 
   // ==========================================================================
-  // 🎬 ACCIONES DEL FORMULARIO Y DE LAS TARJETAS
+  //  ACCIONES DEL FORMULARIO Y DE LAS TARJETAS
   // ==========================================================================
 
   const handleOpenPreview = () => {
-    if (!mainDish) {
-      onShowToast('Selecciona el plato principal de la oferta para generar la vista previa', 'warning');
-      return;
-    }
     setIsPreviewOpen(true);
   };
 
@@ -277,7 +250,7 @@ export function PromoOffersManager({
   };
 
   // ==========================================================================
-  // 🧩 RENDERIZADO CONDICIONAL (campos que aparecen según la pestaña activa)
+  //  RENDERIZADO CONDICIONAL (campos que aparecen según la pestaña activa)
   // ==========================================================================
 
   /** Pestañas superiores: Descuento %/$ · 2x1 · 2da Unidad · Combo. */
@@ -894,7 +867,7 @@ export function PromoOffersManager({
       >
         <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[10000] flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/75 backdrop-blur-md border border-white/15 text-white text-[11px] font-semibold shadow-xl whitespace-nowrap">
           <span className="material-symbols-outlined text-[16px] text-[#FF5A1F]">smartphone</span>
-          <span>Vista previa móvil · así verá el comensal la oferta</span>
+          <span>{preview.isExample ? 'Plantilla de ejemplo · No se publica' : 'Vista previa móvil · así verá el comensal la oferta'}</span>
           <button
             type="button"
             onClick={handleClosePreview}
@@ -905,17 +878,19 @@ export function PromoOffersManager({
           </button>
         </div>
 
+        <LanguageProvider>
         <PromoDealModal
           isOpen={isPreviewOpen}
           onClose={handleClosePreview}
-          deals={previewDeals}
-          discountPercent={previewPricing.discountPercent}
-          pricingOverride={previewPricing}
-          promoCopy={previewSubtitleCopy}
-          complementDishImage={mechanic.requiresComplement ? complementDish?.image ?? null : null}
+          deals={preview.deals}
+          discountPercent={preview.pricing.discountPercent}
+          pricingOverride={preview.pricing}
+          promoCopy={preview.copy}
+          complementDishImage={preview.complementImage}
           countdownSeconds={PROMO_PREVIEW_COUNTDOWN_SECONDS}
           onApply={handleApplyFromPreview}
         />
+        </LanguageProvider>
       </div>
     );
   };
