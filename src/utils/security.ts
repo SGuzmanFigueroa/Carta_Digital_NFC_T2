@@ -264,7 +264,7 @@ function emitAuthSessionChange(user: AuthUser | null): void {
 
 /**
  * Fuente única de verdad para restaurar la sesión activa del terminal:
- * 1. Cookie de sesión: refleja el último inicio de sesión (la valida el middleware de
+ * 1. Cookie de sesión: refleja el último inicio de sesión (la valida el proxy de
  *    rutas protegidas) y descarta cualquier recuerdo obsoleto de otro usuario.
  * 2. Sesión recordada en localStorage (opción "Recordarme"), siempre que pertenezca al
  *    mismo usuario que la cookie o que la cookie ya no exista.
@@ -304,7 +304,7 @@ export function setAuthSessionCookie(user: AuthUser): void {
   const session = buildAuthUser(user);
   if (!session) return;
 
-  // El rol se canonicaliza antes de persistirse: el middleware de rutas y la interfaz
+  // El rol se canonicaliza antes de persistirse: el proxy de rutas y la interfaz
   // comparan siempre el mismo valor normalizado ("Admin" => "admin").
   const payload = encodeURIComponent(
     JSON.stringify({

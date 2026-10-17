@@ -3,10 +3,10 @@ import type { NextRequest } from 'next/server';
 
 const AUTH_COOKIE_NAME = 'gastropulse_session';
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Static files and internal Next.js requests bypass middleware
+  // Static files and internal Next.js requests bypass the proxy
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api') ||

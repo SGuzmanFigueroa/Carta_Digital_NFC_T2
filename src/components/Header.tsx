@@ -122,7 +122,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   // Rol y permisos de la sesión activa. `currentUser` proviene del contexto global, que
   // mantiene la sesión sincronizada con localStorage y con la cookie validada por el
-  // middleware, así que este bloque se recalcula en vivo en cada login / logout.
+  // proxy, así que este bloque se recalcula en vivo en cada login / logout.
   const sessionRole = normalizeRole(currentUser?.role);
   const sessionRoleLabel =
     roleNameMap[sessionRole] ||

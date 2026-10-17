@@ -656,7 +656,7 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
       if (savedDiner) setDinerActiveTicket(JSON.parse(savedDiner));
 
       // Restaura la sesión activa desde localStorage (rememberMe habilitado) o, en su
-      // defecto, desde la cookie de sesión que ya validó el middleware de rutas.
+      // defecto, desde la cookie de sesión que ya validó el proxy de rutas.
       setCurrentUser(readAuthSession());
     } catch (err) {
       console.warn('Error loading GastroPulse state from storage:', err);
