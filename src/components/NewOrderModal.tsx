@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CATALOG_DISHES } from '../data/initialData';
+import { CATALOG_DISHES } from '../data/mockData';
 import { StationId, Ticket, TicketItem } from '../types';
 import { fetchDishesFromDb } from '@/services/menuService';
 import { fetchTablesFromDb } from '@/services/tableService';

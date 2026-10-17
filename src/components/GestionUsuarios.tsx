@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { INITIAL_STAFF } from '../data/initialData';
+import { INITIAL_STAFF } from '../data/mockData';
 import { StaffMember } from '../types';
 import { RolePermissionsMatrix } from './RolePermissionsMatrix';
 import {

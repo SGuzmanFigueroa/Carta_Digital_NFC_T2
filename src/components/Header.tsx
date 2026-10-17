@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { ScreenTab } from '../types';
 import { useRestaurant } from '../context/RestaurantContext';
-import { getTranslations } from '../utils/i18n';
+import { getTranslations } from '../i18n/adminTranslations';
 import { fetchSystemConfigFromDb } from '@/services/configService';
 import { isAdminRole, normalizeRole } from '../utils/security';
 import { DishImage } from './menu/DishImage';

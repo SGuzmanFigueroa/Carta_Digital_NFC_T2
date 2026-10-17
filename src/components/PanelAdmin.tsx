@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { INITIAL_STATION_LOADS, CATALOG_DISHES } from '../data/initialData';
+import { INITIAL_STATION_LOADS, CATALOG_DISHES } from '../data/mockData';
 import { useRestaurant } from '../context/RestaurantContext';
 import { DishImage } from './menu/DishImage';
 

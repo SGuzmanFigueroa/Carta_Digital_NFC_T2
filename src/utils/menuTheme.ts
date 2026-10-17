@@ -1,3 +1,4 @@
+/** Tema claro/oscuro de la carta del comensal. El del panel del personal está en ./theme.ts. */
 export type MenuTheme = 'dark' | 'light';
 export const MENU_THEME_STORAGE_KEY = 'gastropulse_menu_theme';
 export const MENU_THEME_MEDIA_QUERY = '(prefers-color-scheme: dark)';

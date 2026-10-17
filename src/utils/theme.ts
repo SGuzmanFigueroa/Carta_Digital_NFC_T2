@@ -2,6 +2,7 @@
  * GastroPulse OS - Dynamic Theme & Ergonomics Controller
  * Controls live switching between Obsidian Dark, Claro Minimal, and Alto Contraste KDS,
  * plus 9 restaurant chromatic brand accents.
+ * Solo panel del personal; el claro/oscuro de la carta del comensal está en ./menuTheme.ts.
  */
 
 export interface AccentDefinition {

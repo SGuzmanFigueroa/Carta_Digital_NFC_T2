@@ -3,8 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import { Ticket, OrderTicket, OrderRound, OrderRoundItem, TableStatus, Runner, MenuItem, StationId, TicketItem, AuthUser, WaiterCall, PaymentClaim } from '../types';
-import { INITIAL_RUNNERS } from '../data/initialData';
-import { INITIAL_MENU_ITEMS } from '../data/mockData';
+import { INITIAL_MENU_ITEMS, INITIAL_RUNNERS } from '../data/mockData';
 import { kitchenAudio } from '../utils/audio';
 import { supabase } from '@/lib/supabase';
 import { fetchTablesFromDb, settleTableInDb, updateTableStateInDb } from '@/services/tableService';

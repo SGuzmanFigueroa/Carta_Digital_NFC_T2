@@ -1,5 +1,10 @@
-import { ActivePromoOffer, MenuItem, TableStatus, OrderTicket, StaffMember, SystemConfigState } from '../types';
-import { calculatePromoPricing } from '../utils/promo';
+import { MenuItem, TableStatus, SystemConfigState, Runner, StaffMember, StationLoad } from '../types';
+
+/**
+ * Datos de respaldo y de ejemplo (un solo archivo; antes estaban repartidos
+ * entre mockData e initialData, con INITIAL_STAFF duplicado). La app real lee
+ * todo de Supabase: esto solo se usa sin conexión o mientras carga.
+ */
 
 export const INITIAL_MENU_ITEMS: MenuItem[] = [
   {
@@ -324,243 +329,6 @@ export const INITIAL_TABLES: TableStatus[] = [
   }
 ];
 
-export const INITIAL_ORDERS: OrderTicket[] = [
-  {
-    id: 'cmd-0482',
-    table: 'MESA 04',
-    pax: 2,
-    timeAgo: 'Hace 2m',
-    createdTime: '20:42:15',
-    origin: 'QR COMENSAL',
-    status: 'por-validar',
-    items: [
-      { id: 'i-1', name: '1x Wagyu Ribeye A5 250g', quantity: 1, price: 115.00, notes: 'Término: 3/4 sellado', station: 'Parrilla' },
-      { id: 'i-2', name: '1x Tartar Nikkei Trufado', quantity: 1, price: 42.50, allergen: 'Alérgeno: Sésamo', station: 'Cuarto Frío' },
-      { id: 'i-3', name: '1x Copa Gran Malbec Reserva', quantity: 1, price: 21.00, notes: 'Bodega 01', station: 'Barra' }
-    ],
-    subtotal: 178.50,
-    total: 178.50
-  },
-  {
-    id: 'cmd-0480',
-    table: 'MESA 12',
-    pax: 4,
-    timeAgo: 'Hace 4m',
-    createdTime: '20:39:10',
-    origin: 'GARZÓN',
-    waiter: 'Carlos Durand',
-    status: 'por-validar',
-    items: [
-      { id: 'i-4', name: '2x Cóctel Ahumado Roble', quantity: 2, price: 72.00, station: 'Mixología' },
-      { id: 'i-5', name: '1x Pulpo Anticuchero al Carbón', quantity: 1, price: 54.00, station: 'Parrilla' }
-    ],
-    subtotal: 126.00,
-    total: 126.00
-  },
-  {
-    id: 'tk-108',
-    table: '#TK-108',
-    pax: 1,
-    timeAgo: 'Hace 1m',
-    createdTime: '20:44:00',
-    origin: 'DELIVERY APP',
-    status: 'por-validar',
-    items: [
-      { id: 'i-6', name: '2x Smash Burger Dry-Aged C/ Papas Trufa', quantity: 2, price: 84.00, notes: 'Empaque térmico reforzado', station: 'Parrilla' }
-    ],
-    subtotal: 84.00,
-    total: 84.00
-  },
-  {
-    id: 'cmd-0475',
-    table: 'MESA 02',
-    pax: 2,
-    timeAgo: '18:45 min',
-    createdTime: '20:25:00',
-    origin: 'GARZÓN',
-    waiter: 'Lucía Mendoza',
-    status: 'en-cocina',
-    isCritical: true,
-    preparationPercent: 85,
-    stationTarget: 'PARRILLA & SAUTÉ',
-    items: [
-      { id: 'i-7', name: '1x Lomo Saltado Criollo Wagyu', quantity: 1, price: 68.00, station: 'Wok 01' },
-      { id: 'i-8', name: '1x Risotto Hongos Porcini Silvestres', quantity: 1, price: 62.00, station: 'Sauté 03' }
-    ],
-    subtotal: 130.00,
-    total: 130.00
-  },
-  {
-    id: 'cmd-0478',
-    table: 'MESA 07',
-    pax: 4,
-    timeAgo: '03:20 min',
-    createdTime: '20:40:12',
-    origin: 'GARZÓN',
-    waiter: 'Mateo Rivera',
-    status: 'en-cocina',
-    preparationPercent: 35,
-    stationTarget: 'BARRA PRINCIPAL',
-    items: [
-      { id: 'i-9', name: "2x Cócteles de Autor 'Pisco Infused'", quantity: 2, price: 78.00, station: 'Barra Mix' }
-    ],
-    subtotal: 78.00,
-    total: 78.00
-  },
-  {
-    id: 'cmd-0476',
-    table: 'MESA 09',
-    pax: 2,
-    timeAgo: '05:10 min',
-    createdTime: '20:38:00',
-    origin: 'GARZÓN',
-    waiter: 'Carlos Durand',
-    status: 'en-cocina',
-    preparationPercent: 50,
-    stationTarget: 'SALÓN CENTRAL',
-    items: [
-      { id: 'i-10', name: '2x Arroz Chaufa Especial Wok Imperial', quantity: 2, price: 116.00, station: 'Wok Station' }
-    ],
-    subtotal: 116.00,
-    total: 116.00
-  },
-  {
-    id: 'cmd-0470',
-    table: 'MESA 01',
-    pax: 4,
-    timeAgo: 'Listo 2m',
-    createdTime: '20:20:00',
-    origin: 'GARZÓN',
-    waiter: 'Marcos R.',
-    status: 'pase-listo',
-    runnerAssigned: 'Andrea Solís',
-    items: [
-      { id: 'i-11', name: '2x Wagyu A5 Filet Mignon', quantity: 2, price: 230.00, station: 'Campana 01' },
-      { id: 'i-12', name: '1x Esfera Chocolate 70% Cacao', quantity: 1, price: 42.00, station: 'Postres' }
-    ],
-    subtotal: 272.00,
-    total: 272.00
-  },
-  {
-    id: 'cmd-0472',
-    table: 'MESA 05',
-    pax: 4,
-    timeAgo: 'En espera',
-    createdTime: '20:30:00',
-    origin: 'QR COMENSAL',
-    status: 'pase-listo',
-    accountRequested: true,
-    paymentMethod: 'POS Móvil Visa',
-    items: [
-      { id: 'i-13', name: '2x Tartar Nikkei', quantity: 2, price: 85.00 },
-      { id: 'i-14', name: '1x Pisco Sour Catedral', quantity: 1, price: 44.40 }
-    ],
-    subtotal: 129.40,
-    total: 129.40
-  }
-];
-
-export const INITIAL_STAFF: StaffMember[] = [
-  {
-    id: 'st-1',
-    name: 'Martín Valenzuela',
-    initials: 'M',
-    role: 'admin',
-    roleTitle: 'ADMIN GENERAL',
-    status: 'En Turno Activo',
-    assignment: 'Dirección Operativa & Caja Z',
-    permissions: 'Acceso Total, Corte de Caja Z, Edición de Carta',
-    lastAccess: 'Hoy 21:05',
-    pin: '9021',
-    isPinRevealed: false,
-    username: 'admin',
-    email: 'admin@aureabistro.pe',
-    password: 'admin123'
-  },
-  {
-    id: 'st-2',
-    name: 'Lucía Mendoza',
-    initials: 'L',
-    role: 'floor',
-    roleTitle: 'CAMARERO / SALA',
-    status: 'Conectado (Móvil)',
-    assignment: 'Salón Principal (Mesas 01-06)',
-    permissions: 'TPV Móvil, Facturación Simple',
-    lastAccess: 'Hoy 20:58',
-    ordersToday: 34,
-    pin: '1042',
-    isPinRevealed: false,
-    username: 'lucia.m',
-    email: 'salon@aureabistro.pe',
-    password: 'salon123'
-  },
-  {
-    id: 'st-3',
-    name: 'Carlos Durand',
-    initials: 'C',
-    role: 'floor',
-    roleTitle: 'CAMARERO / SALA',
-    status: 'Conectado (Móvil)',
-    assignment: 'Terraza Lounge (Mesas 07-12)',
-    permissions: 'TPV Móvil, Facturación Simple',
-    lastAccess: 'Hoy 20:50',
-    ordersToday: 28,
-    pin: '1045',
-    isPinRevealed: false,
-    username: 'carlos.d',
-    email: 'carlos@aureabistro.pe',
-    password: 'salon123'
-  },
-  {
-    id: 'st-4',
-    name: 'Kenji Takahashi',
-    initials: 'K',
-    role: 'kitchen',
-    roleTitle: 'JEFE DE COCINA / SOUS CHEF',
-    status: 'En Cocina KDS',
-    assignment: 'Estación Grill & Wok',
-    permissions: 'KDS Cocina, Marcar Listo, Pausar Platos (Stock Cero)',
-    lastAccess: 'Hoy 21:00',
-    pin: '2001',
-    isPinRevealed: false,
-    username: 'chef.kenji',
-    email: 'cocina@aureabistro.pe',
-    password: 'kds123'
-  },
-  {
-    id: 'st-5',
-    name: 'Mateo Rivera',
-    initials: 'M',
-    role: 'bar',
-    roleTitle: 'BARTENDER PRINCIPAL',
-    status: 'Activo',
-    assignment: 'Barra & Mixología',
-    permissions: 'KDS Barra, Control de Licores, Anulación Coctelería',
-    lastAccess: 'Hoy 20:45',
-    pin: '3010',
-    isPinRevealed: false,
-    username: 'mateo.bar',
-    email: 'bar@aureabistro.pe',
-    password: 'bar123'
-  },
-  {
-    id: 'st-6',
-    name: 'Andrea Solís',
-    initials: 'A',
-    role: 'runner',
-    roleTitle: 'RUNNER / ENTREGA',
-    status: 'Activo',
-    assignment: 'Pase & Despacho',
-    permissions: 'Notificación de Pase Listo, Confirmar Entrega en Mesa',
-    lastAccess: 'Hoy 20:55',
-    pin: '4002',
-    isPinRevealed: false,
-    username: 'andrea.runner',
-    email: 'runner@aureabistro.pe',
-    password: 'run123'
-  }
-];
-
 export const INITIAL_CONFIG: SystemConfigState = {
   branchName: 'AUREA Bistro - Miraflores',
   branchRuc: '20608941203',
@@ -585,94 +353,262 @@ export const INITIAL_CONFIG: SystemConfigState = {
   acousticBuzzer: true
 };
 
-// ==========================================
-// CD-17 · Ofertas Flash del panel de administración
-// ==========================================
-
-/**
- * Oferta demo del panel: el precio promocional y el ahorro se derivan del
- * precio real de carta (nunca se escribe un precio "a mano").
- */
-function seedPromoOffer(
-  offer: Omit<ActivePromoOffer, 'originalPrice' | 'promoPrice' | 'discountPercent'> & {
-    basePrice: number;
-    percent: number;
+export const INITIAL_RUNNERS: Runner[] = [
+  {
+    id: 'runner-1',
+    runnerNumber: 1,
+    name: 'Mateo C.',
+    status: 'Libre en Pase',
+    location: 'Libre en Pase',
+    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
+    ordersHandledToday: 24,
+    avgDeliveryMinutes: 1.6
+  },
+  {
+    id: 'runner-2',
+    runnerNumber: 2,
+    name: 'Valeria P.',
+    status: 'En Mesa',
+    currentTable: 'Mesa 07',
+    location: 'En Mesa 07',
+    avatarUrl: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=200&auto=format&fit=crop&q=80',
+    ordersHandledToday: 19,
+    avgDeliveryMinutes: 1.9
+  },
+  {
+    id: 'runner-3',
+    runnerNumber: 3,
+    name: 'Rodrigo S.',
+    status: 'Libre en Pase',
+    location: 'Libre en Pase',
+    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80',
+    ordersHandledToday: 21,
+    avgDeliveryMinutes: 1.8
+  },
+  {
+    id: 'runner-4',
+    runnerNumber: 4,
+    name: 'Andrea T.',
+    status: 'Libre en Pase',
+    location: 'Libre en Pase',
+    avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&auto=format&fit=crop&q=80',
+    ordersHandledToday: 15,
+    avgDeliveryMinutes: 2.1
   }
-): ActivePromoOffer {
-  const { basePrice, percent, ...rest } = offer;
-  const pricing = calculatePromoPricing(basePrice, percent);
-  return {
-    ...rest,
-    originalPrice: pricing.originalPrice,
-    promoPrice: pricing.promoPrice,
-    discountPercent: pricing.discountPercent
-  };
-}
+];
 
-/** Promociones en curso que alimentan la parrilla "Ofertas Activas Actualmente". */
-export const INITIAL_ACTIVE_PROMO_OFFERS: ActivePromoOffer[] = [
-  seedPromoOffer({
-    id: 'promo-wagyu-15',
-    mechanic: 'discount',
-    mainDishId: 'wagyu-a5',
-    complementaryDishId: '',
-    badge: '-15% OFF',
-    kicker: 'PLATO DEL CHEF',
-    timingLabel: 'Termina en 12:35 (Hoy)',
-    title: 'Wagyu Ribeye A5 Trufado',
-    subtitle: '280g corte japonés con escamas de sal marina',
-    image: '/images/pulpo-anticuchero.jpg',
-    note: 'Ahorro S/ 17.25',
-    isActive: true,
-    basePrice: 115,
-    percent: 15
-  }),
-  seedPromoOffer({
-    id: 'promo-tartar-2da',
-    mechanic: 'second_unit',
-    mainDishId: 'tartar-nikkei',
-    complementaryDishId: 'causa-limena',
-    badge: '2da -50%',
-    kicker: '2DA UNIDAD',
-    timingLabel: 'Termina en 08:45 (Hoy)',
-    title: 'Tartar & Ceviche Nikkei',
-    subtitle: 'Atún rojo, leche de tigre al ají amarillo y palta',
-    image: '/images/tartar-salmon.jpg',
-    note: '2da al 50%',
-    isActive: true,
-    basePrice: 38,
-    percent: 50
-  }),
-  seedPromoOffer({
-    id: 'promo-pisco-2x1',
-    mechanic: 'two_for_one',
-    mainDishId: 'smoked-old-fashioned',
-    complementaryDishId: '',
-    badge: '2x1 FLASH',
-    kicker: 'HAPPY HOUR BAR',
-    timingLabel: 'Hasta 21:00',
-    title: '2x1 Pisco Sour & Cócteles',
-    subtitle: 'Destilados premium de autor en barra principal',
-    image: '/images/smoked-old-fashioned.jpg',
-    note: 'Lleva 2 x 1',
-    isActive: true,
-    basePrice: 19,
-    percent: 50
-  }),
-  seedPromoOffer({
-    id: 'promo-volcan-pack',
-    mechanic: 'combo',
-    mainDishId: 'esfera-chocolate',
-    complementaryDishId: 'smoked-old-fashioned',
-    badge: 'MARIDAJE',
-    kicker: 'POSTRE + DIGESTIVO',
-    timingLabel: 'Turno Cena',
-    title: 'Volcán Belga + Maridaje',
-    subtitle: 'Volcán 70% cacao + Copa de Oporto o Amaro',
-    image: '/images/esfera-chocolate.jpg',
-    note: '-25% Pack',
-    isActive: true,
-    basePrice: 22,
-    percent: 25
-  })
+export const INITIAL_STATION_LOADS: StationLoad[] = [
+  {
+    id: 'fuego_grill',
+    name: 'P1 Fuego & Grill',
+    code: 'P1',
+    loadPercentage: 85,
+    activeOrders: 6,
+    avgPrepMinutes: 13.8,
+    color: '#ff5708'
+  },
+  {
+    id: 'frio_nikkei',
+    name: 'P2 Frío & Nikkei',
+    code: 'P2',
+    loadPercentage: 45,
+    activeOrders: 3,
+    avgPrepMinutes: 7.2,
+    color: '#0494fc'
+  },
+  {
+    id: 'wok_saute',
+    name: 'P3 Wok & Sauté',
+    code: 'P3',
+    loadPercentage: 30,
+    activeOrders: 2,
+    avgPrepMinutes: 6.5,
+    color: '#ffb59c'
+  },
+  {
+    id: 'pasteleria',
+    name: 'P4 Pastelería',
+    code: 'P4',
+    loadPercentage: 20,
+    activeOrders: 1,
+    avgPrepMinutes: 5.0,
+    color: '#e3e1ec'
+  },
+  {
+    id: 'barra_mixologia',
+    name: 'P5 Barra Mixología',
+    code: 'P5',
+    loadPercentage: 40,
+    activeOrders: 2,
+    avgPrepMinutes: 4.2,
+    color: '#a1c9ff'
+  }
+];
+
+export const INITIAL_STAFF: StaffMember[] = [
+  {
+    id: 'staff-1',
+    name: 'Alonso Echegaray',
+    role: 'Chef Ejecutivo',
+    station: 'Pase General / Expedición',
+    status: 'En servicio',
+    avatarUrl: 'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=200&auto=format&fit=crop&q=80',
+    phone: '+51 987 654 321',
+    shiftHours: '12:00 - 23:30',
+    specialty: 'Alta Cocina & Pase de Mesa'
+  },
+  {
+    id: 'staff-2',
+    name: 'Camila Morán',
+    role: 'Sous Chef / Jefe de Fuego',
+    station: 'P1 Fuego & Grill',
+    status: 'En servicio',
+    avatarUrl: 'https://images.unsplash.com/photo-1583394838336-acd977736f90?w=200&auto=format&fit=crop&q=80',
+    phone: '+51 984 123 456',
+    shiftHours: '11:00 - 20:00',
+    specialty: 'Carnes A5 & Brasa Josper'
+  },
+  {
+    id: 'staff-3',
+    name: 'Kenji Takahashi',
+    role: 'Itamae / Jefe Cuarto Frío',
+    station: 'P2 Frío & Nikkei',
+    status: 'En servicio',
+    avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&auto=format&fit=crop&q=80',
+    phone: '+51 991 789 012',
+    shiftHours: '12:30 - 22:00',
+    specialty: 'Cortes Sashimi & Marinados'
+  },
+  {
+    id: 'staff-4',
+    name: 'Bao Ming',
+    role: 'Wok Master',
+    station: 'P3 Wok & Sauté',
+    status: 'En servicio',
+    avatarUrl: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=200&auto=format&fit=crop&q=80',
+    phone: '+51 965 432 198',
+    shiftHours: '13:00 - 23:00',
+    specialty: 'Wok Hei & Salteados Cantonés'
+  },
+  {
+    id: 'staff-5',
+    name: 'Sofía Ramos',
+    role: 'Head Bartender',
+    station: 'P5 Barra Mixología',
+    status: 'En servicio',
+    avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&auto=format&fit=crop&q=80',
+    phone: '+51 978 901 234',
+    shiftHours: '14:00 - 01:00',
+    specialty: 'Coctelería Botánica & Destilados'
+  },
+  {
+    id: 'staff-6',
+    name: 'Lucía Benavides',
+    role: 'Chef Pastelera',
+    station: 'P4 Pastelería',
+    status: 'Descanso',
+    avatarUrl: 'https://images.unsplash.com/photo-1567532939604-b6b5b0db2604?w=200&auto=format&fit=crop&q=80',
+    phone: '+51 955 678 901',
+    shiftHours: '10:00 - 18:30',
+    specialty: 'Chocolatería Valrhona & Heladería'
+  }
+];
+
+export const CATALOG_DISHES = [
+  {
+    id: 'cat-1',
+    name: 'Wagyu Ribeye A5',
+    category: 'Fuego & Grill',
+    station: 'fuego_grill' as const,
+    stationBadge: 'GRILL',
+    price: 165.0,
+    photoUrl: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=800&auto=format&fit=crop&q=80',
+    prepTime: '14 min',
+    allergens: ['Lácteos'],
+    notes: 'Término Medio (54°C). Salsa trufada aparte en salsera precalentada.'
+  },
+  {
+    id: 'cat-2',
+    name: 'Risotto Hongos Porcini & Trufa',
+    category: 'Fuego & Grill',
+    station: 'fuego_grill' as const,
+    stationBadge: 'MONTAJE',
+    price: 80.0,
+    photoUrl: 'https://images.unsplash.com/photo-1633964913295-ceb43826e7c9?w=800&auto=format&fit=crop&q=80',
+    prepTime: '12 min',
+    allergens: ['Lácteos'],
+    notes: 'Emulsión mantequilla clarificada francesa y trufa negra rallada al pase.'
+  },
+  {
+    id: 'cat-3',
+    name: 'Tartar Nikkei de Atún Bluefin',
+    category: 'Cuarto Frío & Nikkei',
+    station: 'frio_nikkei' as const,
+    stationBadge: 'FRÍO',
+    price: 48.0,
+    photoUrl: 'https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?w=800&auto=format&fit=crop&q=80',
+    prepTime: '8 min',
+    allergens: ['Pescado', 'Sésamo', 'Soya'],
+    notes: 'Wonton crocante, palta fuerte, reducción de ponzu añejo.'
+  },
+  {
+    id: 'cat-4',
+    name: 'Pulpo a la Brasa al Carbón',
+    category: 'Fuego & Grill',
+    station: 'fuego_grill' as const,
+    stationBadge: 'GRILL',
+    price: 72.0,
+    photoUrl: 'https://images.unsplash.com/photo-1541544741938-0af808871cc0?w=800&auto=format&fit=crop&q=80',
+    prepTime: '10 min',
+    allergens: ['Moluscos'],
+    notes: 'Tentáculo sellado a 300°C con chimichurri andino y papas nativas.'
+  },
+  {
+    id: 'cat-5',
+    name: 'Chaufa Especial de Pato & Cecina',
+    category: 'Wok & Sauté',
+    station: 'wok_saute' as const,
+    stationBadge: 'WOK HEI',
+    price: 58.0,
+    photoUrl: 'https://images.unsplash.com/photo-1603133872878-684f208fb84b?w=800&auto=format&fit=crop&q=80',
+    prepTime: '7 min',
+    allergens: ['Huevo', 'Soya'],
+    notes: 'Huevo de codorniz frito, confit de pato y cecina de la selva ahumada.'
+  },
+  {
+    id: 'cat-6',
+    name: 'Esfera Chocolate Valrhona',
+    category: 'Pastelería',
+    station: 'pasteleria' as const,
+    stationBadge: 'POSTRE',
+    price: 46.0,
+    photoUrl: 'https://images.unsplash.com/photo-1587314168485-3236d6710814?w=800&auto=format&fit=crop&q=80',
+    prepTime: '5 min',
+    allergens: ['Lácteos', 'Gluten'],
+    notes: 'Caramelo salado caliente servido en jarrita y helado de vainilla Papantla.'
+  },
+  {
+    id: 'cat-7',
+    name: 'Cóctel Ahumado Áurea',
+    category: 'Barra Mixología',
+    station: 'barra_mixologia' as const,
+    stationBadge: 'BARRA',
+    price: 48.0,
+    photoUrl: 'https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=800&auto=format&fit=crop&q=80',
+    prepTime: '4 min',
+    allergens: ['Alcohol'],
+    notes: 'Gin infusionado en botánicos andinos con campana de humo de romero.'
+  },
+  {
+    id: 'cat-8',
+    name: 'Ceviche Clásico de Corvina',
+    category: 'Cuarto Frío & Nikkei',
+    station: 'frio_nikkei' as const,
+    stationBadge: 'FRÍO',
+    price: 68.0,
+    photoUrl: 'https://images.unsplash.com/photo-1535400255456-984241443b29?w=800&auto=format&fit=crop&q=80',
+    prepTime: '6 min',
+    allergens: ['Pescado'],
+    notes: 'Leche de tigre recién batida con ají limo, choclo tierno y camote glaseado.'
+  }
 ];

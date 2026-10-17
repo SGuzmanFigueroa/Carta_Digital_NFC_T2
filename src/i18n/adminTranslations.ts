@@ -1,6 +1,9 @@
 /**
  * GastroPulse OS - Translation & Regionalization Engine (i18n)
  * Supports dynamic switching between Spanish (es) and English (en).
+ *
+ * Diccionario del PANEL DEL PERSONAL (configuración, cabecera). La carta del
+ * comensal usa ./translations.ts.
  */
 
 export type LanguageCode = 'es' | 'en';

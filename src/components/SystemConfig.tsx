@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { SystemConfigState } from '../types';
 import { applyTheme, ACCENT_PALETTE } from '@/utils/theme';
-import { getTranslations, getLanguageCode } from '@/utils/i18n';
+import { getTranslations, getLanguageCode } from '@/i18n/adminTranslations';
 import { kitchenAudio } from '@/utils/audio';
 import { MenuItem } from '../types';
 import { fetchDishesFromDb, updateDishPrice, deleteDishFromDb } from '@/services/menuService';
