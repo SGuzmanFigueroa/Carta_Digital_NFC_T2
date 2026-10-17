@@ -3,4 +3,10 @@
   publish = ".next"
 
 [build.environment]
-  NODE_VERSION = "20"
+  # Next 16 exige Node >= 20.9; fijamos la LTS 22 (misma que en desarrollo).
+  NODE_VERSION = "22"
+
+# Runtime oficial de Next.js en Netlify: convierte las rutas /api, el proxy
+# (antes middleware) y el SSR en funciones. Sin él solo se sirve lo estático.
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
