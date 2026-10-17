@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -10,32 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
-  }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
+    PostgrestVersion: "14.17"
   }
   public: {
     Tables: {
@@ -62,6 +37,167 @@ export type Database = {
           sort_order?: number | null
         }
         Relationships: []
+      }
+      complaint_book: {
+        Row: {
+          address: string
+          branch_id: string | null
+          claim_code: string
+          claim_type: string
+          claimed_amount: number | null
+          consumer_request: string
+          contracted_good_type: string
+          created_at: string | null
+          declaration_accepted_at: string | null
+          detail: string
+          doc_number: string
+          doc_type: string
+          email: string
+          full_name: string
+          good_description: string | null
+          id: string
+          is_minor: boolean | null
+          parent_name: string | null
+          phone: string
+          provider_snapshot: Json | null
+          request_id: string | null
+          resolution_notes: string | null
+          resolved_at: string | null
+          status: string | null
+          submission_payload: Json | null
+          table_number: string | null
+        }
+        Insert: {
+          address: string
+          branch_id?: string | null
+          claim_code: string
+          claim_type: string
+          claimed_amount?: number | null
+          consumer_request: string
+          contracted_good_type: string
+          created_at?: string | null
+          declaration_accepted_at?: string | null
+          detail: string
+          doc_number: string
+          doc_type: string
+          email: string
+          full_name: string
+          good_description?: string | null
+          id?: string
+          is_minor?: boolean | null
+          parent_name?: string | null
+          phone: string
+          provider_snapshot?: Json | null
+          request_id?: string | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          status?: string | null
+          submission_payload?: Json | null
+          table_number?: string | null
+        }
+        Update: {
+          address?: string
+          branch_id?: string | null
+          claim_code?: string
+          claim_type?: string
+          claimed_amount?: number | null
+          consumer_request?: string
+          contracted_good_type?: string
+          created_at?: string | null
+          declaration_accepted_at?: string | null
+          detail?: string
+          doc_number?: string
+          doc_type?: string
+          email?: string
+          full_name?: string
+          good_description?: string | null
+          id?: string
+          is_minor?: boolean | null
+          parent_name?: string | null
+          phone?: string
+          provider_snapshot?: Json | null
+          request_id?: string | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          status?: string | null
+          submission_payload?: Json | null
+          table_number?: string | null
+        }
+        Relationships: []
+      }
+      complaint_books: {
+        Row: {
+          active: boolean
+          id: string
+          provider_address: string | null
+          provider_name: string
+          provider_ruc: string
+        }
+        Insert: {
+          active?: boolean
+          id: string
+          provider_address?: string | null
+          provider_name: string
+          provider_ruc: string
+        }
+        Update: {
+          active?: boolean
+          id?: string
+          provider_address?: string | null
+          provider_name?: string
+          provider_ruc?: string
+        }
+        Relationships: []
+      }
+      customer_reviews: {
+        Row: {
+          comments: string | null
+          created_at: string
+          id: string
+          operation_code: string | null
+          order_id: string | null
+          payment_method: string | null
+          rating: number
+          table_number: string
+          tip_amount: number
+          verified: boolean
+          voucher_uploaded: boolean
+        }
+        Insert: {
+          comments?: string | null
+          created_at?: string
+          id?: string
+          operation_code?: string | null
+          order_id?: string | null
+          payment_method?: string | null
+          rating: number
+          table_number: string
+          tip_amount?: number
+          verified?: boolean
+          voucher_uploaded?: boolean
+        }
+        Update: {
+          comments?: string | null
+          created_at?: string
+          id?: string
+          operation_code?: string | null
+          order_id?: string | null
+          payment_method?: string | null
+          rating?: number
+          table_number?: string
+          tip_amount?: number
+          verified?: boolean
+          voucher_uploaded?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_reviews_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       dishes: {
         Row: {
@@ -135,6 +271,7 @@ export type Database = {
           dish_id: string | null
           id: string
           item_status: string | null
+          line_no: number | null
           name: string
           notes: string | null
           order_id: string | null
@@ -148,6 +285,7 @@ export type Database = {
           dish_id?: string | null
           id?: string
           item_status?: string | null
+          line_no?: number | null
           name: string
           notes?: string | null
           order_id?: string | null
@@ -161,6 +299,7 @@ export type Database = {
           dish_id?: string | null
           id?: string
           item_status?: string | null
+          line_no?: number | null
           name?: string
           notes?: string | null
           order_id?: string | null
@@ -187,20 +326,24 @@ export type Database = {
       }
       orders: {
         Row: {
+          account_requested: boolean | null
+          completed_at: string | null
+          completion_date_estimated: boolean
+          created_at: string | null
+          id: string
+          idempotency_key: string | null
+          is_critical: boolean | null
+          order_number: number
+          origin: string | null
+          paid_at: string | null
+          pax: number | null
           payment_claimed_at: string | null
+          payment_date_estimated: boolean
+          payment_method: string | null
           payment_reference: string | null
           payment_reviewed_at: string | null
           payment_reviewed_by: string | null
           payment_status: string
-          account_requested: boolean | null
-          created_at: string | null
-          id: string
-          is_critical: boolean | null
-          idempotency_key: string | null
-          order_number: number
-          origin: string | null
-          pax: number | null
-          payment_method: string | null
           preparation_percent: number | null
           runner_assigned: string | null
           status: string
@@ -211,20 +354,24 @@ export type Database = {
           waiter: string | null
         }
         Insert: {
+          account_requested?: boolean | null
+          completed_at?: string | null
+          completion_date_estimated?: boolean
+          created_at?: string | null
+          id: string
+          idempotency_key?: string | null
+          is_critical?: boolean | null
+          order_number?: number
+          origin?: string | null
+          paid_at?: string | null
+          pax?: number | null
           payment_claimed_at?: string | null
+          payment_date_estimated?: boolean
+          payment_method?: string | null
           payment_reference?: string | null
           payment_reviewed_at?: string | null
           payment_reviewed_by?: string | null
           payment_status?: string
-          account_requested?: boolean | null
-          created_at?: string | null
-          id: string
-          is_critical?: boolean | null
-          idempotency_key?: string | null
-          order_number?: number
-          origin?: string | null
-          pax?: number | null
-          payment_method?: string | null
           preparation_percent?: number | null
           runner_assigned?: string | null
           status?: string
@@ -235,20 +382,24 @@ export type Database = {
           waiter?: string | null
         }
         Update: {
+          account_requested?: boolean | null
+          completed_at?: string | null
+          completion_date_estimated?: boolean
+          created_at?: string | null
+          id?: string
+          idempotency_key?: string | null
+          is_critical?: boolean | null
+          order_number?: number
+          origin?: string | null
+          paid_at?: string | null
+          pax?: number | null
           payment_claimed_at?: string | null
+          payment_date_estimated?: boolean
+          payment_method?: string | null
           payment_reference?: string | null
           payment_reviewed_at?: string | null
           payment_reviewed_by?: string | null
           payment_status?: string
-          account_requested?: boolean | null
-          created_at?: string | null
-          id?: string
-          is_critical?: boolean | null
-          order_number?: number
-          idempotency_key?: string | null
-          origin?: string | null
-          pax?: number | null
-          payment_method?: string | null
           preparation_percent?: number | null
           runner_assigned?: string | null
           status?: string
@@ -303,7 +454,22 @@ export type Database = {
           starts_at?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "promo_offers_complementary_dish_id_fkey"
+            columns: ["complementary_dish_id"]
+            isOneToOne: false
+            referencedRelation: "dishes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "promo_offers_main_dish_id_fkey"
+            columns: ["main_dish_id"]
+            isOneToOne: false
+            referencedRelation: "dishes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       restaurant_tables: {
         Row: {
@@ -433,41 +599,41 @@ export type Database = {
       }
       staff_audit_logs: {
         Row: {
+          action: string
           actor_auth_id: string | null
           actor_role: string | null
-          event_type: string | null
-          metadata: Json | null
-          action: string
           created_at: string | null
           details: string | null
+          event_type: string | null
           id: string
           level: string | null
+          metadata: Json | null
           performed_by: string | null
           target: string | null
         }
         Insert: {
+          action: string
           actor_auth_id?: string | null
           actor_role?: string | null
-          event_type?: string | null
-          metadata?: Json | null
-          action: string
           created_at?: string | null
           details?: string | null
+          event_type?: string | null
           id?: string
           level?: string | null
+          metadata?: Json | null
           performed_by?: string | null
           target?: string | null
         }
         Update: {
+          action?: string
           actor_auth_id?: string | null
           actor_role?: string | null
-          event_type?: string | null
-          metadata?: Json | null
-          action?: string
           created_at?: string | null
           details?: string | null
+          event_type?: string | null
           id?: string
           level?: string | null
+          metadata?: Json | null
           performed_by?: string | null
           target?: string | null
         }
@@ -475,8 +641,6 @@ export type Database = {
       }
       system_config: {
         Row: {
-          geofence_config: Json
-          payment_config: Json
           acoustic_buzzer: boolean | null
           auto_cut: boolean | null
           branch_name: string
@@ -486,12 +650,18 @@ export type Database = {
           delay_alerts: boolean | null
           density: string | null
           email: string | null
+          geofence_config: Json
           id: string
           language: string | null
+          logo_url: string | null
           low_stock_alerts: boolean | null
           manager_name: string | null
+          max_items_per_dish: number
+          max_items_per_order: number
+          pairing_price: number
           paper_width: string | null
           payment_alerts: boolean | null
+          payment_config: Json
           phone: string | null
           printer_ip: string | null
           printer_port: string | null
@@ -502,8 +672,6 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
-          geofence_config?: Json
-          payment_config?: Json
           acoustic_buzzer?: boolean | null
           auto_cut?: boolean | null
           branch_name?: string
@@ -513,12 +681,18 @@ export type Database = {
           delay_alerts?: boolean | null
           density?: string | null
           email?: string | null
+          geofence_config?: Json
           id?: string
           language?: string | null
+          logo_url?: string | null
           low_stock_alerts?: boolean | null
           manager_name?: string | null
+          max_items_per_dish?: number
+          max_items_per_order?: number
+          pairing_price?: number
           paper_width?: string | null
           payment_alerts?: boolean | null
+          payment_config?: Json
           phone?: string | null
           printer_ip?: string | null
           printer_port?: string | null
@@ -529,8 +703,6 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
-          geofence_config?: Json
-          payment_config?: Json
           acoustic_buzzer?: boolean | null
           auto_cut?: boolean | null
           branch_name?: string
@@ -540,12 +712,18 @@ export type Database = {
           delay_alerts?: boolean | null
           density?: string | null
           email?: string | null
+          geofence_config?: Json
           id?: string
           language?: string | null
+          logo_url?: string | null
           low_stock_alerts?: boolean | null
           manager_name?: string | null
+          max_items_per_dish?: number
+          max_items_per_order?: number
+          pairing_price?: number
           paper_width?: string | null
           payment_alerts?: boolean | null
+          payment_config?: Json
           phone?: string | null
           printer_ip?: string | null
           printer_port?: string | null
@@ -557,91 +735,118 @@ export type Database = {
         }
         Relationships: []
       }
+      waiter_calls: {
+        Row: {
+          created_at: string
+          id: string
+          reason: string
+          resolved_at: string | null
+          status: string
+          table_number: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          reason: string
+          resolved_at?: string | null
+          status?: string
+          table_number: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          reason?: string
+          resolved_at?: string | null
+          status?: string
+          table_number?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
       admin_set_staff_pin: {
-        Args: { p_staff_id: string; p_pin: string }
+        Args: { p_pin: string; p_staff_id: string }
         Returns: undefined
       }
+      configure_complaint_book: {
+        Args: {
+          p_address: string
+          p_book_id: string
+          p_name: string
+          p_ruc: string
+        }
+        Returns: Json
+      }
       create_waiter_call: {
-        Args: { p_table: string; p_reason: string; p_table_token?: string }
+        Args: { p_reason: string; p_table: string; p_table_token?: string }
         Returns: boolean
       }
-      current_staff_role: {
-        Args: Record<PropertyKey, never>
-        Returns: string | null
-      }
+      current_staff_role: { Args: never; Returns: string }
       diner_table_signal: {
         Args: {
-          p_table: string
-          p_signal: string
-          p_payment_method?: string
-          p_table_token?: string
-          p_payment_kind?: string
           p_operation_code?: string
+          p_payment_kind?: string
+          p_payment_method?: string
+          p_signal: string
+          p_table: string
+          p_table_token?: string
         }
         Returns: boolean
       }
-      get_table_qr_tokens: {
-        Args: { p_count: number }
-        Returns: Json
-      }
-      review_table_payment: {
-        Args: { p_table: string; p_approve: boolean }
-        Returns: number
-      }
-      rotate_table_qr_tokens: {
-        Args: { p_tables?: number[] }
-        Returns: number
-      }
-      get_diner_orders: {
-        Args: { p_refs: Json }
-        Returns: Json
-      }
+      get_complaint_book: { Args: { p_book_id: string }; Returns: Json }
+      get_daily_sales_report: { Args: { p_date?: string }; Returns: Json }
+      get_diner_orders: { Args: { p_refs: Json }; Returns: Json }
+      get_table_qr_tokens: { Args: { p_count: number }; Returns: Json }
       login_retry_after: {
         Args: { p_identifier: string; p_ip: string }
         Returns: number
+      }
+      place_order: {
+        Args: {
+          p_accuracy?: number
+          p_idempotency_key: string
+          p_items: Json
+          p_lat?: number
+          p_lng?: number
+          p_origin?: string
+          p_pax?: number
+          p_table_number: string
+          p_table_token?: string
+          p_waiter?: string
+        }
+        Returns: Json
       }
       record_login_attempt: {
         Args: { p_identifier: string; p_ip: string; p_success: boolean }
         Returns: undefined
       }
+      review_table_payment: {
+        Args: { p_approve: boolean; p_table: string }
+        Returns: number
+      }
+      rotate_table_qr_tokens: { Args: { p_tables?: number[] }; Returns: number }
+      submit_complaint: {
+        Args: { p_book_id: string; p_entry: Json; p_request_id: string }
+        Returns: Json
+      }
       submit_review: {
         Args: {
-          p_table_number: string
-          p_rating: number
-          p_tip_amount?: number
           p_comments?: string
-          p_payment_method?: string
           p_operation_code?: string
-          p_voucher_uploaded?: boolean
           p_order_id?: string
           p_order_key?: string
+          p_payment_method?: string
+          p_rating: number
+          p_table_number: string
+          p_tip_amount?: number
+          p_voucher_uploaded?: boolean
         }
         Returns: string
       }
-      verify_my_pin: {
-        Args: { p_pin: string }
-        Returns: Json
-      }
-      place_order: {
-        Args: {
-          p_table_number: string
-          p_items: Json
-          p_idempotency_key: string
-          p_pax?: number
-          p_origin?: string
-          p_waiter?: string
-          p_table_token?: string
-          p_lat?: number
-          p_lng?: number
-          p_accuracy?: number
-        }
-        Returns: Json
-      }
+      verify_my_pin: { Args: { p_pin: string }; Returns: Json }
     }
     Enums: {
       [_ in never]: never
@@ -770,9 +975,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {},
   },
