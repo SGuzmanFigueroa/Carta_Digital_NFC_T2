@@ -1,5 +1,6 @@
 import React from 'react';
 import { TicketItem } from '../types';
+import { DishImage } from './menu/DishImage';
 
 interface DishDetailModalProps {
   item: TicketItem | null;
@@ -44,11 +45,7 @@ export const DishDetailModal: React.FC<DishDetailModalProps> = ({
 
         {/* Dish High Quality Photo Hero */}
         <div className="relative h-64 sm:h-72 w-full bg-[#0e0e10] overflow-hidden">
-          <img
-            src={item.photoUrl}
-            alt={item.name}
-            className="w-full h-full object-cover"
-          />
+          <DishImage src={item.photoUrl} alt={item.name} sizes="(min-width: 640px) 640px, 100vw" className="object-cover" />
           <div className="absolute inset-0 bg-gradient-to-t from-[#18181b] via-transparent to-black/30"></div>
           
           <div className="absolute bottom-4 left-5 right-5 flex items-end justify-between">

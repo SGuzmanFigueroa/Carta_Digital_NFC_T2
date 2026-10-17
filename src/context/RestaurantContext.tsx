@@ -412,6 +412,8 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
     setIsTerminalLocked(false);
     await logoutStaff();
     if (typeof window !== 'undefined') {
+      // Recarga completa a propósito: borra todo el estado en memoria del personal.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
       window.location.href = '/login';
     }
   }, []);
@@ -679,6 +681,7 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
   useEffect(() => {
     try {
       const savedTickets = localStorage.getItem(STORAGE_KEY_TICKETS);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- datos que solo existen en el navegador (storage/URL/red); leerlos en el render rompe la hidratación
       if (savedTickets) setTickets(JSON.parse(savedTickets));
 
       const savedOrders = localStorage.getItem(STORAGE_KEY_ORDERS);
@@ -747,20 +750,18 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
     };
   }, []);
 
-  // Blindaje absoluto: Si el usuario está en la carta (/ o /menu), desbloquear inmediatamente
-  useEffect(() => {
-    const activeRoute = pathname || (typeof window !== 'undefined' ? window.location.pathname : '');
-    if (!isStaffManagementRoute(activeRoute)) {
-      setIsTerminalLocked(false);
-      setQuickUnlockPin('');
-      setQuickUnlockError('');
-    }
-  }, [pathname]);
+  // Blindaje absoluto: si el usuario está en la carta (/ o /menu), desbloquear de
+  // inmediato. Se ajusta durante el render, así la carta nunca pinta el candado.
+  const isOnStaffRoute = isStaffManagementRoute(pathname || (typeof window !== 'undefined' ? window.location.pathname : ''));
+  if (!isOnStaffRoute && (isTerminalLocked || quickUnlockPin || quickUnlockError)) {
+    setIsTerminalLocked(false);
+    setQuickUnlockPin('');
+    setQuickUnlockError('');
+  }
 
   // Inactivity auto-lock monitor (EXCLUSIVO para terminales operativas del staff: /kds, /pedidos, etc.)
   useEffect(() => {
-    const activeRoute = pathname || (typeof window !== 'undefined' ? window.location.pathname : '');
-    if (!isStaffManagementRoute(activeRoute)) return;
+    if (!isOnStaffRoute) return;
     if (!currentUser || isTerminalLocked) return;
 
     let timeoutId: NodeJS.Timeout;
@@ -787,7 +788,7 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
       clearTimeout(timeoutId);
       events.forEach((ev) => window.removeEventListener(ev, resetTimer));
     };
-  }, [currentUser, isTerminalLocked]);
+  }, [currentUser, isTerminalLocked, isOnStaffRoute]);
 
   // Listen to BroadcastChannel events with strict schema and action validation
   useEffect(() => {
@@ -1792,7 +1793,7 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
       // siempre como "MESA 04" cuando el comensal aún no tenía comanda activa.
       const activeTable = tableOverride?.trim() || dinerActiveTicket?.table || 'MESA 04';
       
-      let updatedDiner = dinerActiveTicket
+      const updatedDiner = dinerActiveTicket
         ? { ...dinerActiveTicket, accountRequested: true, paymentMethod }
         : null;
       setDinerActiveTicket(updatedDiner);

@@ -120,6 +120,7 @@ export const ThreeDView: React.FC<ThreeDViewProps> = ({
       dishId === 'pulpo-brasa' ||
       dishId === 'wagyu-a5'
     ) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- arranca la carga del modelo 3D
       setIsLoadingModel(true);
       const loader = new GLTFLoader();
       

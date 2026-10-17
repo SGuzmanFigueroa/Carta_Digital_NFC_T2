@@ -23,6 +23,7 @@ import {
   toggleWeekday
 } from '@/utils/promoOffers';
 import { PromoDealModal } from './menu/PromoDealModal';
+import { DishImage } from './menu/DishImage';
 
 interface PromoOffersManagerProps {
   /** Tema claro del panel (tokens idénticos al resto de SystemConfig). */
@@ -782,7 +783,7 @@ export function PromoOffersManager({
             }`}
           >
             <div className="relative w-full sm:w-[148px] shrink-0 h-32 sm:h-auto bg-black/20">
-              <img src={offer.image} alt={offer.title} className="w-full h-full object-cover" loading="lazy" />
+              <DishImage src={offer.image} alt={offer.title} sizes="(min-width: 640px) 148px, 100vw" className="object-cover" />
               <span className="absolute top-2 left-2 text-[10px] font-black px-2 py-0.5 rounded bg-[#FF5A1F] text-white shadow-md shadow-[#FF5A1F]/30">
                 {offer.badge}
               </span>

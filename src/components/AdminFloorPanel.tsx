@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { TableStatus, Ticket, OrderTicket } from '../types';
 import { INITIAL_MENU_ITEMS } from '../data/mockData';
+import { DishImage } from './menu/DishImage';
 // CD-28 · Llamados de mesa en vivo (KDS + Salón comparten el mismo estado realtime).
 import { useRestaurant } from '../context/RestaurantContext';
 
@@ -976,11 +977,9 @@ export const AdminFloorPanel: React.FC<AdminFloorPanelProps> = ({
                   onClick={() => onShowToast(`${dish.name}: ${dish.count} órdenes registradas hoy`, 'local_fire_department')}
                   className="p-2 rounded-lg bg-[#201f22] hover:bg-[#2a2a2c] transition-colors flex items-center gap-3 cursor-pointer group"
                 >
-                  <img
-                    src={dish.image}
-                    alt={dish.name}
-                    className="w-12 h-12 rounded-lg object-cover shrink-0 border border-[#353437]/50 group-hover:border-[#ff5708]/50 transition-colors"
-                  />
+                  <div className="relative w-12 h-12 rounded-lg overflow-hidden shrink-0 border border-[#353437]/50 group-hover:border-[#ff5708]/50 transition-colors">
+                    <DishImage src={dish.image} alt={dish.name} sizes="48px" className="object-cover" />
+                  </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
                       <h3 className="text-[13px] text-[#e5e1e4] font-medium truncate group-hover:text-white transition-colors">{dish.name}</h3>

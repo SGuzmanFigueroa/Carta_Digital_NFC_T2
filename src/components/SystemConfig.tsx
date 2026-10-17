@@ -8,6 +8,7 @@ import { kitchenAudio } from '@/utils/audio';
 import { MenuItem } from '../types';
 import { fetchDishesFromDb, updateDishPrice, deleteDishFromDb } from '@/services/menuService';
 import dynamic from 'next/dynamic';
+import { DishImage } from './menu/DishImage';
 // Escáner 3D (Three.js): solo se descarga al abrirlo.
 const Dish3DScannerModal = dynamic(() => import('./Dish3DScannerModal').then((m) => m.Dish3DScannerModal), { ssr: false });
 import {
@@ -26,6 +27,7 @@ import { TableQrImage } from './TableQrImage';
 import { fetchTableQrTokens, rotateTableQrTokens } from '@/services/tableService';
 import { qrDataUrl, tableMenuUrl, tableNumberFromLabel } from '@/utils/tableQr';
 import {ComplaintBookSettings} from './ComplaintBookSettings';
+import { UploadedImage } from './UploadedImage';
 
 interface SystemConfigProps {
   config: SystemConfigState;
@@ -742,22 +744,19 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
 
 
   // Lista dinámica de todas las mesas del restaurante basada en la capacidad total configurada
-  const allTablesList = React.useMemo(() => {
-    const list: string[] = [];
-    for (let i = 1; i <= totalTablesCount; i++) {
-      list.push(`Mesa ${String(i).padStart(2, '0')}`);
-    }
-    list.push('Terraza T1', 'Terraza T2', 'Terraza T3', 'Barra B1', 'Barra B2', 'Salón VIP');
-    return list;
-  }, [totalTablesCount]);
+  // Cálculo trivial (unas 30 etiquetas): sin useMemo.
+  const allTablesList = [
+    ...Array.from({ length: totalTablesCount }, (_, i) => `Mesa ${String(i + 1).padStart(2, '0')}`),
+    'Terraza T1', 'Terraza T2', 'Terraza T3', 'Barra B1', 'Barra B2', 'Salón VIP'
+  ];
 
-  const filteredModalTables = React.useMemo(() => {
+  const filteredModalTables = (() => {
     if (modalZoneFilter === 'salon') return allTablesList.filter(t => t.startsWith('Mesa'));
     if (modalZoneFilter === 'terraza') return allTablesList.filter(t => t.includes('Terraza'));
     if (modalZoneFilter === 'barra') return allTablesList.filter(t => t.includes('Barra'));
     if (modalZoneFilter === 'vip') return allTablesList.filter(t => t.includes('VIP'));
     return allTablesList;
-  }, [allTablesList, modalZoneFilter]);
+  })();
 
   const t = getTranslations(formData.language);
   const activeLabel = ({
@@ -794,8 +793,14 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
   const sidebarBg = isLight ? 'bg-white border-[#e2e8f0] shadow-sm text-[#64748b]' : isHighContrast ? 'bg-black border-2 border-white text-white' : 'bg-[#141414] border-[#2A2A2A] text-gray-400';
   const selectBg = isLight ? 'bg-white border-[#cbd5e1] text-[#0f172a]' : isHighContrast ? 'bg-black border-2 border-white text-white' : 'bg-[#252525] border-[#333] text-gray-200';
 
-  useEffect(() => {
+  // Si llega una configuración nueva (p. ej. desde Supabase), el formulario la toma
+  // en el mismo render; aplicar el tema sí es un efecto (toca el DOM).
+  const [syncedConfig, setSyncedConfig] = useState(config);
+  if (syncedConfig !== config) {
+    setSyncedConfig(config);
     setFormData({ ...config });
+  }
+  useEffect(() => {
     applyTheme(config.themeMode, config.colorAccent, config.density);
   }, [config]);
 
@@ -1126,7 +1131,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                 <div className={`w-[110px] h-[110px] rounded border mb-5 overflow-hidden flex items-center justify-center shadow-md ${
                   isLight ? 'bg-white border-[#e2e8f0]' : 'bg-[#050505] border-[#1A1A1A]'
                 }`}>
-                  <img 
+                  <UploadedImage 
                     src={formData.logoUrl || '/logo.png'} 
                     alt={`Logo ${formData.branchName || 'AUREA Bistro'}`} 
                     className="w-full h-full object-cover"
@@ -2051,7 +2056,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
               }`}>
                 <div className="w-full text-center pb-3 border-b border-dashed border-gray-400/40">
                   <div className="w-10 h-10 mx-auto rounded-lg overflow-hidden border border-gray-300 shadow-sm mb-1.5 flex items-center justify-center bg-black">
-                    <img src={formData.logoUrl || '/logo.png'} alt="Logo" className="w-full h-full object-cover" />
+                    <UploadedImage src={formData.logoUrl || '/logo.png'} alt="Logo" className="w-full h-full object-cover" />
                   </div>
                   <h4 className={`text-[13px] font-extrabold tracking-tight ${titleColor}`}>{formData.branchName || 'AUREA Bistro'}</h4>
                   <span className="text-[10px] font-mono uppercase tracking-widest text-[#FF5A1F] font-bold">CARTA DIGITAL • AUTO-PEDIDO</span>
@@ -2077,7 +2082,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                   {includeLogoInQR && (
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                       <div className="w-10 h-10 rounded-full bg-white p-1 shadow-lg border border-gray-200 flex items-center justify-center">
-                        <img src={formData.logoUrl || '/logo.png'} alt="Mini Logo" className="w-full h-full object-cover rounded-full" />
+                        <UploadedImage src={formData.logoUrl || '/logo.png'} alt="Mini Logo" className="w-full h-full object-cover rounded-full" />
                       </div>
                     </div>
                   )}
@@ -2286,7 +2291,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                         <div className="flex items-center gap-3 min-w-0 flex-1">
                           <div className="w-14 h-14 rounded-lg bg-[#252632] overflow-hidden shrink-0 relative flex items-center justify-center border border-[#373948]">
                             {dish.image ? (
-                              <img src={dish.image} alt={dish.name} className="w-full h-full object-cover" />
+                              <DishImage src={dish.image} alt={dish.name} sizes="56px" className="object-cover" />
                             ) : (
                               <span className="material-symbols-outlined text-[24px] text-gray-500">restaurant</span>
                             )}
@@ -2469,7 +2474,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                     <div className="flex items-center gap-4">
                       <div className="w-32 h-32 rounded-xl bg-white border-2 border-dashed border-[#742284]/30 flex items-center justify-center p-2 shrink-0 shadow-sm overflow-hidden">
                         {paymentGatewayConfig.yapeQrImage ? (
-                          <img
+                          <UploadedImage
                             src={paymentGatewayConfig.yapeQrImage}
                             alt="QR Yape"
                             className="w-full h-full object-contain"
@@ -2536,7 +2541,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                     <div className="flex items-center gap-4">
                       <div className="w-32 h-32 rounded-xl bg-white border-2 border-dashed border-[#0077b6]/30 flex items-center justify-center p-2 shrink-0 shadow-sm overflow-hidden">
                         {paymentGatewayConfig.plinQrImage ? (
-                          <img
+                          <UploadedImage
                             src={paymentGatewayConfig.plinQrImage}
                             alt="QR Plin"
                             className="w-full h-full object-contain"

@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { MenuItem } from '../types';
 import { updateDishPrice, deleteDishFromDb } from '@/services/menuService';
+import { DishImage } from './menu/DishImage';
 
 interface DishCatalogAdminProps {
   dishes: MenuItem[];
@@ -151,11 +152,7 @@ export const DishCatalogAdmin: React.FC<DishCatalogAdminProps> = ({
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="relative w-14 h-14 rounded-lg overflow-hidden bg-[#24252e] shrink-0 border border-[#353642]">
-                    <img
-                      src={dish.image}
-                      alt={dish.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                    />
+                    <DishImage src={dish.image} alt={dish.name} sizes="56px" className="object-cover group-hover:scale-105 transition-transform" />
                     {dish.has3D && (
                       <span className="absolute bottom-0 inset-x-0 bg-[#ff5708]/90 text-[8px] font-mono-code font-bold text-center text-[#2b0b00]">
                         3D ACTIVO

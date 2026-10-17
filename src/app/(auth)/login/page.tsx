@@ -18,6 +18,7 @@ function LoginContent() {
   useEffect(() => {
     const reason = searchParams.get('reason');
     if (reason === 'unauthenticated') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- el motivo llega en la URL y el aviso se cierra con un temporizador
       showToast('Acceso restringido. Inicia sesión con tus credenciales de personal.', 'lock');
     } else if (reason === 'session_closed') {
       showToast('Tu sesión se cerró al cerrar el navegador. Vuelve a iniciar sesión.', 'logout');

@@ -5,6 +5,7 @@ import { useRestaurant } from '../context/RestaurantContext';
 import { getTranslations } from '../utils/i18n';
 import { fetchSystemConfigFromDb } from '@/services/configService';
 import { isAdminRole, normalizeRole } from '../utils/security';
+import { DishImage } from './menu/DishImage';
 
 interface HeaderProps {
   currentTab: ScreenTab;
@@ -335,11 +336,12 @@ export const Header: React.FC<HeaderProps> = ({
                   <span>{currentUser?.roleTitle || (isAdmin ? 'ADMIN GENERAL' : 'En Turno')}</span>
                 </div>
               </div>
-              <div className="w-8 h-8 rounded-full bg-[#ffb59c] flex items-center justify-center overflow-hidden border border-[#ff5708] shrink-0 shadow-sm">
-                <img
+              <div className="relative w-8 h-8 rounded-full bg-[#ffb59c] flex items-center justify-center overflow-hidden border border-[#ff5708] shrink-0 shadow-sm">
+                <DishImage
                   src="https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=100&auto=format&fit=crop&q=80"
                   alt="Staff"
-                  className="w-full h-full object-cover"
+                  sizes="32px"
+                  className="object-cover"
                 />
               </div>
             </button>

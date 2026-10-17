@@ -55,6 +55,7 @@ export function MenuClient({ initialMenuItems }: { initialMenuItems: MenuItem[] 
   const [isOnline, setIsOnline] = useState<boolean>(true);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- datos que solo existen en el navegador (storage/URL/red); leerlos en el render rompe la hidratación
     setIsOnline(isDeviceOnline());
 
     const cachedMenu = getCachedMenuItems();

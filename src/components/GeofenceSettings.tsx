@@ -33,6 +33,7 @@ export const GeofenceSettings: React.FC<GeofenceSettingsProps> = ({
   // Caché para pintar al instante; luego la configuración real de Supabase.
   useEffect(() => {
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- datos que solo existen en el navegador (storage/URL/red); leerlos en el render rompe la hidratación
     setConfig(getStoredGeofenceConfig());
     migrateLocalGeofenceConfigToDb().then(() => loadGeofenceConfig()).then((fresh) => {
       if (!cancelled) setConfig(fresh);

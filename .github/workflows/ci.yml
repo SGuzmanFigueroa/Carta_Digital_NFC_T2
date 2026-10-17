@@ -32,12 +32,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      # El lint todavía tiene ~94 errores heredados (Tarea 46). Se ejecuta para
-      # que el reporte sea visible, pero no bloquea hasta que quede en cero.
-      # Cuando pase en limpio, borra `continue-on-error`.
+      # Lint en cero (Tarea 46): cualquier error o aviso nuevo frena el CI.
       - name: Lint
-        run: npm run lint
-        continue-on-error: true
+        run: npm run lint -- --max-warnings 0
 
       - name: Tests
         run: npm test

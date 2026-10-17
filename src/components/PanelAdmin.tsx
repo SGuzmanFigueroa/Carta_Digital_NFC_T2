@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { INITIAL_STATION_LOADS, CATALOG_DISHES } from '../data/initialData';
 import { useRestaurant } from '../context/RestaurantContext';
+import { DishImage } from './menu/DishImage';
 
 export const PanelAdmin: React.FC = () => {
   const { tickets = [], orders = [], runners = [] } = useRestaurant();
@@ -252,11 +253,9 @@ export const PanelAdmin: React.FC = () => {
                 <span className="w-6 text-center font-mono-code font-bold text-[14px] text-[#ff5708]">
                   #{i + 1}
                 </span>
-                <img
-                  src={dish.photoUrl}
-                  alt={dish.name}
-                  className="w-12 h-12 rounded-lg object-cover border border-[#353437] shrink-0"
-                />
+                <div className="relative w-12 h-12 rounded-lg overflow-hidden border border-[#353437] shrink-0">
+                  <DishImage src={dish.photoUrl} alt={dish.name} sizes="48px" className="object-cover" />
+                </div>
                 <div className="flex-1 min-w-0">
                   <div className="font-bold text-[14px] text-white truncate">{dish.name}</div>
                   <div className="text-[11px] font-mono-code text-[#71717a]">

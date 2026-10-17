@@ -7,6 +7,7 @@ import { useLanguage } from '@/hooks/useLanguage';
 import type { PaymentClaim } from '@/types';
 // CD-31 · Rótulo de mesa visible (ES/EN) sin alterar el valor guardado en la reseña.
 import { localizeTableLabel } from '@/i18n/tableLabel';
+import { UploadedImage } from '../UploadedImage';
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -142,12 +143,11 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     }>;
   }, [paymentConfig, t]);
 
-  // Si el método seleccionado actualmente fue deshabilitado en configuración, cambiar automáticamente al primero activo
-  useEffect(() => {
-    if (availableMethods.length > 0 && !availableMethods.some(m => m.id === selectedMethod)) {
-      setSelectedMethod(availableMethods[0].id);
-    }
-  }, [availableMethods, selectedMethod]);
+  // Si el método seleccionado fue deshabilitado en configuración, pasar al primero
+  // activo. Se ajusta durante el render (sin efecto) para no pintar un método inválido.
+  if (availableMethods.length > 0 && !availableMethods.some(m => m.id === selectedMethod)) {
+    setSelectedMethod(availableMethods[0].id);
+  }
 
   if (!isOpen) return null;
 
@@ -363,7 +363,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 <div className="relative inline-block p-3 rounded-2xl bg-white border-2 border-dashed shadow-inner border-[#cbd5e1] dark:border-white/20">
                   {selectedMethod === 'yape' && paymentConfig.yapeQrImage ? (
                     <div className="flex flex-col items-center">
-                      <img
+                      <UploadedImage
                         src={paymentConfig.yapeQrImage}
                         alt={t('pay.qrAltYape')}
                         className="w-40 h-40 object-contain rounded-xl shadow-sm"
@@ -374,7 +374,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     </div>
                   ) : selectedMethod === 'plin' && paymentConfig.plinQrImage ? (
                     <div className="flex flex-col items-center">
-                      <img
+                      <UploadedImage
                         src={paymentConfig.plinQrImage}
                         alt={t('pay.qrAltPlin')}
                         className="w-40 h-40 object-contain rounded-xl shadow-sm"
@@ -525,7 +525,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                       <div className="flex items-center gap-2">
                         {voucherFile.startsWith('data:image') && (
                           <div className="w-10 h-10 rounded-lg overflow-hidden border border-primary flex-shrink-0">
-                            <img src={voucherFile} alt="Preview" className="w-full h-full object-cover" />
+                            <UploadedImage src={voucherFile} alt="Preview" className="w-full h-full object-cover" />
                           </div>
                         )}
                         <button

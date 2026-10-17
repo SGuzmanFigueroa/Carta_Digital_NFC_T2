@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { MenuItem } from '../types';
 import { createDishInDb } from '@/services/menuService';
 import { ThreeDView } from './ThreeDView';
+import { UploadedImage } from './UploadedImage';
 
 interface Dish3DScannerModalProps {
   onClose: () => void;
@@ -169,6 +170,7 @@ export const Dish3DScannerModal: React.FC<Dish3DScannerModalProps> = ({
 
   // Auto request on mount
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- arranca la conexión con la cámara (sistema externo) al abrir el modal
     requestCameraAccess();
 
     return () => {
@@ -177,6 +179,7 @@ export const Dish3DScannerModal: React.FC<Dish3DScannerModalProps> = ({
         streamRef.current = null;
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al montar
   }, []);
 
   // Helper to capture current frame from video feed
@@ -386,7 +389,7 @@ export const Dish3DScannerModal: React.FC<Dish3DScannerModalProps> = ({
             />
 
             {/* Live Video Feed or Captured Photo */}
-            {streamRef.current ? (
+            {cameraActive ? (
               <video
                 ref={videoRef}
                 autoPlay
@@ -395,7 +398,7 @@ export const Dish3DScannerModal: React.FC<Dish3DScannerModalProps> = ({
                 className="absolute inset-0 w-full h-full object-cover z-0"
               />
             ) : dishPhotoUrl ? (
-              <img
+              <UploadedImage
                 src={dishPhotoUrl}
                 alt="Emplatado del Plato"
                 className="absolute inset-0 w-full h-full object-cover z-0"

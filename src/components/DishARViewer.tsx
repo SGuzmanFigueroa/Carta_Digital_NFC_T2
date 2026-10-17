@@ -249,6 +249,7 @@ export const DishARViewer: React.FC<DishARViewerProps> = ({
       anchorProgressRef.current = 0;
       anchorOffsetRef.current = { x: 0, y: 0 };
       manualOrbitRef.current = { x: 0, y: 0 };
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- la cámara se apagó: se reinicia el anclaje de la RA
       updateStatus('idle');
       onAnchorChange?.(false);
       onStatusChange?.('Esperando cámara');

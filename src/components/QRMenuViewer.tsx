@@ -320,6 +320,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       if (saved) {
         const parsed: LastOrderRecord = JSON.parse(saved);
         if (parsed && Array.isArray(parsed.items) && parsed.items.length > 0) {
+          // eslint-disable-next-line react-hooks/set-state-in-effect -- datos que solo existen en el navegador (storage/URL/red); leerlos en el render rompe la hidratación
           setLastOrder(parsed);
           setShowWelcomeBack(true);
         }
@@ -380,6 +381,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
         } else if (!formatted.startsWith('MESA') && !formatted.startsWith('BARRA')) {
           formatted = `MESA ${formatted}`;
         }
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- datos que solo existen en el navegador (storage/URL/red); leerlos en el render rompe la hidratación
         setSelectedTable(formatted);
         // Código secreto del QR de la mesa (&t=…): sin él el servidor no acepta pedidos.
         saveTableAccess(formatted, params.get('t'));
@@ -404,6 +406,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
         } catch {}
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al montar: el QR de la mesa se lee una vez
   }, []);
   const stopArCamera = React.useCallback(() => {
     if (mediaStreamRef.current) {
@@ -630,6 +633,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   useEffect(() => {
     if (isArModalOpen) return;
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- al cerrar el modal se apaga la cámara (sistema externo) y se limpia su estado
     stopArCamera();
     setArCameraMessage(null);
     setArCameraHelp(null);
@@ -649,6 +653,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     }
 
     if (!arCameraActive && !isArCameraRequesting && !arCameraMessage) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- mensaje según el estado real de la cámara
       setArCameraMessage(t('ar.tapToActivate'));
       setArCameraHelp(t('ar.permissionOnce'));
     }
@@ -912,22 +917,24 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     0
   );
 
+  const activeTicketId = activeTableTicket?.id;
+  const activeTicketStatus = activeTableTicket?.status;
   useEffect(() => {
-    if (!activeTableTicket) return;
+    if (!activeTicketId || !activeTicketStatus) return;
 
     const previousStatus = observedOrderStatus.current;
-    observedOrderStatus.current = { id: activeTableTicket.id, status: activeTableTicket.status };
+    observedOrderStatus.current = { id: activeTicketId, status: activeTicketStatus };
 
     if (
-      previousStatus?.id !== activeTableTicket.id ||
+      previousStatus?.id !== activeTicketId ||
       previousStatus.status === 'pase-listo' ||
-      activeTableTicket.status !== 'pase-listo'
+      activeTicketStatus !== 'pase-listo'
     ) {
       return;
     }
 
     kitchenAudio.playReadyBell();
-  }, [activeTableTicket?.id, activeTableTicket?.status]);
+  }, [activeTicketId, activeTicketStatus]);
 
   /** CD-31 · Etiqueta accesible del carrito, traducida (con singular/plural). */
   const cartAriaLabel = t('cart.aria', {
@@ -1090,6 +1097,8 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       if (beatTimer !== undefined) window.clearTimeout(beatTimer);
       window.clearTimeout(safetyTimer);
     };
+    // Solo al pasar de 0 a N ofertas: si una oferta se edita, el pop-up no se reabre.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [promoDeals.length, openPromoModal]);
 
   // Aplica la oferta: agrega el plato al pedido con su PRECIO PROMOCIONAL real

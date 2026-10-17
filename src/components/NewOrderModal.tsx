@@ -4,6 +4,7 @@ import { StationId, Ticket, TicketItem } from '../types';
 import { fetchDishesFromDb } from '@/services/menuService';
 import { fetchTablesFromDb } from '@/services/tableService';
 import { getPersistedStaffList } from '@/services/authService';
+import { DishImage } from './menu/DishImage';
 
 interface NewOrderModalProps {
   onClose: () => void;
@@ -272,11 +273,9 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
                         : 'bg-[#121215] border-[#27272a] hover:border-[#3f3f46]'
                     }`}
                   >
-                    <img
-                      src={dish.photoUrl}
-                      alt={dish.name}
-                      className="w-12 h-12 rounded object-cover shrink-0 border border-[#353437]"
-                    />
+                    <div className="relative w-12 h-12 rounded overflow-hidden shrink-0 border border-[#353437]">
+                      <DishImage src={dish.photoUrl} alt={dish.name} sizes="48px" className="object-cover" />
+                    </div>
                     <div className="flex-1 min-w-0">
                       <div className="font-semibold text-[13px] text-white truncate">
                         {dish.name}
