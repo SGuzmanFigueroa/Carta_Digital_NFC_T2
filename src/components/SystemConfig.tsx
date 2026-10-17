@@ -7,7 +7,9 @@ import { getTranslations, getLanguageCode } from '@/utils/i18n';
 import { kitchenAudio } from '@/utils/audio';
 import { MenuItem } from '../types';
 import { fetchDishesFromDb, updateDishPrice, deleteDishFromDb } from '@/services/menuService';
-import { Dish3DScannerModal } from './Dish3DScannerModal';
+import dynamic from 'next/dynamic';
+// Escáner 3D (Three.js): solo se descarga al abrirlo.
+const Dish3DScannerModal = dynamic(() => import('./Dish3DScannerModal').then((m) => m.Dish3DScannerModal), { ssr: false });
 import {
   CONFIG_SYNC_ERROR_EVENT,
   getPaymentConfig,

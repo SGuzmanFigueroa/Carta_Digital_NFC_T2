@@ -8,6 +8,7 @@ import type { PromoPricing, PromoSubtitleTextInput } from '@/utils/promo';
 import { getPromoMechanic } from '@/utils/promoOffers';
 import { buildMenuPromoSubtitle, buildPromoSecondDishAltText } from '@/i18n/menuContent';
 import { useLanguage } from '@/hooks/useLanguage';
+import { DishImage } from './DishImage';
 
 interface PromoDealModalProps {
   isOpen: boolean;
@@ -246,13 +247,15 @@ function PromoPhotoGallery({ images, altTexts, ariaLabel }: PromoPhotoGalleryPro
         {images.map((image, index) => (
           <div
             key={`${image}-${index}`}
-            className="h-full w-full min-w-full shrink-0 basis-full snap-center snap-always"
+            className="relative h-full w-full min-w-full shrink-0 basis-full snap-center snap-always"
           >
-            <img
+            <DishImage
               src={image}
               alt={altTexts[index] ?? altTexts[0] ?? ''}
+              sizes="(min-width: 640px) 420px, 100vw"
+              priority={index === 0}
               draggable={false}
-              className="h-full w-full object-cover select-none"
+              className="object-cover select-none"
             />
           </div>
         ))}

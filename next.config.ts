@@ -36,6 +36,14 @@ const nextConfig: NextConfig = {
    * Solo aplica en `next dev`; en producción/`next start` se ignora.
    */
   allowedDevOrigins: ["192.168.1.39"],
+  // Fotos de platos optimizadas con next/image (src/components/menu/DishImage.tsx).
+  // Solo estos orígenes: otros se muestran sin optimizar.
+  images: {
+    remotePatterns: [
+      { protocol: "https", hostname: "lh3.googleusercontent.com", pathname: "/**" },
+      { protocol: "https", hostname: "images.unsplash.com", pathname: "/**" },
+    ],
+  },
   async headers() {
     return [
       {

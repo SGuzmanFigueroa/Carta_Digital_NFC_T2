@@ -17,9 +17,10 @@ const ThreeDView = dynamic(
   }
 );
 
-import { ARTableViewer } from './ARTableViewer';
-import { DishARViewer } from './DishARViewer';
-import { WebXRDishLauncher } from './WebXRDishLauncher';
+// Visores de RA con Three.js (~600 KB): se descargan recién al abrir la cámara RA,
+// no al cargar la carta.
+const DishARViewer = dynamic(() => import('./DishARViewer').then((m) => m.DishARViewer), { ssr: false });
+const WebXRDishLauncher = dynamic(() => import('./WebXRDishLauncher').then((m) => m.WebXRDishLauncher), { ssr: false });
 // CD-13 · Componentes del tema Claro/Oscuro y navegación inferior del comensal.
 import { ThemeToggle } from './menu/ThemeToggle';
 // CD-31 · Selector de idioma [ES | EN] de la carta del comensal.
@@ -62,6 +63,7 @@ import { WaiterCallModal } from './menu/WaiterCallModal';
 import { formatSoles } from '@/utils/promo';
 import { fetchPromoOffers, rowToPromoOffer } from '@/services/promoService';
 import { saveTableAccess } from '@/utils/tableAccess';
+import { DishImage } from './menu/DishImage';
 import { DietaryFilters, DIETARY_FILTERS, getDietaryPreferences } from './menu/DietaryFilters';
 import type { DietaryPreference } from '../types';
 import { getArDishDimensionCm } from '@/config/arDishProfiles';
@@ -1700,10 +1702,13 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                   aria-label={t('dish.openHeroDetails', { dish: heroItem.name })}
                   className="absolute inset-0 h-full w-full cursor-zoom-in text-left"
                 >
-                  <img
+                  {/* Foto principal visible al cargar: priority para el LCP. */}
+                  <DishImage
                     src={heroItem.image_url_hd || heroItem.image}
                     alt={heroItem.name}
-                    className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    sizes="(min-width: 1024px) 66vw, 100vw"
+                    priority
+                    className="object-cover transition-transform duration-700 group-hover:scale-105"
                   />
                 </button>
               </div>
@@ -1867,12 +1872,11 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                     aria-label={t('dish.openDetails', { dish: dish.name })}
                     className="absolute inset-0 h-full w-full cursor-zoom-in text-left"
                   >
-                    <img
+                    <DishImage
                       src={dish.image}
                       alt=""
-                      loading="lazy"
-                      decoding="async"
-                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+                      className="object-cover transition-transform duration-500 group-hover:scale-105"
                     />
                   </button>
                 </div>
