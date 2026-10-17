@@ -245,6 +245,51 @@ export type Database = {
         }
         Relationships: []
       }
+      promo_offers: {
+        Row: {
+          complementary_dish_id: string | null
+          created_at: string
+          discount_percent: number
+          display: Json
+          ends_at: string | null
+          id: string
+          is_active: boolean
+          main_dish_id: string
+          mechanic: string
+          priority: number
+          starts_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          complementary_dish_id?: string | null
+          created_at?: string
+          discount_percent: number
+          display?: Json
+          ends_at?: string | null
+          id?: string
+          is_active?: boolean
+          main_dish_id: string
+          mechanic: string
+          priority?: number
+          starts_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          complementary_dish_id?: string | null
+          created_at?: string
+          discount_percent?: number
+          display?: Json
+          ends_at?: string | null
+          id?: string
+          is_active?: boolean
+          main_dish_id?: string
+          mechanic?: string
+          priority?: number
+          starts_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       restaurant_tables: {
         Row: {
           amount: number | null

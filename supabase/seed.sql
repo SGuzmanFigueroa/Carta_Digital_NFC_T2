@@ -64,3 +64,16 @@ INSERT INTO public.complaint_books (id, provider_name, provider_ruc)
 SELECT 'primary', branch_name, branch_ruc FROM public.system_config
 WHERE id = 'primary' AND branch_ruc ~ '^[0-9]{11}$'
 ON CONFLICT (id) DO NOTHING;
+
+-- Ofertas flash de demostración (mismas que INITIAL_ACTIVE_PROMO_OFFERS).
+-- El precio promocional lo calcula place_order con discount_percent.
+INSERT INTO public.promo_offers (id, mechanic, main_dish_id, complementary_dish_id, discount_percent, priority, display) VALUES
+('promo-wagyu-15', 'discount', 'wagyu-a5', NULL, 15, 1,
+  '{"badge":"-15% OFF","kicker":"PLATO DEL CHEF","timingLabel":"Termina en 12:35 (Hoy)","title":"Wagyu Ribeye A5 Trufado","subtitle":"280g corte japonés con escamas de sal marina","image":"/images/pulpo-anticuchero.jpg","note":"Ahorro S/ 17.25"}'),
+('promo-tartar-2da', 'second_unit', 'tartar-nikkei', 'causa-limena', 50, 2,
+  '{"badge":"2da -50%","kicker":"2DA UNIDAD","timingLabel":"Termina en 08:45 (Hoy)","title":"Tartar & Ceviche Nikkei","subtitle":"Atún rojo, leche de tigre al ají amarillo y palta","image":"/images/tartar-salmon.jpg","note":"2da al 50%"}'),
+('promo-pisco-2x1', 'two_for_one', 'smoked-old-fashioned', NULL, 50, 2,
+  '{"badge":"2x1 FLASH","kicker":"HAPPY HOUR BAR","timingLabel":"Hasta 21:00","title":"2x1 Pisco Sour & Cócteles","subtitle":"Destilados premium de autor en barra principal","image":"/images/smoked-old-fashioned.jpg","note":"Lleva 2 x 1"}'),
+('promo-volcan-pack', 'combo', 'esfera-chocolate', 'smoked-old-fashioned', 25, 3,
+  '{"badge":"MARIDAJE","kicker":"POSTRE + DIGESTIVO","timingLabel":"Turno Cena","title":"Volcán Belga + Maridaje","subtitle":"Volcán 70% cacao + Copa de Oporto o Amaro","image":"/images/esfera-chocolate.jpg","note":"-25% Pack"}')
+ON CONFLICT (id) DO NOTHING;

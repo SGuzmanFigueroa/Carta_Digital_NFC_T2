@@ -12,6 +12,8 @@
 --    offline) devuelve la comanda ya creada en vez de duplicarla.
 -- 4. Los límites por plato/orden del prototipo cd4 pasan a system_config
 --    y el prototipo se archiva (Tarea 19).
+-- 5. Ofertas flash en public.promo_offers (antes solo en el localStorage del
+--    admin). El servidor aplica el % vigente sobre el precio de carta.
 -- ==========================================================
 
 CREATE SCHEMA IF NOT EXISTS private;
@@ -46,6 +48,49 @@ BEGIN
     WHERE cfg.id = 'primary';
   END IF;
 END $$;
+
+-- ---------- Ofertas flash ----------
+-- Se guarda el PORCENTAJE, no el precio: place_order calcula
+-- round(precio_de_carta * (1 - %/100), 2) en cada pedido, así una oferta nunca
+-- queda desfasada si cambia el precio del plato.
+CREATE TABLE IF NOT EXISTS public.promo_offers (
+  id text PRIMARY KEY DEFAULT ('promo-' || gen_random_uuid()::text),
+  mechanic text NOT NULL CHECK (mechanic IN ('discount', 'two_for_one', 'second_unit', 'combo')),
+  main_dish_id text NOT NULL REFERENCES public.dishes(id) ON UPDATE CASCADE ON DELETE CASCADE,
+  complementary_dish_id text REFERENCES public.dishes(id) ON UPDATE CASCADE ON DELETE SET NULL,
+  discount_percent numeric(5,2) NOT NULL CHECK (discount_percent > 0 AND discount_percent < 100),
+  is_active boolean NOT NULL DEFAULT true,
+  starts_at timestamptz,
+  ends_at timestamptz,
+  priority integer NOT NULL DEFAULT 3 CHECK (priority BETWEEN 1 AND 5),
+  -- Textos de la tarjeta (badge, kicker, title, subtitle, image, note, timingLabel).
+  display jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CHECK (ends_at IS NULL OR starts_at IS NULL OR ends_at > starts_at)
+);
+CREATE INDEX IF NOT EXISTS promo_offers_active_idx ON public.promo_offers (is_active, priority);
+
+ALTER TABLE public.promo_offers ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow public read promo_offers" ON public.promo_offers;
+CREATE POLICY "Allow public read promo_offers" ON public.promo_offers FOR SELECT USING (true);
+-- TEMPORAL (igual que dishes hoy): escritura abierta hasta que el personal use
+-- Supabase Auth (Fase 2, Tarea 1); entonces se limitará al rol admin.
+DROP POLICY IF EXISTS "Allow public write promo_offers" ON public.promo_offers;
+CREATE POLICY "Allow public write promo_offers" ON public.promo_offers FOR ALL USING (true) WITH CHECK (true);
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime')
+     AND NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'promo_offers') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.promo_offers;
+  END IF;
+END $$;
+
+-- ---------- Orden de los platos ----------
+-- Todos los platos de una comanda comparten created_at (misma transacción):
+-- line_no conserva el orden del carrito para que el cliente los empareje.
+ALTER TABLE public.order_items ADD COLUMN IF NOT EXISTS line_no integer;
 
 -- ---------- Idempotencia ----------
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS idempotency_key uuid;
@@ -91,7 +136,7 @@ AS $$
         'price', i.price,
         'notes', i.notes,
         'station', i.station
-      ) ORDER BY i.created_at, i.id)
+      ) ORDER BY i.line_no NULLS LAST, i.created_at, i.id)
       FROM public.order_items AS i
       WHERE i.order_id = o.id
     ), '[]'::jsonb)
@@ -101,7 +146,8 @@ AS $$
 $$;
 
 -- ---------- place_order ----------
--- p_items: [{ "dish_id": "lomo-saltado", "quantity": 2, "notes": "sin cebolla", "station": "fuego_grill" }, ...]
+-- p_items: [{ "dish_id": "lomo-saltado", "quantity": 2, "notes": "sin cebolla", "station": "fuego_grill",
+--             "promo_offer_id": "promo-..." (opcional) }, ...]
 --          o, para maridajes que no están en la carta: { "pairing_name": "Pisco Sour", "quantity": 1 }
 --          `station` es solo una sugerencia de enrutamiento a cocina; nunca afecta al precio.
 -- p_origin: 'QR COMENSAL' (queda 'por-validar') o 'GARZÓN' (entra directo 'en-cocina').
@@ -131,6 +177,7 @@ DECLARE
   v_order_id text;
   v_item jsonb;
   v_dish record;
+  v_discount numeric(5,2);
   v_qty integer;
   v_name text;
   v_price numeric(10,2);
@@ -141,6 +188,7 @@ DECLARE
   v_counts jsonb := '{}'::jsonb;
   v_units integer := 0;
   v_total numeric(10,2) := 0;
+  v_line integer := 0;
 BEGIN
   IF p_idempotency_key IS NULL THEN
     RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'Falta la referencia del pedido.';
@@ -211,6 +259,21 @@ BEGIN
       v_dish_id := v_dish.id;
       v_name := v_dish.name;
       v_price := v_dish.price;
+
+      IF coalesce(v_item->>'promo_offer_id', '') <> '' THEN
+        SELECT p.discount_percent INTO v_discount
+        FROM public.promo_offers AS p
+        WHERE p.id = v_item->>'promo_offer_id'
+          AND p.main_dish_id = v_dish.id
+          AND p.is_active
+          AND (p.starts_at IS NULL OR p.starts_at <= now())
+          AND (p.ends_at IS NULL OR p.ends_at > now());
+        IF NOT FOUND THEN
+          RAISE EXCEPTION USING ERRCODE = '22023',
+            MESSAGE = 'Una de las ofertas ya no está vigente. Revisa tu pedido.';
+        END IF;
+        v_price := round(v_dish.price * (100 - v_discount) / 100, 2);
+      END IF;
       v_station := CASE v_dish.category_id
         WHEN 'fondos' THEN 'wok_saute'
         WHEN 'entradas' THEN 'frio_nikkei'
@@ -243,8 +306,9 @@ BEGIN
         MESSAGE = format('La orden no puede superar las %s unidades en total.', v_max_per_order);
     END IF;
 
-    INSERT INTO public.order_items (order_id, dish_id, name, quantity, price, notes, station, item_status, checked)
-    VALUES (v_order_id, v_dish_id, v_name, v_qty, v_price, v_notes, v_station, 'pendiente', false);
+    v_line := v_line + 1;
+    INSERT INTO public.order_items (order_id, line_no, dish_id, name, quantity, price, notes, station, item_status, checked)
+    VALUES (v_order_id, v_line, v_dish_id, v_name, v_qty, v_price, v_notes, v_station, 'pendiente', false);
 
     v_total := v_total + v_price * v_qty;
   END LOOP;

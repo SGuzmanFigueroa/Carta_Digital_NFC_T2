@@ -97,6 +97,8 @@ export type PlaceOrderItem = {
   notes?: string;
   /** Solo enruta el plato en cocina; nunca afecta al precio. */
   station?: StationId;
+  /** Oferta flash aplicada; el servidor valida su vigencia y calcula el precio. */
+  promoOfferId?: string;
 };
 
 export type PlaceOrderInput = {
@@ -134,7 +136,8 @@ export function toPlaceOrderItems(
   return cartItems.map(({ item, quantity, notes }) => ({
     ...(isTemporaryPairingItem(item) ? { pairingName: item.name } : { dishId: item.id }),
     quantity,
-    notes: notes?.trim() || undefined
+    notes: notes?.trim() || undefined,
+    promoOfferId: item.appliedPromoOfferId
   }));
 }
 
@@ -171,7 +174,8 @@ export async function placeOrderInDb(input: PlaceOrderInput): Promise<PlacedOrde
       pairing_name: item.pairingName,
       quantity: item.quantity,
       notes: item.notes,
-      station: item.station
+      station: item.station,
+      promo_offer_id: item.promoOfferId
     })),
     p_idempotency_key: input.idempotencyKey,
     p_pax: input.pax ?? 2,

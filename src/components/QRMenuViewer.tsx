@@ -60,7 +60,7 @@ import { GeofenceWarningModal } from './menu/GeofenceWarningModal';
 // CD-28 · Bottom Sheet de asistencia en mesa (motivos exactos del ticket).
 import { WaiterCallModal } from './menu/WaiterCallModal';
 import { formatSoles } from '@/utils/promo';
-import { INITIAL_ACTIVE_PROMO_OFFERS } from '@/data/mockData';
+import { fetchPromoOffers, rowToPromoOffer } from '@/services/promoService';
 import { DietaryFilters, DIETARY_FILTERS, getDietaryPreferences } from './menu/DietaryFilters';
 import type { DietaryPreference } from '../types';
 import { getArDishDimensionCm } from '@/config/arDishProfiles';
@@ -121,8 +121,6 @@ function localizeGeofenceMessage(
 const PROMO_DEAL_DISCOUNT = 15;
 /** Duración de la cuenta regresiva del pop-up (755s = "¡TERMINA EN 12:35!"). */
 const PROMO_DEAL_DURATION_SECONDS = 755;
-/** Platos reales del menú que se rotan en el pop-up (con respaldo automático). */
-const PROMO_DEAL_IDS = ['wagyu-a5', 'pulpo-brasa', 'esfera-chocolate'];
 /**
  * ⏱️ Autoplay de la tira "Oferta Flash" de portada: cada cuánto rota de plato.
  * 2000ms = ritmo "2s" (dentro del rango 1.8-2s pedido para el banner): pasa de
@@ -180,6 +178,10 @@ const normalizeTable = (table: string) => normalizeStr(table).replace(/\s+/g, '-
 
 
 type MenuCartItem = { item: MenuItem; quantity: number; notes?: string };
+
+/** Un mismo plato puede estar dos veces en el carrito: a precio de carta y en oferta. */
+const cartLineKey = (item: MenuItem) =>
+  item.appliedPromoOfferId ? `${item.id}|promo:${item.appliedPromoOfferId}` : item.id;
 
 interface QRMenuViewerProps {
   menuItems: MenuItem[];
@@ -931,11 +933,9 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     hapticAddToCart();
 
     setCart((prev) => {
-      const existing = prev.find((c) => c.item.id === item.id);
-      if (existing) {
-        return prev.map((c) =>
-          c.item.id === item.id ? { ...c, quantity: c.quantity + 1 } : c
-        );
+      const key = cartLineKey(item);
+      if (prev.some((c) => cartLineKey(c.item) === key)) {
+        return prev.map((c) => (cartLineKey(c.item) === key ? { ...c, quantity: c.quantity + 1 } : c));
       }
       return [...prev, { item, quantity: 1 }];
     });
@@ -952,61 +952,55 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   // ==========================================================================
   //  CD-16 · OFERTA FLASH: platos reales + estado del pop-up promocional
   // ==========================================================================
-  const [activeStoredOffers, setActiveStoredOffers] = useState<any[]>(INITIAL_ACTIVE_PROMO_OFFERS);
+  // Ofertas vigentes desde Supabase (public.promo_offers). Solo se muestran las
+  // que el servidor va a respetar al cobrar: sin ofertas no hay pop-up.
+  const [livePromoRows, setLivePromoRows] = useState<Awaited<ReturnType<typeof fetchPromoOffers>>>([]);
 
   useEffect(() => {
-    const handler = () => {
-      try {
-        const raw = localStorage.getItem('gastropulse_active_promo_offers');
-        if (raw) {
-          setActiveStoredOffers(JSON.parse(raw));
-        } else {
-          setActiveStoredOffers(INITIAL_ACTIVE_PROMO_OFFERS);
-        }
-      } catch (e) {}
+    let cancelled = false;
+    const load = () => {
+      fetchPromoOffers({ onlyLive: true })
+        .then((rows) => {
+          if (!cancelled) setLivePromoRows(rows);
+        })
+        .catch((err) => console.warn('[promo] No se pudieron cargar las ofertas:', err));
     };
-    handler();
-    window.addEventListener('gastropulse_promo_offers_changed', handler);
-    window.addEventListener('storage', handler);
+    load();
+    // El panel de admin avisa en la misma pestaña; el intervalo cubre las ventanas que vencen.
+    window.addEventListener('gastropulse_promo_offers_changed', load);
+    const intervalId = window.setInterval(load, 60_000);
     return () => {
-      window.removeEventListener('gastropulse_promo_offers_changed', handler);
-      window.removeEventListener('storage', handler);
+      cancelled = true;
+      window.removeEventListener('gastropulse_promo_offers_changed', load);
+      window.clearInterval(intervalId);
     };
   }, []);
 
   const promoDeals = React.useMemo<MenuItem[]>(() => {
-    const activeFromStore = activeStoredOffers.filter((o) => o.isActive !== false);
-    if (activeFromStore.length > 0) {
-      const mapped = activeFromStore
-        .map((offer) => {
-          const item = menuItems.find((m) => m.id === offer.mainDishId);
-          if (!item) return null;
-          // CD-31 · Título de la oferta (dato de la BD) y plato, localizados a la vez.
-          const localizedOffer = localizePromoOffer(offer, language);
-          const localizedItem = localizeMenuItem(item, language);
-          return {
-            ...localizedItem,
-            name: localizedOffer.title || localizedItem.name,
-            promoDiscountPercent: offer.discountPercent ?? PROMO_DEAL_DISCOUNT,
-            promoPriceCustom: offer.promoPrice,
-            promoOriginalPriceCustom: offer.originalPrice,
-            promoBadge: offer.badge,
-            promoKicker: offer.kicker,
-            promoTimingLabel: offer.timingLabel,
-            promoOfferId: offer.id,
-            promoTitle: offer.title,
-            promoSubtitle: offer.subtitle,
-          } as MenuItem;
-        })
-        .filter((item): item is MenuItem => item !== null);
-      if (mapped.length > 0) return mapped;
-    }
-    const matched = PROMO_DEAL_IDS.map((id) => menuItems.find((item) => item.id === id)).filter(
-      (item): item is MenuItem => Boolean(item)
-    );
-    const fallbackDeals = matched.length > 0 ? matched : menuItems.slice(0, 3);
-    return fallbackDeals.map((item) => localizeMenuItem(item, language));
-  }, [menuItems, activeStoredOffers, language]);
+    return livePromoRows
+      .map((row) => {
+        const item = menuItems.find((m) => m.id === row.main_dish_id);
+        if (!item) return null;
+        const offer = rowToPromoOffer(row, menuItems);
+        // CD-31 · Título de la oferta (dato de la BD) y plato, localizados a la vez.
+        const localizedOffer = localizePromoOffer(offer, language);
+        const localizedItem = localizeMenuItem(item, language);
+        return {
+          ...localizedItem,
+          name: localizedOffer.title || localizedItem.name,
+          promoDiscountPercent: offer.discountPercent,
+          promoPriceCustom: offer.promoPrice,
+          promoOriginalPriceCustom: offer.originalPrice,
+          promoBadge: offer.badge,
+          promoKicker: offer.kicker,
+          promoTimingLabel: offer.timingLabel,
+          promoOfferId: offer.id,
+          promoTitle: offer.title,
+          promoSubtitle: offer.subtitle,
+        } as MenuItem;
+      })
+      .filter((item): item is MenuItem => item !== null);
+  }, [menuItems, livePromoRows, language]);
 
   /**
    * Abre el pop-up promocional. Si llega el `id` de un plato (toque en la tira
@@ -1098,13 +1092,12 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     hapticAddToCart();
 
     setCart((prev) => {
-      const existing = prev.find((c) => c.item.id === dish.id && c.item.price === promoPrice);
-      if (existing) {
-        return prev.map((c) =>
-          c.item.id === dish.id && c.item.price === promoPrice ? { ...c, quantity: c.quantity + 1 } : c
-        );
+      const isSamePromoLine = (c: MenuCartItem) => c.item.id === dish.id && c.item.appliedPromoOfferId === dish.promoOfferId;
+      if (prev.some(isSamePromoLine)) {
+        return prev.map((c) => (isSamePromoLine(c) ? { ...c, quantity: c.quantity + 1 } : c));
       }
-      return [...prev, { item: { ...dish, price: promoPrice }, quantity: 1 }];
+      // appliedPromoOfferId: el servidor valida la oferta y fija el precio al cobrar.
+      return [...prev, { item: { ...dish, price: promoPrice, appliedPromoOfferId: dish.promoOfferId }, quantity: 1 }];
     });
 
     setIsPromoModalOpen(false);
@@ -1112,23 +1105,23 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       t('toast.promoApplied', {
         dish: dish.name,
         price: formatSoles(promoPrice),
-        percent: PROMO_DEAL_DISCOUNT
+        percent: dish.promoDiscountPercent ?? PROMO_DEAL_DISCOUNT
       }),
       'local_fire_department'
     );
   };
 
-  const handleRemoveFromCart = (itemId: string) => {
+  const handleRemoveFromCart = (lineKey: string) => {
     setCart((prev) =>
       prev
-        .map((c) => (c.item.id === itemId ? { ...c, quantity: c.quantity - 1 } : c))
+        .map((c) => (cartLineKey(c.item) === lineKey ? { ...c, quantity: c.quantity - 1 } : c))
         .filter((c) => c.quantity > 0)
     );
   };
 
-  const handleUpdateNotes = (itemId: string, notes: string) => {
+  const handleUpdateNotes = (lineKey: string, notes: string) => {
     setCart((prev) =>
-      prev.map((c) => (c.item.id === itemId ? { ...c, notes } : c))
+      prev.map((c) => (cartLineKey(c.item) === lineKey ? { ...c, notes } : c))
     );
   };
 
@@ -2050,7 +2043,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
             <div className="space-y-2.5">
               {cart.map((c) => (
                 <div
-                  key={c.item.id}
+                  key={cartLineKey(c.item)}
                   className="bg-[#f8fafc] dark:bg-[#1e1f28] p-3 rounded-xl border border-[#e2e8f0] dark:border-[#2a2b36] space-y-2"
                 >
                   <div className="flex items-center justify-between gap-2">
@@ -2066,7 +2059,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                     <div className="inline-flex items-center rounded-xl bg-[#f1f5f9] dark:bg-[#15161c] border border-[#cbd5e1] dark:border-[#2d2e38] p-0.5 shadow-sm">
                       <button
                         type="button"
-                        onClick={() => handleRemoveFromCart(c.item.id)}
+                        onClick={() => handleRemoveFromCart(cartLineKey(c.item))}
                         className="w-7 h-7 rounded-lg flex items-center justify-center text-[#475569] dark:text-[#a1a1aa] hover:bg-primary hover:text-white active:scale-90 transition-all font-bold text-[15px] cursor-pointer select-none"
                         title={t('cart.decrease')}
                       >
@@ -2086,21 +2079,21 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                     </div>
                   </div>
 
-                  {Boolean(activeNoteItemId[c.item.id] || (c.notes && c.notes.trim().length > 0)) ? (
+                  {Boolean(activeNoteItemId[cartLineKey(c.item)] || (c.notes && c.notes.trim().length > 0)) ? (
                     <div className="relative flex items-center">
                       <input
                         type="text"
                         maxLength={60}
                         placeholder={t('cart.notePlaceholder')}
                         value={c.notes || ''}
-                        onChange={(e) => handleUpdateNotes(c.item.id, e.target.value)}
+                        onChange={(e) => handleUpdateNotes(cartLineKey(c.item), e.target.value)}
                         className="w-full bg-white dark:bg-[#15161c] text-[#0f172a] dark:text-[#e5e1e4] pl-2.5 pr-8 py-2 min-h-[44px] rounded-lg text-[11px] placeholder:text-[#94a3b8] dark:placeholder:text-[#71717a] border border-[#e2e8f0] dark:border-[#2d2e38] focus:outline-none focus:border-primary"
-                        autoFocus={Boolean(activeNoteItemId[c.item.id] && !c.notes)}
+                        autoFocus={Boolean(activeNoteItemId[cartLineKey(c.item)] && !c.notes)}
                       />
                       {(!c.notes || c.notes.length === 0) ? (
                         <button
                           type="button"
-                          onClick={() => setActiveNoteItemId((prev) => ({ ...prev, [c.item.id]: false }))}
+                          onClick={() => setActiveNoteItemId((prev) => ({ ...prev, [cartLineKey(c.item)]: false }))}
                           aria-label={t('cart.closeNote')}
                           className="absolute right-2 text-[#94a3b8] hover:text-[#475569] dark:hover:text-white p-1 cursor-pointer"
                         >
@@ -2110,8 +2103,8 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                         <button
                           type="button"
                           onClick={() => {
-                            handleUpdateNotes(c.item.id, '');
-                            setActiveNoteItemId((prev) => ({ ...prev, [c.item.id]: false }));
+                            handleUpdateNotes(cartLineKey(c.item), '');
+                            setActiveNoteItemId((prev) => ({ ...prev, [cartLineKey(c.item)]: false }));
                           }}
                           title={t('cart.removeNote')}
                           aria-label={t('cart.removeNote')}
@@ -2124,7 +2117,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                   ) : (
                     <button
                       type="button"
-                      onClick={() => setActiveNoteItemId((prev) => ({ ...prev, [c.item.id]: true }))}
+                      onClick={() => setActiveNoteItemId((prev) => ({ ...prev, [cartLineKey(c.item)]: true }))}
                       className="w-full flex items-center justify-start gap-1.5 px-2.5 py-1.5 text-[11px] font-medium text-[#64748b] dark:text-[#94a3b8] hover:text-primary dark:hover:text-primary hover:bg-[#f1f5f9] dark:hover:bg-[#181920] rounded-lg border border-dashed border-[#cbd5e1] dark:border-[#2a2b36] transition-colors cursor-pointer"
                     >
                       <span className="material-symbols-outlined text-[15px]">edit_note</span>

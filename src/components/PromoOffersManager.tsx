@@ -1,8 +1,9 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ActivePromoOffer, MenuItem, PromoMechanic, PromoOfferDraft } from '@/types';
-import { INITIAL_ACTIVE_PROMO_OFFERS, INITIAL_MENU_ITEMS } from '@/data/mockData';
+import { INITIAL_MENU_ITEMS } from '@/data/mockData';
+import { createPromoOffer, fetchPromoOffers, rowToPromoOffer, setPromoOfferActive } from '@/services/promoService';
 import { formatSoles } from '@/utils/promo';
 import {
   PROMO_DISCOUNT_TYPES,
@@ -59,31 +60,32 @@ export function PromoOffersManager({
   const [offerForm, setOfferForm] = useState<PromoOfferDraft>(createInitialOfferForm);
   // 📱 Modal de vista previa con el pop-up real del comensal.
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  // 🗂️ Ofertas en curso mostradas en la parrilla inferior del panel.
-  const PROMO_STORAGE_KEY = 'gastropulse_active_promo_offers';
-  const [activeOffers, setActiveOffers] = useState<ActivePromoOffer[]>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem(PROMO_STORAGE_KEY);
-        if (saved) return JSON.parse(saved);
-      } catch (e) {
-        console.warn('Error reading active promo offers from localStorage', e);
-      }
-    }
-    return INITIAL_ACTIVE_PROMO_OFFERS;
-  });
+  // 🗂️ Ofertas en curso (public.promo_offers). La carta del comensal y el
+  // servidor de pedidos leen la misma tabla, así el descuento se respeta al cobrar.
+  const [offerRows, setOfferRows] = useState<Awaited<ReturnType<typeof fetchPromoOffers>>>([]);
+  const [isSavingOffer, setIsSavingOffer] = useState(false);
+  const showToastRef = useRef(onShowToast);
+  useEffect(() => {
+    showToastRef.current = onShowToast;
+  }, [onShowToast]);
 
-  const persistOffers = (offers: ActivePromoOffer[]) => {
-    setActiveOffers(offers);
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem(PROMO_STORAGE_KEY, JSON.stringify(offers));
-        window.dispatchEvent(new Event('gastropulse_promo_offers_changed'));
-      } catch (e) {
-        console.warn('Error writing active promo offers to localStorage', e);
-      }
-    }
-  };
+  useEffect(() => {
+    let cancelled = false;
+    fetchPromoOffers()
+      .then((rows) => {
+        if (!cancelled) setOfferRows(rows);
+      })
+      .catch((err) => {
+        console.warn('[promo] No se pudieron cargar las ofertas:', err);
+        if (!cancelled) showToastRef.current('No se pudieron cargar las ofertas desde Supabase', 'error');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  /** Avisa a la carta abierta en esta misma pestaña para que recargue las ofertas. */
+  const notifyOffersChanged = () => window.dispatchEvent(new Event('gastropulse_promo_offers_changed'));
 
   // Tokens de color compartidos con las demás secciones del panel.
   const cardBg = isLight ? 'bg-[#f8fafc] border-[#e2e8f0] shadow-sm' : isHighContrast ? 'bg-black border-2 border-white' : 'bg-[#1C1C1C] border-[#2A2A2A]';
@@ -104,6 +106,10 @@ export function PromoOffersManager({
 
   // 🍽️ Carta disponible: datos reales de Supabase o catálogo demo offline.
   const dishOptions = useMemo(() => (dishes.length > 0 ? dishes : INITIAL_MENU_ITEMS), [dishes]);
+  const activeOffers = useMemo<ActivePromoOffer[]>(
+    () => offerRows.map((row) => rowToPromoOffer(row, dishOptions)),
+    [offerRows, dishOptions]
+  );
   const mainDishId = offerForm.mainDishId || dishOptions[0]?.id || '';
   const mainDish = useMemo(
     () => dishOptions.find((dish) => dish.id === mainDishId) ?? null,
@@ -190,7 +196,8 @@ export function PromoOffersManager({
     onShowToast('Vista previa móvil: así verá el comensal la oferta en su celular', 'smartphone');
   };
 
-  const handleAddOffer = () => {
+  const handleAddOffer = async () => {
+    if (isSavingOffer) return;
     if (!mainDish) {
       onShowToast('Selecciona el plato principal de la oferta', 'warning');
       return;
@@ -202,13 +209,41 @@ export function PromoOffersManager({
     }
 
     const nextOffer = buildActiveOffer(offerForm, mainDish, complementDish);
-    persistOffers([nextOffer, ...activeOffers]);
-    onShowToast(`Oferta añadida: ${nextOffer.title} (${nextOffer.badge})`, 'check_circle');
-    setOfferForm(createInitialOfferForm());
+    if (!(nextOffer.discountPercent > 0 && nextOffer.discountPercent < 100)) {
+      onShowToast('El descuento debe ser mayor a 0% y menor a 100%', 'warning');
+      return;
+    }
+    // Vigencia exacta solo en modo Flash; el horario recurrente aún no lo valida el servidor.
+    const toIso = (value: string) => (value ? new Date(value).toISOString() : null);
+    setIsSavingOffer(true);
+    try {
+      const row = await createPromoOffer(nextOffer, {
+        startsAt: offerForm.isRecurring ? null : toIso(offerForm.startAt),
+        endsAt: offerForm.isRecurring ? null : toIso(offerForm.endAt),
+        priority: Number(offerForm.priority) || 3
+      });
+      setOfferRows((rows) => [row, ...rows]);
+      notifyOffersChanged();
+      onShowToast(`Oferta añadida: ${nextOffer.title} (${nextOffer.badge})`, 'check_circle');
+      setOfferForm(createInitialOfferForm());
+    } catch (err) {
+      console.error('[promo] No se pudo guardar la oferta:', err);
+      onShowToast('No se pudo guardar la oferta en Supabase', 'error');
+    } finally {
+      setIsSavingOffer(false);
+    }
   };
 
-  const handleToggleOfferActive = (offer: ActivePromoOffer) => {
-    persistOffers(activeOffers.map((item) => (item.id === offer.id ? { ...item, isActive: !item.isActive } : item)));
+  const handleToggleOfferActive = async (offer: ActivePromoOffer) => {
+    try {
+      await setPromoOfferActive(offer.id, !offer.isActive);
+    } catch (err) {
+      console.error('[promo] No se pudo cambiar la oferta:', err);
+      onShowToast('No se pudo actualizar la oferta en Supabase', 'error');
+      return;
+    }
+    setOfferRows((rows) => rows.map((row) => (row.id === offer.id ? { ...row, is_active: !offer.isActive } : row)));
+    notifyOffersChanged();
     onShowToast(
       `"${offer.title}" ${offer.isActive ? 'retirada' : 'publicada'} en la Carta Digital QR`,
       offer.isActive ? 'visibility_off' : 'visibility'
@@ -704,10 +739,11 @@ export function PromoOffersManager({
           <button
             type="button"
             onClick={handleAddOffer}
-            className="px-4 py-2.5 min-h-[44px] rounded-lg bg-[#FF5A1F] hover:bg-[#FF703D] text-white font-bold text-[12px] flex items-center gap-1.5 cursor-pointer shadow-md shadow-[#FF5A1F]/20 active:scale-95 transition-all"
+            disabled={isSavingOffer}
+            className="px-4 py-2.5 min-h-[44px] rounded-lg bg-[#FF5A1F] hover:bg-[#FF703D] disabled:opacity-60 disabled:cursor-wait text-white font-bold text-[12px] flex items-center gap-1.5 cursor-pointer shadow-md shadow-[#FF5A1F]/20 active:scale-95 transition-all"
           >
             <span className="material-symbols-outlined text-[16px]">add_circle</span>
-            <span>Añadir Oferta</span>
+            <span>{isSavingOffer ? 'Guardando…' : 'Añadir Oferta'}</span>
           </button>
         </div>
       </div>

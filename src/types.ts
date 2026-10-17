@@ -210,6 +210,16 @@ export interface MenuItem {
   badgeEn?: string;
   dietaryEn?: string;
   pairingEn?: string;
+  /** Datos de la oferta flash cuando el plato se muestra como promoción. */
+  promoOfferId?: string;
+  promoDiscountPercent?: number;
+  promoPriceCustom?: number;
+  promoOriginalPriceCustom?: number;
+  /**
+   * Solo en ítems del carrito: oferta aplicada con "Aplicar descuento". El
+   * servidor la valida y calcula el precio; sin ella se cobra el de carta.
+   */
+  appliedPromoOfferId?: string;
 }
 
 export type DietaryPreference = 'vegetarian' | 'gluten-free' | 'dairy-free' | 'spicy';

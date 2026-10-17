@@ -99,6 +99,33 @@ test('place_order: un plato inválido revierte toda la comanda (atómico)', asyn
   } finally { await db.close(); }
 });
 
+test('place_order: ofertas flash validadas y calculadas en el servidor', async () => {
+  const db = await setup();
+  try {
+    await db.exec(`INSERT INTO public.promo_offers(id,mechanic,main_dish_id,discount_percent,is_active,starts_at,ends_at) VALUES
+      ('vigente','discount','lomo',15,true,now() - interval '1 hour',now() + interval '1 hour'),
+      ('sin-fechas','two_for_one','pisco',50,true,NULL,NULL),
+      ('vencida','discount','lomo',30,true,now() - interval '2 hours',now() - interval '1 hour'),
+      ('futura','discount','lomo',30,true,now() + interval '1 hour',NULL),
+      ('apagada','discount','lomo',30,false,NULL,NULL);`);
+
+    const order = await place(db, [
+      { dish_id: 'lomo', quantity: 2, promo_offer_id: 'vigente' },
+      { dish_id: 'pisco', quantity: 1, promo_offer_id: 'sin-fechas' },
+      { dish_id: 'lomo', quantity: 1 },
+    ]);
+    assert.deepEqual(order.items.map(i => Number(i.price)), [57.8, 15, 68], '68 * 0.85 = 57.80; 30 * 0.5 = 15');
+    assert.equal(Number(order.total), 57.8 * 2 + 15 + 68);
+
+    for (const id of ['vencida', 'futura', 'apagada', 'no-existe']) {
+      await assert.rejects(place(db, [{ dish_id: 'lomo', quantity: 1, promo_offer_id: id }]), /ya no está vigente/, id);
+    }
+    // Una oferta del pisco no abarata el lomo.
+    await assert.rejects(place(db, [{ dish_id: 'lomo', quantity: 1, promo_offer_id: 'sin-fechas' }]), /ya no está vigente/);
+    await assert.rejects(db.exec("INSERT INTO public.promo_offers(mechanic,main_dish_id,discount_percent) VALUES ('discount','lomo',100)"));
+  } finally { await db.close(); }
+});
+
 test('prototipo cd4 archivado sin perder datos', async () => {
   const db = await setup();
   try {
