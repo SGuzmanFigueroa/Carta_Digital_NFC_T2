@@ -45,8 +45,9 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     };
     syncConfig();
 
-    const handleCustomEvent = (e: any) => {
-      if (e.detail) setPaymentConfig(e.detail);
+    const handleCustomEvent = (e: Event) => {
+      const detail = (e as CustomEvent<PaymentGatewayConfig | undefined>).detail;
+      if (detail) setPaymentConfig(detail);
       else syncConfig();
     };
 

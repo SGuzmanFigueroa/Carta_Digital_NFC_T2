@@ -27,7 +27,7 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
   const [editingStaff, setEditingStaff] = useState<StaffMember | null>(null);
   const [changingPinStaff, setChangingPinStaff] = useState<StaffMember | null>(null);
   const [viewingPermissionsStaff, setViewingPermissionsStaff] = useState<StaffMember | null>(null);
-  const [editingPermissions, setEditingPermissions] = useState<Record<string, 'allow' | 'read' | 'deny'>>({});
+  const [editingPermissions, setEditingPermissions] = useState<NonNullable<StaffMember['customPermissions']>>({});
 
   // --- Scroll horizontal "profesional" de las pestañas de filtro (Todos / Administración / etc.) ---
   const tabsScrollRef = useRef<HTMLDivElement>(null);
@@ -74,7 +74,7 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
     const initial = staff.customPermissions 
       ? { ...getDefaultPermissionsForRole(staff.role), ...staff.customPermissions }
       : getDefaultPermissionsForRole(staff.role);
-    setEditingPermissions(initial as any);
+    setEditingPermissions(initial);
     setViewingPermissionsStaff(staff);
   };
   const [newPinValue, setNewPinValue] = useState('');
@@ -259,7 +259,7 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
             <button
               key={tab.id}
               type="button"
-              onClick={() => setActiveTab(tab.id as any)}
+              onClick={() => setActiveTab(tab.id as typeof activeTab)}
               className={`px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors shrink-0 cursor-pointer whitespace-nowrap ${
                 activeTab === tab.id
                   ? 'bg-[#ff5708] text-[#2b0b00] font-bold shadow-sm'
@@ -492,7 +492,7 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
                   <label className="block text-[11px] font-bold text-[#c6c5cf] uppercase mb-1">Rol Operativo</label>
                   <select
                     value={newRole}
-                    onChange={(e) => setNewRole(e.target.value as any)}
+                    onChange={(e) => setNewRole(e.target.value as StaffMember['role'])}
                     className="w-full px-3 py-2 rounded-lg bg-[#141416] border border-[#2d2e38] text-white focus:border-[#ff5708] focus:outline-none"
                   >
                     <option value="floor">Camarero / Sala</option>
@@ -821,14 +821,14 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
               </div>
 
               <div className="divide-y divide-[#2d2e38] border border-[#2d2e38] rounded-xl overflow-hidden bg-[#141416]">
-                {[
+                {([
                   { id: 'panelAdmin', title: 'Panel de Administración', desc: 'Cierres de caja, métricas financieras y auditoría' },
                   { id: 'kdsCocina', title: 'Cocina KDS', desc: 'Visualización y despacho de comandas en tiempo real' },
                   { id: 'edicionMenu', title: 'Edición de Menú', desc: 'Cambio de precios, recetas y disponibilidad' },
                   { id: 'cobroPos', title: 'Cobro TPV / POS', desc: 'Cobro de mesas, tarjetas y emisión de boletas' },
                   { id: 'anulacionComandas', title: 'Anulación de Comandas', desc: 'Cancelación de pedidos y descuentos especiales' },
-                ].map((cap) => {
-                  const currentVal = (editingPermissions as any)[cap.id] || 'deny';
+                ] as const).map((cap) => {
+                  const currentVal = editingPermissions[cap.id] || 'deny';
                   return (
                     <div key={cap.id} className="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                       <div className="min-w-0 flex-1">
@@ -914,7 +914,7 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
                       customPermissions: editingPermissions,
                       permissions: 'Permisos Personalizados'
                     };
-                    onUpdateStaff(updated as any);
+                    onUpdateStaff(updated);
                     setViewingPermissionsStaff(null);
                     onShowToast(`Permisos de ${viewingPermissionsStaff.name} guardados con éxito`, 'verified_user');
                   }}

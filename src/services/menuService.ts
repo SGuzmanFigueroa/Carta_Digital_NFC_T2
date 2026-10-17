@@ -4,6 +4,7 @@ import { INITIAL_MENU_ITEMS } from '@/data/mockData';
 import type { Database } from '@/types/database.types';
 
 type DishRow = Database['public']['Tables']['dishes']['Row'];
+type DishUpdate = Database['public']['Tables']['dishes']['Update'];
 
 /** Fila de public.dishes → plato de la carta (compartido con el render del servidor). */
 export function mapDishRow(d: DishRow): MenuItem {
@@ -110,7 +111,7 @@ export async function createDishInDb(dish: Partial<MenuItem>): Promise<MenuItem 
 
 export async function updateDishInDb(dishId: string, updates: Partial<MenuItem>): Promise<boolean> {
   try {
-    const payload: any = {};
+    const payload: DishUpdate = {};
     if (updates.name !== undefined) payload.name = updates.name;
     if (updates.description !== undefined) payload.description = updates.description;
     if (updates.price !== undefined) payload.price = updates.price;

@@ -176,7 +176,7 @@ export function ComplaintBookModal({
                       </label>
                       <select
                         value={docType}
-                        onChange={(e: any) => setDocType(e.target.value)}
+                        onChange={(e) => setDocType(e.target.value as typeof docType)}
                         className="w-full h-10 px-2 rounded-lg bg-[#f8fafc] dark:bg-[#1b1c24] border border-[#cbd5e1] dark:border-[#2d2e38] text-[12px] focus:outline-none focus:border-[#ff5708]"
                       >
                         <option value="DNI">DNI</option>

@@ -237,15 +237,16 @@ export const PromoFlashTicker = React.memo(function PromoFlashTicker({
   // con módulo para no quedar nunca fuera de rango.
   const currentIndex = totalDeals > 0 ? activeIndex % totalDeals : 0;
   const deal = totalDeals > 0 ? deals[currentIndex] : undefined;
-  const effectiveDiscount = (deal as any)?.promoDiscountPercent ?? discountPercent;
+  const effectiveDiscount = deal?.promoDiscountPercent ?? discountPercent;
 
   const pricing = useMemo(() => {
     if (!deal) return null;
-    if ((deal as any)?.promoPriceCustom && (deal as any)?.promoOriginalPriceCustom) {
+    const { promoPriceCustom, promoOriginalPriceCustom } = deal;
+    if (promoPriceCustom && promoOriginalPriceCustom) {
       return {
-        originalPrice: (deal as any).promoOriginalPriceCustom,
-        promoPrice: (deal as any).promoPriceCustom,
-        savings: (deal as any).promoOriginalPriceCustom - (deal as any).promoPriceCustom,
+        originalPrice: promoOriginalPriceCustom,
+        promoPrice: promoPriceCustom,
+        savings: promoOriginalPriceCustom - promoPriceCustom,
         discountPercent: effectiveDiscount
       };
     }

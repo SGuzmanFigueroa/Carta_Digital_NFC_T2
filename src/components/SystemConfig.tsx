@@ -805,7 +805,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
-            setActiveSection(entry.target.id as any);
+            setActiveSection(entry.target.id as typeof activeSection);
           }
         });
       },
@@ -1049,7 +1049,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                 <a
                   key={item.id}
                   href={`#${item.id}`}
-                  onClick={() => { setActiveSection(item.id as any); setShowMobileNav(false); }}
+                  onClick={() => { setActiveSection(item.id as typeof activeSection); setShowMobileNav(false); }}
                   className={`gap-3 flex justify-between items-center px-4 py-3 rounded text-sm transition-all cursor-pointer ${
                     isActive
                       ? isLight
@@ -1682,7 +1682,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                     <select 
                       value={formData.paperWidth} 
                       onChange={(e) => {
-                        const newWidth = e.target.value as any;
+                        const newWidth = e.target.value as SystemConfigState['paperWidth'];
                         setFormData({...formData, paperWidth: newWidth});
                         const isEn = formData.language.includes('English');
                         onShowToast(isEn ? `Paper width set to ${newWidth}` : `Ancho de papel configurado en ${newWidth}`, 'receipt_long');
@@ -2592,13 +2592,13 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                 </h3>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {[
+                  {([
                     { key: 'acceptYape', label: 'Yape QR Móvil', icon: 'qr_code' },
                     { key: 'acceptPlin', label: 'Plin QR Móvil', icon: 'qr_code' },
                     { key: 'acceptPos', label: 'Tarjeta POS Inalámbrico', icon: 'point_of_sale' },
                     { key: 'acceptCash', label: 'Efectivo con Vuelto', icon: 'payments' },
-                  ].map((m) => {
-                    const isChecked = (paymentGatewayConfig as any)[m.key];
+                  ] as const).map((m) => {
+                    const isChecked = paymentGatewayConfig[m.key];
                     return (
                       <button
                         key={m.key}

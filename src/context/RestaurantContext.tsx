@@ -473,7 +473,7 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
   );
 
   // Broadcast channel for instantaneous cross-tab synchronization
-  const broadcastSync = useCallback((action: string, payload: any) => {
+  const broadcastSync = useCallback((action: string, payload: unknown) => {
     try {
       if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
         const channel = new BroadcastChannel('gastropulse_sync_bus');

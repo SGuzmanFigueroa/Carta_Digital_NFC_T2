@@ -5,6 +5,16 @@ import { createAuditLogInDb } from './authService';
 
 const STORAGE_KEY = 'gastropulse_system_config';
 
+const THEME_MODES: readonly SystemConfigState['themeMode'][] = ['obsidian', 'midnight', 'titanium', 'light', 'kds-high-contrast'];
+const DENSITIES: readonly SystemConfigState['density'][] = ['compact', 'touch'];
+const TIME_FORMATS: readonly SystemConfigState['timeFormat'][] = ['24h', '12h'];
+const PAPER_WIDTHS: readonly SystemConfigState['paperWidth'][] = ['80mm', '58mm'];
+
+/** Valor de la BD (texto libre) solo si es una de las opciones que entiende la app. */
+function oneOf<T extends string>(value: string | null, options: readonly T[]): T | undefined {
+  return options.find((option) => option === value);
+}
+
 export async function fetchSystemConfigFromDb(): Promise<SystemConfigState> {
   let localConfig: SystemConfigState | null = null;
   if (typeof window !== 'undefined') {
@@ -32,26 +42,26 @@ export async function fetchSystemConfigFromDb(): Promise<SystemConfigState> {
     const merged: SystemConfigState = {
       branchName: data.branch_name || localConfig?.branchName || INITIAL_CONFIG.branchName,
       branchRuc: data.branch_ruc || localConfig?.branchRuc || INITIAL_CONFIG.branchRuc,
-      logoUrl: (data as any).logo_url || localConfig?.logoUrl || "/logo.png",
+      logoUrl: data.logo_url || localConfig?.logoUrl || "/logo.png",
       managerName: data.manager_name || localConfig?.managerName || INITIAL_CONFIG.managerName,
       email: data.email || localConfig?.email || INITIAL_CONFIG.email,
       phone: data.phone || localConfig?.phone || INITIAL_CONFIG.phone,
-      soundAlerts: data.sound_alerts !== null ? data.sound_alerts : (localConfig?.soundAlerts ?? INITIAL_CONFIG.soundAlerts),
-      delayAlerts: data.delay_alerts !== null ? data.delay_alerts : (localConfig?.delayAlerts ?? INITIAL_CONFIG.delayAlerts),
-      paymentAlerts: (data as any).payment_alerts !== null ? (data as any).payment_alerts : (localConfig?.paymentAlerts ?? INITIAL_CONFIG.paymentAlerts),
-      lowStockAlerts: (data as any).low_stock_alerts !== null ? (data as any).low_stock_alerts : (localConfig?.lowStockAlerts ?? INITIAL_CONFIG.lowStockAlerts),
-      themeMode: (data.theme_mode as any) || localConfig?.themeMode || INITIAL_CONFIG.themeMode,
-      colorAccent: (data as any).color_accent || localConfig?.colorAccent || INITIAL_CONFIG.colorAccent,
-      density: (data as any).density || localConfig?.density || INITIAL_CONFIG.density,
-      language: (data as any).language || localConfig?.language || INITIAL_CONFIG.language,
+      soundAlerts: data.sound_alerts ?? (localConfig?.soundAlerts ?? INITIAL_CONFIG.soundAlerts),
+      delayAlerts: data.delay_alerts ?? (localConfig?.delayAlerts ?? INITIAL_CONFIG.delayAlerts),
+      paymentAlerts: data.payment_alerts ?? (localConfig?.paymentAlerts ?? INITIAL_CONFIG.paymentAlerts),
+      lowStockAlerts: data.low_stock_alerts ?? (localConfig?.lowStockAlerts ?? INITIAL_CONFIG.lowStockAlerts),
+      themeMode: oneOf(data.theme_mode, THEME_MODES) || localConfig?.themeMode || INITIAL_CONFIG.themeMode,
+      colorAccent: data.color_accent || localConfig?.colorAccent || INITIAL_CONFIG.colorAccent,
+      density: oneOf(data.density, DENSITIES) || localConfig?.density || INITIAL_CONFIG.density,
+      language: data.language || localConfig?.language || INITIAL_CONFIG.language,
       currency: data.currency || localConfig?.currency || INITIAL_CONFIG.currency,
       timezone: data.timezone || localConfig?.timezone || INITIAL_CONFIG.timezone,
-      timeFormat: (data as any).time_format || localConfig?.timeFormat || INITIAL_CONFIG.timeFormat,
-      printerIp: (data as any).printer_ip || localConfig?.printerIp || INITIAL_CONFIG.printerIp,
-      printerPort: (data as any).printer_port || localConfig?.printerPort || INITIAL_CONFIG.printerPort,
-      paperWidth: (data as any).paper_width || localConfig?.paperWidth || INITIAL_CONFIG.paperWidth,
-      autoCut: (data as any).auto_cut !== null ? (data as any).auto_cut : (localConfig?.autoCut ?? INITIAL_CONFIG.autoCut),
-      acousticBuzzer: (data as any).acoustic_buzzer !== null ? (data as any).acoustic_buzzer : (localConfig?.acousticBuzzer ?? INITIAL_CONFIG.acousticBuzzer)
+      timeFormat: oneOf(data.time_format, TIME_FORMATS) || localConfig?.timeFormat || INITIAL_CONFIG.timeFormat,
+      printerIp: data.printer_ip || localConfig?.printerIp || INITIAL_CONFIG.printerIp,
+      printerPort: data.printer_port || localConfig?.printerPort || INITIAL_CONFIG.printerPort,
+      paperWidth: oneOf(data.paper_width, PAPER_WIDTHS) || localConfig?.paperWidth || INITIAL_CONFIG.paperWidth,
+      autoCut: data.auto_cut ?? (localConfig?.autoCut ?? INITIAL_CONFIG.autoCut),
+      acousticBuzzer: data.acoustic_buzzer ?? (localConfig?.acousticBuzzer ?? INITIAL_CONFIG.acousticBuzzer)
     };
 
     if (typeof window !== 'undefined') {
@@ -104,7 +114,7 @@ export async function saveSystemConfigToDb(updated: SystemConfigState): Promise<
         auto_cut: updated.autoCut,
         acoustic_buzzer: updated.acousticBuzzer,
         updated_at: new Date().toISOString()
-      } as any);
+      });
 
     if (error) {
       console.error('Error updating system_config in Supabase:', error);

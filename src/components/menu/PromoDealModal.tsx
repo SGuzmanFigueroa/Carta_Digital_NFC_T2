@@ -542,12 +542,12 @@ export function PromoDealModal({
       : false;
 
     return validDeals.map((item, index) => {
-      const itemDiscount = (item as any)?.promoDiscountPercent ?? discountPercent;
-      const itemPricing = (item as any)?.promoPriceCustom && (item as any)?.promoOriginalPriceCustom
+      const itemDiscount = item.promoDiscountPercent ?? discountPercent;
+      const itemPricing = item.promoPriceCustom && item.promoOriginalPriceCustom
         ? {
-            originalPrice: (item as any).promoOriginalPriceCustom,
-            promoPrice: (item as any).promoPriceCustom,
-            savings: (item as any).promoOriginalPriceCustom - (item as any).promoPriceCustom,
+            originalPrice: item.promoOriginalPriceCustom,
+            promoPrice: item.promoPriceCustom,
+            savings: item.promoOriginalPriceCustom - item.promoPriceCustom,
             discountPercent: itemDiscount
           }
         : (offerPricing ?? calculatePromoPricing(item.price, itemDiscount));

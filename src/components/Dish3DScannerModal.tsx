@@ -151,7 +151,8 @@ export const Dish3DScannerModal: React.FC<Dish3DScannerModalProps> = ({
         setCameraError(null);
         onShowToast('Cámara trasera conectada con éxito', 'videocam');
       }
-    } catch (err: any) {
+    } catch (caught) {
+      const err = caught instanceof Error ? caught : new Error(String(caught));
       console.warn('Camera request error:', err);
       setCameraActive(false);
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
@@ -684,7 +685,7 @@ export const Dish3DScannerModal: React.FC<Dish3DScannerModalProps> = ({
                     </label>
                     <select
                       value={dishCategory}
-                      onChange={(e) => setDishCategory(e.target.value as any)}
+                      onChange={(e) => setDishCategory(e.target.value as typeof dishCategory)}
                       className="w-full px-3.5 py-2 rounded-xl bg-[#1c1d25] border border-[#2f313f] text-white text-[13px] focus:border-[#ff5708] focus:outline-none cursor-pointer"
                     >
                       <option value="fondos">Platos de Fondo</option>

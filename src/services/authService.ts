@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 import { AuthUser, StaffMember, RolePermissionItem, StaffAuditLogItem, PermissionState } from '@/types';
 import { cacheAuthProfile, clearAuthProfile } from '@/utils/security';
 import { clearSessionChoice, isBrowserSessionExpired, rememberSessionChoice } from '@/utils/sessionPersistence';
+import type { Database } from '@/types/database.types';
 
 // ==========================================
 // Sesión del personal (Supabase Auth)
@@ -318,7 +319,7 @@ export async function fetchRolePermissionsFromDb(): Promise<RolePermissionItem[]
     }
 
     const order = ['admin', 'sous_chef', 'waiter', 'bartender', 'runner'];
-    const items: RolePermissionItem[] = data.map((d: any) => ({
+    const items: RolePermissionItem[] = data.map((d) => ({
       id: d.id,
       roleId: d.role_id,
       roleTitle: d.role_title,
@@ -349,9 +350,11 @@ export async function updateRolePermissionInDb(
   value: PermissionState
 ): Promise<boolean> {
   try {
+    const patch: Database['public']['Tables']['role_permissions']['Update'] = { updated_at: new Date().toISOString() };
+    patch[field] = value;
     const { error } = await supabase
       .from('role_permissions')
-      .update({ [field]: value, updated_at: new Date().toISOString() } as any)
+      .update(patch)
       .eq('role_id', roleId);
 
     if (error) {
@@ -365,6 +368,8 @@ export async function updateRolePermissionInDb(
   }
 }
 
+const AUDIT_LEVELS: readonly StaffAuditLogItem['level'][] = ['info', 'warning', 'critical'];
+
 export async function fetchAuditLogsFromDb(): Promise<StaffAuditLogItem[]> {
   try {
     const { data, error } = await supabase
@@ -376,14 +381,14 @@ export async function fetchAuditLogsFromDb(): Promise<StaffAuditLogItem[]> {
     // Sin registros (o sin permiso) se muestra vacío: antes se inventaban entradas de ejemplo.
     if (error || !data) return [];
 
-    return data.map((l: any) => ({
+    return data.map((l) => ({
       id: l.id,
       action: l.action,
       performedBy: l.performed_by || 'Sistema GastroPulse',
       target: l.target || undefined,
       details: l.details || undefined,
-      level: l.level || 'info',
-      createdAt: l.created_at
+      level: AUDIT_LEVELS.find((level) => level === l.level) ?? 'info',
+      createdAt: l.created_at ?? ''
     }));
   } catch (err) {
     console.error('Error fetching audit logs:', err);

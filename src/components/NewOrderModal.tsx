@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CATALOG_DISHES } from '../data/initialData';
-import { Ticket, TicketItem } from '../types';
+import { StationId, Ticket, TicketItem } from '../types';
 import { fetchDishesFromDb } from '@/services/menuService';
 import { fetchTablesFromDb } from '@/services/tableService';
 import { getPersistedStaffList } from '@/services/authService';
@@ -11,11 +11,13 @@ interface NewOrderModalProps {
   onCreateTicket: (ticket: Ticket) => Promise<boolean> | void;
 }
 
+type CatalogDish = Omit<(typeof CATALOG_DISHES)[number], 'station'> & { station: StationId };
+
 export const NewOrderModal: React.FC<NewOrderModalProps> = ({
   onClose,
   onCreateTicket
 }) => {
-  const [catalog, setCatalog] = useState(CATALOG_DISHES);
+  const [catalog, setCatalog] = useState<CatalogDish[]>(CATALOG_DISHES);
   const [isCatalogLoading, setIsCatalogLoading] = useState(true);
   const [availableTables, setAvailableTables] = useState<string[]>([
     'MESA 01', 'MESA 02', 'MESA 03', 'MESA 04', 'MESA 05', 'MESA 08', 'MESA 12', 'MESA 14', 'MESA 20', 'BARRA 02'
@@ -42,7 +44,7 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
           id: d.id,
           name: d.name,
           category: d.category === 'fondos' ? 'Fuego & Wok' : d.category === 'entradas' ? 'Entradas Nikkei' : d.category === 'bebidas' ? 'Barra & Mixología' : 'Pastelería',
-          station: (d.category === 'fondos' ? 'wok_saute' : d.category === 'entradas' ? 'frio_nikkei' : d.category === 'bebidas' ? 'barra_mixologia' : 'pasteleria') as any,
+          station: (d.category === 'fondos' ? 'wok_saute' : d.category === 'entradas' ? 'frio_nikkei' : d.category === 'bebidas' ? 'barra_mixologia' : 'pasteleria') as StationId,
           stationBadge: d.category === 'fondos' ? 'WOK & SAUTÉ' : d.category === 'entradas' ? 'CUARTO FRÍO' : d.category === 'bebidas' ? 'BARRA' : 'PASTELERÍA',
           price: d.price,
           photoUrl: d.image,

@@ -27,7 +27,7 @@ export interface AuditLogEntry {
   user?: string;
   role?: string;
   details: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 const STORAGE_KEY_AUDIT = 'gastropulse_security_audit_v1';

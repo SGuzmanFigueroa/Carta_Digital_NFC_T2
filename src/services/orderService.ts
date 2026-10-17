@@ -87,7 +87,6 @@ export async function fetchOrdersFromDb(options: { paymentStatus?: 'paid'; throw
       runnerAssigned: o.runner_assigned || undefined,
       accountRequested: Boolean(o.account_requested),
       paymentMethod: o.payment_method || undefined,
-      stationTarget: (o as any).station_target || undefined,
       paymentVerification: (o.payment_status as OrderTicket['paymentVerification']) || 'none',
       paymentReference: o.payment_reference || undefined
     }));
