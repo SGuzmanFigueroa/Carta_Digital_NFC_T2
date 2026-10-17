@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Valores ficticios: el build solo necesita que existan. Nunca pongas
+      # aquí claves reales; para eso están los secrets del repositorio.
+      NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+      NEXT_TELEMETRY_DISABLED: 1
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # El lint todavía tiene ~94 errores heredados (Tarea 46). Se ejecuta para
+      # que el reporte sea visible, pero no bloquea hasta que quede en cero.
+      # Cuando pase en limpio, borra `continue-on-error`.
+      - name: Lint
+        run: npm run lint
+        continue-on-error: true
+
+      - name: Tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
