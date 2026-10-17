@@ -5,6 +5,7 @@ import {
   createServiceClient,
   isSameOrigin,
   json,
+  recordAudit,
   staffAuthEmail,
   type StaffRole
 } from '@/lib/supabaseServer';
@@ -70,6 +71,13 @@ export async function POST(request: Request) {
       type: 'magiclink'
     });
     if (error || !data.session) throw error ?? new Error('Sin sesión');
+    await recordAudit(service, {
+      action: 'Acceso rápido demo',
+      performedBy: staff.username,
+      details: 'Botón demo del login (solo etapa de desarrollo)',
+      level: 'warning',
+      eventType: 'LOGIN_SUCCESS'
+    });
 
     return json({
       session: { access_token: data.session.access_token, refresh_token: data.session.refresh_token },

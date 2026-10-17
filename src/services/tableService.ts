@@ -31,12 +31,22 @@ export async function fetchTablesFromDb(): Promise<TableStatus[]> {
   }
 }
 
+/**
+ * Actualiza UNA mesa (la que coincide exactamente con el número). Antes usaba
+ * ilike '%1%', así que liberar la Mesa 1 también liberaba las mesas 10, 11 y 12.
+ */
 export async function updateTableStateInDb(
   tableNumber: string,
   updates: Partial<{ status: string; amount: number; pax: number; waiter: string | null }>
 ): Promise<boolean> {
   try {
-    const digits = tableNumber.replace(/\D/g, '').padStart(2, '0');
+    const target = Number(tableNumber.replace(/D/g, ''));
+    if (!target) return false;
+    const { data: all, error: readError } = await supabase.from('restaurant_tables').select('id, number');
+    if (readError) throw readError;
+    const ids = (all ?? []).filter((t) => Number(t.number.replace(/D/g, '')) === target).map((t) => t.id);
+    if (ids.length === 0) return false;
+
     const { error } = await supabase
       .from('restaurant_tables')
       .update({
@@ -46,7 +56,7 @@ export async function updateTableStateInDb(
         ...(updates.waiter !== undefined && { waiter: updates.waiter }),
         updated_at: new Date().toISOString()
       })
-      .or(`number.ilike.%${digits}%,number.eq.${tableNumber}`);
+      .in('id', ids);
 
     return !error;
   } catch (err) {

@@ -4,6 +4,10 @@
  * Arquitectura Segura, Aislamiento de Pedidos y Tolerancia a Entornos de Desarrollo
  */
 
+import { supabase } from '@/lib/supabase';
+import type { Json } from '@/types/database.types';
+import { CONFIG_SYNC_ERROR_EVENT } from '@/services/paymentConfigService';
+
 export interface GeofenceConfig {
   enabled: boolean;
   latitude: number;
@@ -82,17 +86,53 @@ export function getStoredGeofenceConfig(): GeofenceConfig {
   }
 }
 
+function writeGeofenceCache(config: GeofenceConfig): void {
+  try {
+    localStorage.setItem(STORAGE_KEY_GEOFENCE, JSON.stringify(config));
+  } catch {}
+  window.dispatchEvent(new CustomEvent('gastropulse_geofence_changed', { detail: config }));
+}
+
 /**
- * Guarda y emite evento reactivo de cambio de configuración
+ * Lee la geocerca real desde Supabase (system_config.geofence_config) y la deja
+ * en caché. Antes vivía solo en el localStorage del admin, así que los
+ * comensales validaban contra las coordenadas por defecto.
+ */
+export async function loadGeofenceConfig(): Promise<GeofenceConfig> {
+  if (typeof window === 'undefined') return DEFAULT_GEOFENCE_CONFIG;
+  const { data, error } = await supabase.from('system_config').select('geofence_config').eq('id', 'primary').maybeSingle();
+  const stored = (data?.geofence_config ?? {}) as Partial<GeofenceConfig>;
+  if (error || Object.keys(stored).length === 0) return getStoredGeofenceConfig();
+  try {
+    localStorage.setItem(STORAGE_KEY_GEOFENCE, JSON.stringify({ ...DEFAULT_GEOFENCE_CONFIG, ...stored }));
+  } catch {}
+  const config = getStoredGeofenceConfig();
+  writeGeofenceCache(config);
+  return config;
+}
+
+/**
+ * Guarda la geocerca (solo el admin: RLS). Actualiza la pantalla al instante y
+ * la persiste en Supabase; si falla, emite CONFIG_SYNC_ERROR_EVENT.
  */
 export function saveStoredGeofenceConfig(config: GeofenceConfig): void {
   if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(STORAGE_KEY_GEOFENCE, JSON.stringify(config));
-    window.dispatchEvent(new CustomEvent('gastropulse_geofence_changed', { detail: config }));
-  } catch (err) {
-    console.error('Error al guardar configuración de geocerca:', err);
-  }
+  writeGeofenceCache(config);
+  void supabase
+    .from('system_config')
+    .update({ geofence_config: config as unknown as Json, updated_at: new Date().toISOString() })
+    .eq('id', 'primary')
+    .select('id')
+    .then(({ data, error }) => {
+      if (error || !data?.length) {
+        console.error('[geocerca] No se guardó en Supabase:', error?.message ?? 'sin permiso');
+        window.dispatchEvent(
+          new CustomEvent(CONFIG_SYNC_ERROR_EVENT, {
+            detail: 'No se guardó la geocerca en el servidor. Revisa tu sesión de administrador.'
+          })
+        );
+      }
+    });
 }
 
 /**
@@ -118,7 +158,12 @@ export function isLocalEnvironment(): boolean {
 export async function validateDinerGeofence(
   overrideConfig?: Partial<GeofenceConfig>
 ): Promise<GeofenceValidationResult> {
-  const config: GeofenceConfig = { ...getStoredGeofenceConfig(), ...overrideConfig };
+  // La ubicación real del restaurante (Supabase), sin bloquear más de 3 s si la red va lenta.
+  const latest = await Promise.race([
+    loadGeofenceConfig().catch(() => getStoredGeofenceConfig()),
+    new Promise<GeofenceConfig>((resolve) => setTimeout(() => resolve(getStoredGeofenceConfig()), 3000))
+  ]);
+  const config: GeofenceConfig = { ...latest, ...overrideConfig };
 
   // 1. Si la geocerca está desactivada en administración
   if (!config.enabled) {
@@ -242,4 +287,12 @@ export async function validateDinerGeofence(
       }
     );
   });
+}
+
+/** Migración única de la geocerca guardada solo en el navegador del admin (ver pagos). */
+export async function migrateLocalGeofenceConfigToDb(): Promise<void> {
+  if (typeof window === 'undefined' || !localStorage.getItem(STORAGE_KEY_GEOFENCE)) return;
+  const { data, error } = await supabase.from('system_config').select('geofence_config').eq('id', 'primary').maybeSingle();
+  if (error || !data) return;
+  if (Object.keys((data.geofence_config ?? {}) as object).length === 0) saveStoredGeofenceConfig(getStoredGeofenceConfig());
 }

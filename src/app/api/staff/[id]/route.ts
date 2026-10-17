@@ -3,7 +3,9 @@ import {
   createServiceClient,
   isSameOrigin,
   json,
+  recordAudit,
   staffAppMetadata,
+  staffName,
   type StaffRole
 } from '@/lib/supabaseServer';
 import { parsePassword, parsePin, parseStaffFields, requireAdmin } from '../shared';
@@ -48,7 +50,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     const service = createServiceClient();
     const { data: current, error: readError } = await service
       .from('staff')
-      .select('id, role, auth_user_id, must_change_password')
+      .select('id, name, role, auth_user_id, must_change_password')
       .eq('id', id)
       .maybeSingle();
     if (readError) throw readError;
@@ -77,6 +79,20 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       if (error) throw error;
     }
 
+    const changes = [
+      ...Object.keys(fields),
+      ...(pin ? ['PIN'] : []),
+      ...(password ? ['contraseña temporal'] : [])
+    ];
+    await recordAudit(service, {
+      action: 'Actualización de colaborador',
+      performedBy: await staffName(service, admin.staffId),
+      target: fields.name ?? current.name,
+      // Solo qué cambió, nunca los valores de PIN o contraseña.
+      details: `Cambios: ${changes.join(', ') || 'ninguno'}`,
+      level: fields.role && fields.role !== current.role ? 'warning' : 'info',
+      eventType: 'STAFF_UPDATED'
+    });
     return json({ ok: true });
   } catch (err) {
     if (err instanceof ServerConfigError) return json({ error: 'Falta configurar el servidor (service role).' }, 503);
@@ -99,7 +115,7 @@ export async function DELETE(request: Request, { params }: RouteContext) {
     const service = createServiceClient();
     const { data: current, error: readError } = await service
       .from('staff')
-      .select('auth_user_id')
+      .select('name, username, auth_user_id')
       .eq('id', id)
       .maybeSingle();
     if (readError) throw readError;
@@ -108,6 +124,14 @@ export async function DELETE(request: Request, { params }: RouteContext) {
     const { error } = await service.from('staff').delete().eq('id', id);
     if (error) throw error;
     if (current.auth_user_id) await service.auth.admin.deleteUser(current.auth_user_id);
+    await recordAudit(service, {
+      action: 'Colaborador dado de baja',
+      performedBy: await staffName(service, admin.staffId),
+      target: current.name,
+      details: `Usuario ${current.username} retirado del sistema`,
+      level: 'warning',
+      eventType: 'STAFF_DELETED'
+    });
     return json({ ok: true });
   } catch (err) {
     if (err instanceof ServerConfigError) return json({ error: 'Falta configurar el servidor (service role).' }, 503);

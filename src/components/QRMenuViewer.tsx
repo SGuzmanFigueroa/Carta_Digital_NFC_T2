@@ -2463,6 +2463,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
               tableNumber={activeTicket?.table || selectedTable}
               totalAmount={paymentAmount ?? consolidatedTotalAmount}
               orderId={activeTicket?.id}
+              orderKey={activeTicket?.dinerKey}
               onRequestTableAccount={onRequestTableAccount}
               onShowToast={onShowToast}
             />

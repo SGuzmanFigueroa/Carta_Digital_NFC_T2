@@ -1,4 +1,6 @@
 import { AuthUser } from '../types';
+import { supabase } from '@/lib/supabase';
+import type { Json } from '@/types/database.types';
 
 // ==========================================
 // GastroPulse Security & Defense Utilities
@@ -90,18 +92,43 @@ export function sanitizeNotes(notes?: unknown): string {
 // ==========================================
 // Audit Logger (Security & Operational Trail)
 // ==========================================
+// Antes escribía en localStorage (borrable desde el navegador y que nadie
+// leía). Ahora va a public.staff_audit_logs: la base firma quién lo hizo según
+// el JWT y ninguna fila se puede editar ni borrar. Solo se registra con sesión
+// de personal; los intentos de login fallidos los registra el servidor.
+
+const AUDIT_ACTION_LABELS: Record<SecurityEventType, string> = {
+  LOGIN_SUCCESS: 'Inicio de sesión',
+  LOGIN_FAILED: 'Intento de acceso fallido',
+  PIN_LOCKOUT: 'Bloqueo por intentos fallidos',
+  PRICE_TAMPERING_DETECTED: 'Alteración de precio detectada',
+  CORTE_Z_EXECUTED: 'Corte Z ejecutado',
+  TABLE_SETTLED: 'Mesa cobrada',
+  TABLE_PRIORITIZED: 'Mesa priorizada',
+  SESSION_LOCKED: 'Terminal bloqueada',
+  SESSION_UNLOCKED: 'Terminal desbloqueada',
+  UNAUTHORIZED_ACCESS_ATTEMPT: 'Intento de acceso no autorizado'
+};
+
+const AUDIT_LEVELS = { INFO: 'info', WARN: 'warning', CRITICAL: 'critical' } as const;
+
+async function persistAuditEntry(entry: AuditLogEntry): Promise<void> {
+  try {
+    localStorage.removeItem(STORAGE_KEY_AUDIT);
+  } catch {}
+  const { data } = await supabase.auth.getSession();
+  if (!data.session) return;
+  const { error } = await supabase.from('staff_audit_logs').insert({
+    action: AUDIT_ACTION_LABELS[entry.eventType] ?? entry.eventType,
+    event_type: entry.eventType,
+    level: AUDIT_LEVELS[entry.severity],
+    details: entry.details,
+    metadata: (entry.metadata ?? null) as Json
+  });
+  if (error) console.warn('[auditoría] No se pudo registrar el evento:', error.message);
+}
 
 export class AuditLogger {
-  static getLogs(): AuditLogEntry[] {
-    if (typeof window === 'undefined') return [];
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY_AUDIT);
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  }
-
   static log(entry: Omit<AuditLogEntry, 'id' | 'timestamp' | 'isoDate'>): AuditLogEntry {
     const now = new Date();
     const newEntry: AuditLogEntry = {
@@ -110,25 +137,8 @@ export class AuditLogger {
       isoDate: now.toISOString(),
       ...entry,
     };
-
-    if (typeof window !== 'undefined') {
-      try {
-        const existing = this.getLogs();
-        // Keep last 150 entries in rolling ring buffer
-        const updated = [newEntry, ...existing].slice(0, 150);
-        localStorage.setItem(STORAGE_KEY_AUDIT, JSON.stringify(updated));
-      } catch (err) {
-        console.warn('Audit log write error:', err);
-      }
-    }
-
+    if (typeof window !== 'undefined') void persistAuditEntry(newEntry);
     return newEntry;
-  }
-
-  static clear(): void {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem(STORAGE_KEY_AUDIT);
-    }
   }
 }
 

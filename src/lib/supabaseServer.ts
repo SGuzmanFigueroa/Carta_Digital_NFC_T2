@@ -115,3 +115,36 @@ export const json = (body: unknown, status = 200, headers: Record<string, string
 export function ilikeExact(value: string): string {
   return value.replace(/[\\%_]/g, (c) => `\\${c}`);
 }
+
+export type AuditEntry = {
+  action: string;
+  performedBy: string;
+  target?: string | null;
+  details?: string | null;
+  level?: 'info' | 'warning' | 'critical';
+  eventType?: string;
+  metadata?: Record<string, string | number | boolean | null>;
+};
+
+/**
+ * Registro de auditoría desde el servidor (service_role). La tabla es inmutable
+ * y un fallo al auditar nunca debe romper la operación principal.
+ */
+export async function recordAudit(service: SupabaseClient<Database>, entry: AuditEntry): Promise<void> {
+  const { error } = await service.from('staff_audit_logs').insert({
+    action: entry.action,
+    performed_by: entry.performedBy,
+    target: entry.target ?? null,
+    details: entry.details ?? null,
+    level: entry.level ?? 'info',
+    event_type: entry.eventType ?? null,
+    metadata: entry.metadata ?? null
+  });
+  if (error) console.error('[auditoría]', error.message);
+}
+
+/** Nombre del colaborador para la auditoría (o un genérico si no se encuentra). */
+export async function staffName(service: SupabaseClient<Database>, staffId: string): Promise<string> {
+  const { data } = await service.from('staff').select('name').eq('id', staffId).maybeSingle();
+  return data?.name ?? 'Colaborador desconocido';
+}

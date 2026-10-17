@@ -4,7 +4,9 @@ import {
   isSameOrigin,
   json,
   normalizeUsername,
+  recordAudit,
   staffAppMetadata,
+  staffName,
   staffAuthEmail,
   type StaffRole
 } from '@/lib/supabaseServer';
@@ -86,6 +88,13 @@ export async function POST(request: Request) {
       return json({ error: 'No se pudo completar el alta. Inténtalo de nuevo.' }, 503);
     }
 
+    await recordAudit(service, {
+      action: 'Nuevo colaborador registrado',
+      performedBy: await staffName(service, admin.staffId),
+      target: fields.name as string,
+      details: `Usuario ${username} · Rol ${role}`,
+      eventType: 'STAFF_CREATED'
+    });
     return json({ id: row.id }, 201);
   } catch (err) {
     if (err instanceof ServerConfigError) return json({ error: 'Falta configurar el servidor (service role).' }, 503);

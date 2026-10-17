@@ -9,8 +9,7 @@ import {
   getPersistedStaffList,
   createStaffMemberInDb,
   updateStaffMemberInDb,
-  deleteStaffMemberFromDb,
-  createAuditLogInDb
+  deleteStaffMemberFromDb
 } from '@/services/authService';
 
 export default function PersonalPage() {
@@ -41,12 +40,6 @@ export default function PersonalPage() {
       return;
     }
     await reloadStaff();
-    await createAuditLogInDb(
-      'Nuevo Colaborador Registrado',
-      newStaff.name,
-      `Rol: ${newStaff.role}, Asignación: ${newStaff.assignment}`,
-      'info'
-    );
     showToast(`${newStaff.name} registrado. Su contraseña es temporal: deberá cambiarla al entrar.`, 'person_add');
   };
 
@@ -57,12 +50,6 @@ export default function PersonalPage() {
       return;
     }
     await reloadStaff();
-    await createAuditLogInDb(
-      'Actualización de Colaborador',
-      updatedStaff.name,
-      'Datos o PIN modificados',
-      'info'
-    );
     showToast(`Datos de ${updatedStaff.name} actualizados`, 'check_circle');
   };
 
@@ -74,15 +61,8 @@ export default function PersonalPage() {
       return;
     }
     await reloadStaff();
-    if (target) {
-      await createAuditLogInDb(
-        'Colaborador Dado de Baja',
-        target.name,
-        `Usuario ${target.username} retirado del sistema`,
-        'warning'
-      );
-    }
-    showToast('Colaborador eliminado del sistema', 'delete');
+    // La auditoría (alta, cambios y baja) la registra el servidor en /api/staff.
+    showToast(`${target?.name ?? 'Colaborador'} eliminado del sistema`, 'delete');
   };
 
   const handleSelectTab = (tab: string) => {

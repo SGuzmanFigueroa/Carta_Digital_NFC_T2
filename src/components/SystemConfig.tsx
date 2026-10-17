@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { SystemConfigState } from '../types';
 import { applyTheme, ACCENT_PALETTE } from '@/utils/theme';
 import { getTranslations, getLanguageCode } from '@/utils/i18n';
@@ -8,7 +8,14 @@ import { kitchenAudio } from '@/utils/audio';
 import { MenuItem } from '../types';
 import { fetchDishesFromDb, updateDishPrice, deleteDishFromDb } from '@/services/menuService';
 import { Dish3DScannerModal } from './Dish3DScannerModal';
-import { getPaymentConfig, savePaymentConfig, PaymentGatewayConfig } from '@/services/paymentConfigService';
+import {
+  CONFIG_SYNC_ERROR_EVENT,
+  getPaymentConfig,
+  loadPaymentConfig,
+  migrateLocalPaymentConfigToDb,
+  savePaymentConfig,
+  PaymentGatewayConfig
+} from '@/services/paymentConfigService';
 import { DishCatalogAdmin } from './DishCatalogAdmin';
 // CD-17 · Sección 09: Gestión de Ofertas Flash (formulario + vista previa móvil).
 import { PromoOffersManager } from './PromoOffersManager';
@@ -42,6 +49,27 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
   const [tableSearchFilter, setTableSearchFilter] = useState('');
   const [modalZoneFilter, setModalZoneFilter] = useState<string>('all');
   const [paymentGatewayConfig, setPaymentGatewayConfig] = useState<PaymentGatewayConfig>(() => getPaymentConfig());
+
+  // Datos de pago y geocerca viven en Supabase (system_config): se cargan al abrir
+  // y, si un guardado falla (p. ej. sesión vencida), se avisa en vez de fingir éxito.
+  const showToastRef = useRef(onShowToast);
+  useEffect(() => {
+    showToastRef.current = onShowToast;
+  }, [onShowToast]);
+  useEffect(() => {
+    let cancelled = false;
+    migrateLocalPaymentConfigToDb()
+      .then(() => loadPaymentConfig())
+      .then((config) => {
+      if (!cancelled) setPaymentGatewayConfig(config);
+    });
+    const handleSyncError = (event: Event) => showToastRef.current((event as CustomEvent<string>).detail, 'error');
+    window.addEventListener(CONFIG_SYNC_ERROR_EVENT, handleSyncError);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(CONFIG_SYNC_ERROR_EVENT, handleSyncError);
+    };
+  }, []);
 
   const handleUploadPaymentQr = (method: 'yape' | 'plin', file: File) => {
     const reader = new FileReader();

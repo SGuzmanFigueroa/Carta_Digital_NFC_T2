@@ -6,6 +6,7 @@ import {
   ilikeExact,
   isSameOrigin,
   json,
+  recordAudit,
   staffAuthEmail
 } from '@/lib/supabaseServer';
 
@@ -61,7 +62,7 @@ export async function POST(request: Request) {
     const column = identifier.includes('@') ? 'email' : 'username';
     const { data: matches, error: staffError } = await service
       .from('staff')
-      .select('id, username, status, auth_user_id')
+      .select('id, name, username, status, auth_user_id')
       .ilike(column, ilikeExact(identifier))
       .limit(2);
     if (staffError) throw staffError;
@@ -78,6 +79,15 @@ export async function POST(request: Request) {
       await service.rpc('record_login_attempt', { p_identifier: identifier, p_ip: ip, p_success: false });
       // Si este fallo activó el bloqueo, se avisa ya (la pantalla inicia la cuenta regresiva).
       const { data: lockedFor } = await service.rpc('login_retry_after', { p_identifier: identifier, p_ip: ip });
+      await recordAudit(service, {
+        action: lockedFor && lockedFor > 0 ? 'Bloqueo por intentos fallidos' : 'Intento de acceso fallido',
+        performedBy: 'Login (sin sesión)',
+        target: identifier.slice(0, 80),
+        details: `IP ${ip}`,
+        level: lockedFor && lockedFor > 0 ? 'critical' : 'warning',
+        eventType: lockedFor && lockedFor > 0 ? 'PIN_LOCKOUT' : 'LOGIN_FAILED',
+        metadata: { ip }
+      });
       if (lockedFor && lockedFor > 0) {
         return json(
           { error: 'Demasiados intentos fallidos. Espera para volver a intentarlo.', retryAfter: lockedFor },
@@ -94,6 +104,14 @@ export async function POST(request: Request) {
     }
 
     await service.rpc('record_login_attempt', { p_identifier: identifier, p_ip: ip, p_success: true });
+    await recordAudit(service, {
+      action: 'Inicio de sesión',
+      performedBy: staff.name,
+      target: staff.username,
+      details: `IP ${ip}`,
+      eventType: 'LOGIN_SUCCESS',
+      metadata: { ip }
+    });
     return json({
       session: { access_token: data.session.access_token, refresh_token: data.session.refresh_token },
       mustChangePassword: data.user.app_metadata?.must_change_password === true

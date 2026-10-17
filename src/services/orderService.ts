@@ -1,8 +1,14 @@
 import { supabase } from '@/lib/supabase';
 import { OrderTicket, OrderItem, MenuItem, StationId } from '@/types';
 import { isTemporaryPairingItem } from '@/features/menu/pairing';
-import { updateTableStateInDb } from './tableService';
 import type { Database } from '@/types/database.types';
+import { limaDate } from '@/features/reports/daily';
+
+/** Número de mesa sin texto ni ceros: "MESA 04 (Terraza)" → 4. */
+const tableDigits = (value: string | null | undefined) => {
+  const digits = (value ?? '').replace(/\D/g, '');
+  return digits ? Number(digits) : null;
+};
 
 export async function fetchOrdersFromDb(options: { paymentStatus?: 'paid'; throwOnError?: boolean } = {}): Promise<OrderTicket[]> {
   try {
@@ -289,23 +295,50 @@ export async function callWaiterForTableInDb(
   return true;
 }
 
+/**
+ * Cobra los pedidos abiertos de UNA mesa. Antes filtraba con ilike '%1%', así
+ * que cobrar la Mesa 1 también marcaba como cobradas las mesas 10, 11 y 12.
+ */
 export async function settleOrdersForTableInDb(tableNumber: string): Promise<boolean> {
   try {
-    const digits = tableNumber.replace(/\D/g, '').padStart(2, '0');
+    const target = tableDigits(tableNumber);
+    if (target === null) return false;
+    const { data: open, error: readError } = await supabase
+      .from('orders')
+      .select('id, table_number')
+      .not('status', 'in', '(cobrado,cancelado)');
+    if (readError) throw readError;
+
+    const ids = (open ?? []).filter((o) => tableDigits(o.table_number) === target).map((o) => o.id);
+    if (ids.length === 0) return true;
     const { error } = await supabase
       .from('orders')
-      .update({
-        status: 'cobrado',
-        updated_at: new Date().toISOString()
-      })
-      .or(`table_number.ilike.%${digits}%,table_number.ilike.%${tableNumber}%`)
-      .not('status', 'in', '(cobrado,cancelado)');
-
-    return !error;
+      .update({ status: 'cobrado', updated_at: new Date().toISOString() })
+      .in('id', ids);
+    if (error) throw error;
+    return true;
   } catch (err) {
     console.error('Error settling orders for table in DB:', err);
     return false;
   }
+}
+
+/**
+ * Caja del turno: suma de lo cobrado hoy (hora de Lima) según la base. Antes
+ * era un número local que arrancaba en S/ 4,215 de ejemplo. null = sin dato.
+ */
+export async function fetchShiftRevenueFromDb(): Promise<number | null> {
+  const startOfDay = `${limaDate()}T00:00:00-05:00`;
+  const { data, error } = await supabase
+    .from('orders')
+    .select('total')
+    .eq('status', 'cobrado')
+    .gte('paid_at', startOfDay);
+  if (error) {
+    console.warn('[caja] No se pudo calcular lo cobrado hoy:', error.message);
+    return null;
+  }
+  return Math.round((data ?? []).reduce((sum, o) => sum + Number(o.total), 0) * 100) / 100;
 }
 
 export async function updateOrderItemCheckInDb(itemId: string, checked: boolean): Promise<boolean> {

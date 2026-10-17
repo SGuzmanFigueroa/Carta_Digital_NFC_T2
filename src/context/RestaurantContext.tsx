@@ -3,13 +3,14 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import { Ticket, OrderTicket, OrderRound, OrderRoundItem, TableStatus, Runner, MenuItem, StationId, TicketItem, AuthUser, WaiterCall } from '../types';
-import { INITIAL_TICKETS, INITIAL_RUNNERS } from '../data/initialData';
-import { INITIAL_ORDERS, INITIAL_TABLES, INITIAL_MENU_ITEMS } from '../data/mockData';
+import { INITIAL_RUNNERS } from '../data/initialData';
+import { INITIAL_MENU_ITEMS } from '../data/mockData';
 import { kitchenAudio } from '../utils/audio';
 import { supabase } from '@/lib/supabase';
 import { fetchTablesFromDb, settleTableInDb, updateTableStateInDb } from '@/services/tableService';
 import {
   fetchOrdersFromDb,
+  fetchShiftRevenueFromDb,
   placeOrderInDb,
   fetchDinerOrderStatuses,
   toPlaceOrderItems,
@@ -296,14 +297,17 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
   const pathname = usePathname();
   const currentPath = pathname || (typeof window !== 'undefined' ? window.location.pathname : '');
   const isStaffTerminal = isStaffManagementRoute(currentPath);
-  const [tickets, setTickets] = useState<Ticket[]>(INITIAL_TICKETS);
-  const [orders, setOrders] = useState<OrderTicket[]>(INITIAL_ORDERS);
+  // Arrancan vacíos: los llena Supabase (antes eran datos de ejemplo que se
+  // quedaban en pantalla si la base devolvía cero pedidos).
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [orders, setOrders] = useState<OrderTicket[]>([]);
   const [tableOrderRounds, setTableOrderRounds] = useState<OrderRound[]>([]);
-  const [tables, setTables] = useState<TableStatus[]>(INITIAL_TABLES);
+  const [tables, setTables] = useState<TableStatus[]>([]);
   // CD-28 · Llamados de mesa abiertos (los consume el KDS y el panel de Salón).
   const [waiterCalls, setWaiterCalls] = useState<WaiterCall[]>([]);
   const [runners, setRunners] = useState<Runner[]>(INITIAL_RUNNERS);
-  const [totalShiftRevenue, setTotalShiftRevenue] = useState<number>(4215.00);
+  // Caja del turno: se calcula en la base (fetchShiftRevenueFromDb); antes arrancaba en S/ 4,215 inventados.
+  const [totalShiftRevenue, setTotalShiftRevenue] = useState<number>(0);
   const [kitchenPaused, setKitchenPaused] = useState<boolean>(false);
   const [audioEnabled, setAudioEnabled] = useState<boolean>(true);
   const [lastDispatchedTicket, setLastDispatchedTicket] = useState<Ticket | null>(null);
@@ -329,14 +333,22 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
     }
   }, [dinerActiveTicket]);
 
-  const syncKdsTickets = useCallback((freshOrders: OrderTicket[]) => {
+  /**
+   * Arma las comandas del KDS desde los pedidos de la base. Con sesión de
+   * personal (`authoritative`) la base manda: se descartan comandas locales sin
+   * pedido real (cachés viejos o datos de ejemplo).
+   */
+  const syncKdsTickets = useCallback((freshOrders: OrderTicket[], authoritative = false) => {
     const incomingTickets = freshOrders
       .map(toKdsTicket)
       .filter((ticket): ticket is Ticket => ticket !== null);
 
     setTickets((currentTickets) => {
       const incomingByOrderNumber = new Map(incomingTickets.map((ticket) => [ticket.orderNumber, ticket]));
-      const mergedTickets = currentTickets.map((currentTicket) => {
+      const keptTickets = authoritative
+        ? currentTickets.filter((ticket) => incomingByOrderNumber.has(ticket.orderNumber))
+        : currentTickets;
+      const mergedTickets = keptTickets.map((currentTicket) => {
         const incomingTicket = incomingByOrderNumber.get(currentTicket.orderNumber);
         if (!incomingTicket) return currentTicket;
 
@@ -515,13 +527,24 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
 
     // Re-sincronización defensiva del canal core. Envuelta en try/catch: un fallo de
     // red se registra y NUNCA se propaga al bucle de mensajes del socket.
+    // Con sesión de personal la base es la fuente de verdad: si devuelve cero
+    // pedidos, se muestran cero. El comensal no tiene sesión y RLS le oculta los
+    // pedidos de otros, así que conserva su caché local (sus propios pedidos).
+    const hasStaffSession = async () => Boolean((await supabase.auth.getSession()).data.session);
+
     const resyncOrders = async (scope: string) => {
       try {
-        const freshOrders = await fetchOrdersFromDb();
-        if (disposed || !freshOrders || freshOrders.length === 0) return;
+        const freshOrders = await fetchOrdersFromDb({ throwOnError: true });
+        if (disposed) return;
+        const authoritative = await hasStaffSession();
+        if (!authoritative && freshOrders.length === 0) return;
         setOrders(freshOrders);
         realtimeCallbacksRef.current.syncDinerTicketStatus(freshOrders);
-        realtimeCallbacksRef.current.syncKdsTickets(freshOrders);
+        realtimeCallbacksRef.current.syncKdsTickets(freshOrders, authoritative);
+        if (authoritative) {
+          const revenue = await fetchShiftRevenueFromDb();
+          if (!disposed && revenue !== null) setTotalShiftRevenue(revenue);
+        }
       } catch (err) {
         console.warn(`[realtime:${scope}] ${realtimeStamp()} error re-sincronizando comandas`, err);
       }
@@ -538,21 +561,8 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
     };
 
     // 1. Foto inicial desde Supabase (una vez por montaje; durabilidad ante F5).
-    fetchTablesFromDb().then((dbTables) => {
-      if (disposed) return;
-      if (dbTables && dbTables.length > 0) {
-        setTables(dbTables);
-      }
-    }).catch(console.warn);
-
-    fetchOrdersFromDb().then((dbOrders) => {
-      if (disposed) return;
-      if (dbOrders && dbOrders.length > 0) {
-        setOrders(dbOrders);
-        realtimeCallbacksRef.current.syncDinerTicketStatus(dbOrders);
-        realtimeCallbacksRef.current.syncKdsTickets(dbOrders);
-      }
-    }).catch(console.warn);
+    void resyncTables('inicial');
+    void resyncOrders('inicial');
 
     // CD-28 · Llamados de mesa: se re-consultan al montar (durabilidad ante
     // recarga/reapertura del KDS, algo que un canal Broadcast no puede ofrecer).
@@ -1404,11 +1414,17 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
   // 7. Collect Table Bill and Free Table (Corte / Cobro)
   const collectTableBill = useCallback(
     (tableNumber: string, amount?: number) => {
-      // Settle in Supabase DB (Table + Orders)
-      settleTableInDb(tableNumber).catch(console.warn);
-      settleOrdersForTableInDb(tableNumber).catch(console.warn);
+      // Cobra en Supabase (mesa + pedidos) y luego recalcula la caja desde la base.
+      Promise.all([settleTableInDb(tableNumber), settleOrdersForTableInDb(tableNumber)])
+        .then(() => fetchShiftRevenueFromDb())
+        .then((revenue) => {
+          if (revenue !== null) setTotalShiftRevenue(revenue);
+        })
+        .catch(console.warn);
       const cleanNum = tableNumber.replace(/\D/g, '');
-      const billAmount = amount || 165.00;
+      // Monto real de la mesa (antes, sin monto se sumaban S/ 165 inventados).
+      const tableAmount = tables.find((tbl) => tbl.number === cleanNum || tbl.number === tableNumber)?.amount;
+      const billAmount = amount ?? tableAmount ?? 0;
 
       const updatedTables = tables.map((tbl) => {
         if (tbl.number === cleanNum || tbl.number === tableNumber) {
@@ -1552,21 +1568,16 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
   }, [showToast]);
 
   // 13. Reset All Demo Data
+  // "Restablecer": borra los cachés locales de este dispositivo y vuelve a leer
+  // todo de Supabase (ya no hay datos de ejemplo que restaurar).
   const resetAllDemoData = useCallback(() => {
-    setTickets(INITIAL_TICKETS);
-    setOrders(INITIAL_ORDERS);
-    setTableOrderRounds([]);
-    setTables(INITIAL_TABLES);
-    setRunners(INITIAL_RUNNERS);
-    setTotalShiftRevenue(4215.00);
-    setDinerActiveTicket(null);
-    localStorage.removeItem(STORAGE_KEY_TICKETS);
-    localStorage.removeItem(STORAGE_KEY_ORDERS);
-    localStorage.removeItem(STORAGE_KEY_TABLES);
-    localStorage.removeItem(STORAGE_KEY_REVENUE);
-    localStorage.removeItem(STORAGE_KEY_DINER);
-    kitchenAudio.playDispatchSound();
-    showToast('Datos de demostración restablecidos', 'restart_alt');
+    [STORAGE_KEY_TICKETS, STORAGE_KEY_ORDERS, STORAGE_KEY_TABLES, STORAGE_KEY_REVENUE, STORAGE_KEY_DINER].forEach((key) => {
+      try {
+        localStorage.removeItem(key);
+      } catch {}
+    });
+    showToast('Cachés locales limpiados. Recargando desde el servidor…', 'restart_alt');
+    setTimeout(() => window.location.reload(), 600);
   }, [showToast]);
 
   // 14. Simulate New Incoming Order

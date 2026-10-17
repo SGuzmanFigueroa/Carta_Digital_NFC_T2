@@ -6,7 +6,9 @@ import {
   isSameOrigin,
   isValidPassword,
   json,
-  staffAuthEmail
+  recordAudit,
+  staffAuthEmail,
+  staffName
 } from '@/lib/supabaseServer';
 
 export const runtime = 'nodejs';
@@ -52,6 +54,13 @@ export async function POST(request: Request) {
       .eq('id', staff.staffId)
       .select('username')
       .single();
+
+    await recordAudit(service, {
+      action: 'Cambio de contraseña',
+      performedBy: await staffName(service, staff.staffId),
+      target: row?.username ?? null,
+      eventType: 'PASSWORD_CHANGED'
+    });
 
     // Cambiar la contraseña invalida la sesión anterior: se abre una nueva (con
     // must_change_password=false en el JWT) para que el navegador siga dentro.

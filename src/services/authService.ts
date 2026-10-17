@@ -373,37 +373,8 @@ export async function fetchAuditLogsFromDb(): Promise<StaffAuditLogItem[]> {
       .order('created_at', { ascending: false })
       .limit(50);
 
-    if (error || !data || data.length === 0) {
-      return [
-        {
-          id: 'log-1',
-          action: 'Actualización de Permisos',
-          performedBy: 'Chef Ejecutivo',
-          target: 'Jefe de Cocina',
-          details: 'Modificación de acceso: Edición de Menú a Lectura',
-          level: 'info',
-          createdAt: new Date(Date.now() - 15 * 60000).toISOString()
-        },
-        {
-          id: 'log-2',
-          action: 'Nuevo Colaborador Registrado',
-          performedBy: 'Administrador General',
-          target: 'Mateo Rivera',
-          details: 'Asignado a Barra & Mixología con PIN TPV encriptado',
-          level: 'info',
-          createdAt: new Date(Date.now() - 45 * 60000).toISOString()
-        },
-        {
-          id: 'log-3',
-          action: 'Verificación de Políticas Globales',
-          performedBy: 'Seguridad Sistema',
-          target: 'Terminales TPV & KDS',
-          details: 'Políticas de timeout y PIN estricto sincronizadas',
-          level: 'info',
-          createdAt: new Date(Date.now() - 120 * 60000).toISOString()
-        }
-      ];
-    }
+    // Sin registros (o sin permiso) se muestra vacío: antes se inventaban entradas de ejemplo.
+    if (error || !data) return [];
 
     return data.map((l: any) => ({
       id: l.id,

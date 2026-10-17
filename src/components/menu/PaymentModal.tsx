@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { submitCustomerReview } from '@/services/reviewService';
-import { getPaymentConfig, PaymentGatewayConfig } from '@/services/paymentConfigService';
+import { getPaymentConfig, loadPaymentConfig, PaymentGatewayConfig } from '@/services/paymentConfigService';
 import { useLanguage } from '@/hooks/useLanguage';
 // CD-31 · Rótulo de mesa visible (ES/EN) sin alterar el valor guardado en la reseña.
 import { localizeTableLabel } from '@/i18n/tableLabel';
@@ -13,6 +13,8 @@ interface PaymentModalProps {
   tableNumber: string;
   totalAmount: number;
   orderId?: string;
+  /** Clave del pedido del comensal: verifica la reseña (una por pedido). */
+  orderKey?: string;
   onRequestTableAccount?: (paymentMethod: string) => Promise<boolean> | void;
   onShowToast: (msg: string, icon?: string) => void;
 }
@@ -26,6 +28,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   tableNumber,
   totalAmount,
   orderId,
+  orderKey,
   onRequestTableAccount,
   onShowToast
 }) => {
@@ -61,11 +64,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     };
   }, []);
 
-  // Cada vez que el comensal abre el modal, refrescar la configuración de pagos más reciente
+  // Cada vez que el comensal abre el modal se lee la configuración real de Supabase
+  // (número y QR de Yape/Plin); llega por el evento de arriba.
   useEffect(() => {
-    if (isOpen) {
-      setPaymentConfig(getPaymentConfig());
-    }
+    if (isOpen) void loadPaymentConfig();
   }, [isOpen]);
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('yape');
   const [opCode, setOpCode] = useState('');
@@ -247,6 +249,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       await submitCustomerReview({
         tableNumber,
         orderId,
+        orderKey,
         rating,
         ratingLabel: getRatingLabel(rating),
         tipAmount: effectiveTip,
@@ -259,8 +262,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       onShowToast(t('pay.reviewThanks'), 'sentiment_very_satisfied');
       setStep('completed');
     } catch (err) {
-      console.warn('Error saving review:', err);
-      setStep('completed');
+      // Se avisa y se deja reintentar; si el pedido ya tenía reseña, se da por cerrada.
+      const message = err instanceof Error ? err.message : 'No se pudo enviar tu reseña.';
+      onShowToast(message, 'error');
+      if (/ya tiene una reseña/i.test(message)) setStep('completed');
     } finally {
       setIsSubmitting(false);
     }

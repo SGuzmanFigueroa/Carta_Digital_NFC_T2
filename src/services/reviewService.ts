@@ -1,9 +1,10 @@
 import { supabase } from '@/lib/supabase';
 
 export interface CustomerReview {
-  id: string;
   tableNumber: string;
   orderId?: string;
+  /** Clave del pedido (dinerKey): prueba que el pedido es del comensal y verifica la reseña. */
+  orderKey?: string;
   rating: number; // 1 a 5
   ratingLabel: string;
   tipAmount: number;
@@ -11,60 +12,33 @@ export interface CustomerReview {
   paymentMethod: string;
   operationCode?: string;
   voucherUploaded?: boolean;
-  createdAt: string;
 }
 
-const STORAGE_KEY_REVIEWS = 'gastropulse_customer_reviews_v1';
+/** Versiones anteriores guardaban las reseñas solo en el celular (la tabla no existía). */
+const LEGACY_STORAGE_KEY_REVIEWS = 'gastropulse_customer_reviews_v1';
 
-export function getLocalReviews(): CustomerReview[] {
-  if (typeof window === 'undefined') return [];
+/**
+ * Guarda la reseña en Supabase (RPC submit_review). Lanza un Error con un
+ * mensaje para el comensal si no se pudo registrar.
+ */
+export async function submitCustomerReview(review: CustomerReview): Promise<string> {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY_REVIEWS);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
+    localStorage.removeItem(LEGACY_STORAGE_KEY_REVIEWS);
+  } catch {}
+
+  const { data, error } = await supabase.rpc('submit_review', {
+    p_table_number: review.tableNumber,
+    p_rating: review.rating,
+    p_tip_amount: review.tipAmount,
+    p_comments: review.comments,
+    p_payment_method: review.paymentMethod,
+    p_operation_code: review.operationCode,
+    p_voucher_uploaded: Boolean(review.voucherUploaded),
+    p_order_id: review.orderId,
+    p_order_key: review.orderKey
+  });
+  if (error) {
+    throw new Error(error.code === '22023' ? error.message : 'No se pudo enviar tu reseña. Inténtalo de nuevo.');
   }
-}
-
-export async function submitCustomerReview(review: Omit<CustomerReview, 'id' | 'createdAt'>): Promise<CustomerReview> {
-  const newReview: CustomerReview = {
-    ...review,
-    id: `rev-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-    createdAt: new Date().toISOString()
-  };
-
-  // 1. Guardar localmente para persistencia garantizada
-  try {
-    const existing = getLocalReviews();
-    localStorage.setItem(STORAGE_KEY_REVIEWS, JSON.stringify([newReview, ...existing]));
-  } catch (err) {
-    console.warn('Error saving review to localStorage:', err);
-  }
-
-  // 2. Intentar sincronizar con Supabase en segundo plano
-  (async () => {
-    try {
-      const { error } = await (supabase as any)
-        .from('customer_reviews')
-        .insert({
-          id: newReview.id,
-          table_number: newReview.tableNumber,
-          order_id: newReview.orderId,
-          rating: newReview.rating,
-          tip_amount: newReview.tipAmount,
-          comments: newReview.comments,
-          payment_method: newReview.paymentMethod,
-          operation_code: newReview.operationCode,
-          created_at: newReview.createdAt
-        });
-
-      if (error) {
-        console.warn('Aviso: customer_reviews table no disponible en Supabase (respaldado en local):', error.message);
-      }
-    } catch (e) {
-      console.warn('Error silencioso al registrar reseña en Supabase:', e);
-    }
-  })();
-
-  return newReview;
+  return data as string;
 }

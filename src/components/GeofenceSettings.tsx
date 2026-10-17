@@ -4,6 +4,8 @@ import React, { useState, useEffect } from 'react';
 import {
   GeofenceConfig,
   getStoredGeofenceConfig,
+  loadGeofenceConfig,
+  migrateLocalGeofenceConfigToDb,
   saveStoredGeofenceConfig,
   DEFAULT_GEOFENCE_CONFIG,
   isLocalEnvironment
@@ -29,8 +31,16 @@ export const GeofenceSettings: React.FC<GeofenceSettingsProps> = ({
   const [detectedAccuracy, setDetectedAccuracy] = useState<number | null>(null);
   const isDev = isLocalEnvironment();
 
+  // Caché para pintar al instante; luego la configuración real de Supabase.
   useEffect(() => {
+    let cancelled = false;
     setConfig(getStoredGeofenceConfig());
+    migrateLocalGeofenceConfigToDb().then(() => loadGeofenceConfig()).then((fresh) => {
+      if (!cancelled) setConfig(fresh);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleToggleEnabled = () => {

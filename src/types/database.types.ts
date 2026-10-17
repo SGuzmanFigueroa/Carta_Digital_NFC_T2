@@ -418,6 +418,10 @@ export type Database = {
       }
       staff_audit_logs: {
         Row: {
+          actor_auth_id: string | null
+          actor_role: string | null
+          event_type: string | null
+          metadata: Json | null
           action: string
           created_at: string | null
           details: string | null
@@ -427,6 +431,10 @@ export type Database = {
           target: string | null
         }
         Insert: {
+          actor_auth_id?: string | null
+          actor_role?: string | null
+          event_type?: string | null
+          metadata?: Json | null
           action: string
           created_at?: string | null
           details?: string | null
@@ -436,6 +444,10 @@ export type Database = {
           target?: string | null
         }
         Update: {
+          actor_auth_id?: string | null
+          actor_role?: string | null
+          event_type?: string | null
+          metadata?: Json | null
           action?: string
           created_at?: string | null
           details?: string | null
@@ -448,6 +460,8 @@ export type Database = {
       }
       system_config: {
         Row: {
+          geofence_config: Json
+          payment_config: Json
           acoustic_buzzer: boolean | null
           auto_cut: boolean | null
           branch_name: string
@@ -473,6 +487,8 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          geofence_config?: Json
+          payment_config?: Json
           acoustic_buzzer?: boolean | null
           auto_cut?: boolean | null
           branch_name?: string
@@ -498,6 +514,8 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          geofence_config?: Json
+          payment_config?: Json
           acoustic_buzzer?: boolean | null
           auto_cut?: boolean | null
           branch_name?: string
@@ -552,6 +570,20 @@ export type Database = {
       record_login_attempt: {
         Args: { p_identifier: string; p_ip: string; p_success: boolean }
         Returns: undefined
+      }
+      submit_review: {
+        Args: {
+          p_table_number: string
+          p_rating: number
+          p_tip_amount?: number
+          p_comments?: string
+          p_payment_method?: string
+          p_operation_code?: string
+          p_voucher_uploaded?: boolean
+          p_order_id?: string
+          p_order_key?: string
+        }
+        Returns: string
       }
       verify_my_pin: {
         Args: { p_pin: string }

@@ -1,50 +1,15 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
-const { PGlite } = require('@electric-sql/pglite');
-const { pgcrypto } = require('@electric-sql/pglite/contrib/pgcrypto');
-const root = path.join(__dirname, '..');
-const migration = name => fs.readFileSync(path.join(root, 'supabase/migrations', name), 'utf8').replace(/^﻿/, '');
+const { createDb, as } = require('./db-helpers.cjs');
 
 async function setup() {
-  const db = new PGlite({ extensions: { pgcrypto } });
-  // Igual que Supabase: anon/authenticated tienen privilegios de tabla y RLS decide.
-  await db.exec(`CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role;
-    GRANT USAGE ON SCHEMA public TO anon, authenticated;
-    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated;
-    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated;
-    CREATE SCHEMA extensions; CREATE EXTENSION pgcrypto SCHEMA extensions;
-    CREATE SCHEMA auth; CREATE TABLE auth.users (id uuid PRIMARY KEY);
-    CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$ SELECT NULL::uuid $$;
-    CREATE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS $$
-      SELECT coalesce(nullif(current_setting('test.jwt', true), ''), '{}')::jsonb $$;
-    GRANT USAGE ON SCHEMA auth TO anon, authenticated;`);
-  // Sin Realtime en PGlite: solo sentencias sueltas, no los format('ALTER PUBLICATION ...').
-  const noPublication = sql => sql.replace(/^(\s*)ALTER PUBLICATION[^;]+;/gm, '$1NULL;');
-  for (const name of [
-    '20260919183000_init_gastropulse.sql',
-    '20260921210000_staff_roles_and_permissions.sql',
-    '20261010000000_create_waiter_calls.sql',
-    '20261017000000_atomic_place_order.sql',
-    '20261018000000_staff_supabase_auth.sql',
-    '20261018000100_staff_lockdown.sql',
-    '20261018010000_rls_lockdown.sql',
-  ]) {
-    await db.exec(noPublication(migration(name).replace('CREATE EXTENSION IF NOT EXISTS pgcrypto;', '')));
-  }
+  const db = await createDb();
   await db.exec(`INSERT INTO public.categories(id, name) VALUES ('fondos', 'Fondos');
     INSERT INTO public.dishes(id, name, price, category_id) VALUES ('lomo', 'Lomo', 68, 'fondos');
     INSERT INTO public.restaurant_tables(id, number, status) VALUES ('m-04', 'Mesa 04', 'disponible'), ('m-05', 'Mesa 05', 'disponible');
     INSERT INTO public.system_config(id) VALUES ('primary');
     INSERT INTO public.staff_audit_logs(action) VALUES ('Registro previo');`);
   return db;
-}
-
-async function as(db, role, staffRole) {
-  await db.exec('RESET ROLE');
-  await db.query("SELECT set_config('test.jwt', $1, false)", [staffRole ? JSON.stringify({ app_metadata: { staff_role: staffRole } }) : '']);
-  if (role) await db.exec(`SET ROLE ${role}`);
 }
 
 const rows = async (db, sql, params) => (await db.query(sql, params)).rows;
