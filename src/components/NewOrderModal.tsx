@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CATALOG_DISHES } from '../data/initialData';
-import { Ticket, TicketItem, MenuItem, TableStatus, StaffMember } from '../types';
+import { Ticket, TicketItem } from '../types';
 import { fetchDishesFromDb } from '@/services/menuService';
 import { fetchTablesFromDb } from '@/services/tableService';
 import { getPersistedStaffList } from '@/services/authService';
@@ -25,7 +25,7 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
   ]);
   const [table, setTable] = useState('MESA 05');
   const [zone, setZone] = useState('SALÓN PRINCIPAL');
-  const [serviceType, setServiceType] = useState('Servicio Almuerzo');
+  const [serviceType] = useState('Servicio Almuerzo');
   const [waiter, setWaiter] = useState('Carlos M.');
   const [allergyAlert, setAllergyAlert] = useState('');
   const [notes, setNotes] = useState('');

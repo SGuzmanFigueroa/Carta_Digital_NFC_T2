@@ -252,15 +252,6 @@ export const PromoFlashTicker = React.memo(function PromoFlashTicker({
     return calculatePromoPricing(deal.price, effectiveDiscount);
   }, [deal, effectiveDiscount]);
 
-  const bannerHeader = useMemo(() => {
-    if (!deal) return t('promo.tickerLabel', { percent: Math.round(discountPercent) });
-    const badge = (deal as any)?.promoBadge;
-    if (badge && !badge.includes('%')) {
-      return t('promo.tickerBadge', { badge });
-    }
-    return t('promo.tickerLabel', { percent: Math.round(effectiveDiscount) });
-  }, [deal, discountPercent, effectiveDiscount, t]);
-
   /** Toca/click: abre el detalle de la oferta que se está viendo en la tira. */
   const handleOpenDeal = useCallback(() => {
     if (deal) onOpenDeal(deal);

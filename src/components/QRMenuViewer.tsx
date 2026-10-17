@@ -223,8 +223,6 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   onRecordTableOrderRound,
   onRequestTableAccount,
   onCallWaiter,
-  onDishCreated,
-  onRefreshDishes
 }) => {
    const [selectedCategory, setSelectedCategory] = useState<string>('todos');
    const [searchQuery, setSearchQuery] = useState('');
@@ -243,7 +241,6 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
    /** Oferta con la que debe abrir el pop-up (la que se veía en la tira flash). */
   const [promoInitialDealId, setPromoInitialDealId] = useState<string | null>(null);
   const [selectedDishDetails, setSelectedDishDetails] = useState<MenuItem | null>(null);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'Efectivo' | 'Tarjeta POS (Visa/MC)' | 'Yape / Plin'>('Tarjeta POS (Visa/MC)');
   const [waiterCalled, setWaiterCalled] = useState(false);
   // CD-28 · Controla el Bottom Sheet de motivos de asistencia en mesa.
   const [isWaiterCallModalOpen, setIsWaiterCallModalOpen] = useState(false);
@@ -1241,18 +1238,6 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     onShowToast(t('toast.orderSent', { table: localizeTableLabel(selectedTable, language) }), 'soup_kitchen');
   };
 
-  const handleConfirmAccountRequest = async () => {
-    if (onRequestTableAccount) {
-      // CD-28 · Mismo defecto hermano: la cuenta también se pedía sin mesa (fallback "MESA 04").
-      await onRequestTableAccount(selectedPaymentMethod, selectedTable);
-    }
-    setIsPaymentModalOpen(false);
-    onShowToast(
-      t('pay.accountRequested', { method: selectedPaymentMethod }),
-      'receipt_long'
-    );
-  };
-
   const handleOpenSplitBill = () => {
     setIsPaymentModalOpen(false);
     setPaymentAmount(null);
@@ -2017,7 +2002,9 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
               <button
                 type="button"
                 onClick={handleSendOrder}
-                className="px-3 sm:px-4 py-2 min-h-[44px] rounded-xl bg-primary text-on-primary font-bold text-[12px] sm:text-[13px] flex items-center gap-1 hover:brightness-110 active:scale-95 transition-all shadow-[0_0_15px] shadow-primary/35 cursor-pointer"
+                disabled={isVerifyingGeofence}
+                aria-busy={isVerifyingGeofence}
+                className="disabled:opacity-60 disabled:cursor-wait px-3 sm:px-4 py-2 min-h-[44px] rounded-xl bg-primary text-on-primary font-bold text-[12px] sm:text-[13px] flex items-center gap-1 hover:brightness-110 active:scale-95 transition-all shadow-[0_0_15px] shadow-primary/35 cursor-pointer"
               >
                 <span>{t('cart.send')}</span>
                 <span className="material-symbols-outlined text-[16px]">send</span>
@@ -2171,7 +2158,9 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                 <button
                   type="button"
                   onClick={handleSendOrder}
-                  className="flex-1 py-2.5 min-h-[44px] rounded-xl bg-primary text-on-primary font-bold text-[13px] flex items-center justify-center gap-1.5 hover:brightness-110 shadow-lg cursor-pointer"
+                  disabled={isVerifyingGeofence}
+                  aria-busy={isVerifyingGeofence}
+                  className="disabled:opacity-60 disabled:cursor-wait flex-1 py-2.5 min-h-[44px] rounded-xl bg-primary text-on-primary font-bold text-[13px] flex items-center justify-center gap-1.5 hover:brightness-110 shadow-lg cursor-pointer"
                 >
                   <span>{t('cart.confirmSend')}</span>
                   <span className="material-symbols-outlined text-[16px]">send</span>

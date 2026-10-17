@@ -296,8 +296,6 @@ function toKdsTicket(order: OrderTicket): Ticket | null {
 
 export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const pathname = usePathname();
-  const currentPath = pathname || (typeof window !== 'undefined' ? window.location.pathname : '');
-  const isStaffTerminal = isStaffManagementRoute(currentPath);
   // Arrancan vacíos: los llena Supabase (antes eran datos de ejemplo que se
   // quedaban en pantalla si la base devolvía cero pedidos).
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -482,7 +480,7 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
         channel.postMessage({ action, payload, timestamp: Date.now() });
         channel.close();
       }
-    } catch (err) {
+    } catch {
       // BroadcastChannel optional fallback
     }
   }, []);

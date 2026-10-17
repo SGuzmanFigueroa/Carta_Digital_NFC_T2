@@ -244,7 +244,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
     setShowLogoModal(false);
   };
   // Función para imprimir de forma aislada sin imprimir el resto del dashboard de configuración
-  const printIsolatedDocument = (html: string, docTitle: string) => {
+  const printIsolatedDocument = (html: string) => {
     const iframe = document.createElement('iframe');
     iframe.style.position = 'fixed';
     iframe.style.right = '0';
@@ -326,7 +326,6 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
 
   // Función para imprimir únicamente el atril / standee físico de mesa en 1 sola hoja limpia
   const handlePrintStandee = async () => {
-    const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
     const tableName = customTableName.trim() || ('MESA ' + selectedTableNumber);
     const targetMenuUrl = signedTableUrl(tableName, selectedZone);
     const qrCodeUrl = await qrDataUrl(targetMenuUrl, 500, qrColor);
@@ -550,12 +549,11 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
 </body>
 </html>`;
 
-    printIsolatedDocument(htmlContent, `Atril-${tableName}`);
+    printIsolatedDocument(htmlContent);
   };
 
   // Función para imprimir lote de mesas en cuadrícula A4 optimizada para corte
   const handlePrintAllTables = async (customList?: string[], customTitle?: string) => {
-    const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
     const branchName = formData.branchName || 'AUREA Bistro';
     const logoUrl = formData.logoUrl || '/logo.png';
     
@@ -738,7 +736,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
 </body>
 </html>`;
 
-    printIsolatedDocument(htmlContent, `Lote-QRs-${branchName}`);
+    printIsolatedDocument(htmlContent);
   };
 
 
@@ -784,10 +782,8 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
     : 'bg-[#1A1A1A] border-[#2A2A2A]';
 
   const sectionHeaderBorder = isLight ? 'border-[#e2e8f0]' : isHighContrast ? 'border-white' : 'border-[#2A2A2A]';
-  const iconBoxBg = isLight ? 'bg-[#fff7ed] border-[#fed7aa]' : isHighContrast ? 'bg-black border-2 border-white' : 'bg-[#252525] border-[#333]';
   const titleColor = isLight ? 'text-[#0f172a]' : 'text-white';
   const descColor = isLight ? 'text-[#64748b]' : 'text-gray-400';
-  const badgeStyle = isLight ? 'text-[#64748b] bg-[#f1f5f9] border-[#e2e8f0]' : 'text-gray-400 bg-[#252525] border-[#333]';
   const inputBg = isLight 
     ? 'bg-[#f8fafc] border-[#cbd5e1] text-[#0f172a] focus:border-[#FF5A1F] focus:bg-white' 
     : isHighContrast 

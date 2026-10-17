@@ -35,7 +35,7 @@ export const Dish3DScannerModal: React.FC<Dish3DScannerModalProps> = ({
   const [dishPhotoUrl, setDishPhotoUrl] = useState<string>('');
 
   // 4 Quadrant Continuous Scan Tracking
-  const [sectors, setSectors] = useState<SectorStatus[]>([
+  const [, setSectors] = useState<SectorStatus[]>([
     { id: 'front', name: 'Frente', range: '0° - 90°', isComplete: false, quality: 'pending' },
     { id: 'right', name: 'Derecha', range: '90° - 180°', isComplete: false, quality: 'pending' },
     { id: 'back', name: 'Atrás', range: '180° - 270°', isComplete: false, quality: 'pending' },
@@ -44,8 +44,8 @@ export const Dish3DScannerModal: React.FC<Dish3DScannerModalProps> = ({
 
   // Live Guidance and Speed Control
   const [guideMessage, setGuideMessage] = useState('Centra el plato en la retícula');
-  const [qualityAlert, setQualityAlert] = useState<string | null>(null);
-  const [activeSectorIdx, setActiveSectorIdx] = useState(0);
+  const [, setQualityAlert] = useState<string | null>(null);
+  const [, setActiveSectorIdx] = useState(0);
 
   // Dish metadata form
   const [dishName, setDishName] = useState('Ají de Gallina Clásico');
@@ -53,7 +53,7 @@ export const Dish3DScannerModal: React.FC<Dish3DScannerModalProps> = ({
   const [dishCategory, setDishCategory] = useState<'fondos' | 'entradas' | 'postres' | 'bebidas'>('fondos');
   const [dishDescription, setDishDescription] = useState('Pechuga deshilachada en crema de ají amarillo con queso parmesano, pecanas, huevo y aceituna botija.');
   const [dishPrepTime, setDishPrepTime] = useState('18 min');
-  const [dishDietary, setDishDietary] = useState<string>('Contiene Lácteos y Frutos Secos');
+  const [dishDietary] = useState<string>('Contiene Lácteos y Frutos Secos');
   const [dishPairing, setDishPairing] = useState('Vino Blanco Chardonnay o Cerveza Artesanal');
   const [isPublishing, setIsPublishing] = useState(false);
 
@@ -168,11 +168,9 @@ export const Dish3DScannerModal: React.FC<Dish3DScannerModalProps> = ({
 
   // Auto request on mount
   useEffect(() => {
-    let mounted = true;
     requestCameraAccess();
 
     return () => {
-      mounted = false;
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((t) => t.stop());
         streamRef.current = null;
@@ -265,14 +263,6 @@ export const Dish3DScannerModal: React.FC<Dish3DScannerModalProps> = ({
         }, 800);
       }
     }, 450);
-  };
-
-  // Re-scan a specific sector if desired
-  const handleRescanSector = (sectorIdx: number) => {
-    onShowToast(`Re-escaneando sector: ${sectors[sectorIdx].name}`, 'sync');
-    setQualityAlert(null);
-    setActiveSectorIdx(sectorIdx);
-    setGuideMessage(`Re-escaneando ${sectors[sectorIdx].name} (${sectors[sectorIdx].range}). Pasa la cámara lentamente.`);
   };
 
   // Publish to Supabase and Menu

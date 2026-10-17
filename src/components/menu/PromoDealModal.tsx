@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowRight, Clock, Star, TrendingUp, X, Zap } from 'lucide-react';
+import { ArrowRight, Clock, Star, TrendingUp, X } from 'lucide-react';
 import type { MenuItem } from '@/types';
 import { calculatePromoPricing, formatPromoCountdown, formatSoles } from '@/utils/promo';
 import type { PromoPricing, PromoSubtitleTextInput } from '@/utils/promo';

@@ -15,7 +15,6 @@ interface DishCatalogAdminProps {
 export const DishCatalogAdmin: React.FC<DishCatalogAdminProps> = ({
   dishes,
   onClose,
-  onOpenScanner,
   onRefreshDishes,
   onShowToast
 }) => {

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { QRMenuViewer } from '@/components/QRMenuViewer';
 import { PWAInstallBanner } from '@/components/menu/PWAInstallBanner';
 import { useRestaurant } from '@/context/RestaurantContext';
-import { OrderTicket, MenuItem } from '@/types';
+import { MenuItem } from '@/types';
 import { fetchDishesFromDb } from '@/services/menuService';
 import { MenuThemeProvider } from '@/hooks/useMenuTheme';
 import { LanguageProvider, resolveInitialMenuLanguage, useLanguage } from '@/hooks/useLanguage';
@@ -113,7 +113,7 @@ export function MenuClient({ initialMenuItems }: { initialMenuItems: MenuItem[] 
     };
   }, [showToast, reconcileQueuedOrder]);
 
-  const handleAddNewOrder = (newTicket: OrderTicket) => {
+  const handleAddNewOrder = () => {
     // Handled via sendOrderFromMenu inside QRMenuViewer
   };
 

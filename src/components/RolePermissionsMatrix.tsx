@@ -34,7 +34,7 @@ const COLUMN_NAMES: Record<PermissionColumnKey, string> = {
 
 export const RolePermissionsMatrix: React.FC<RolePermissionsMatrixProps> = ({ onShowToast }) => {
   const [permissions, setPermissions] = useState<RolePermissionItem[]>(DEFAULT_ROLE_PERMISSIONS);
-  const [isLoading, setIsLoading] = useState(true);
+  const [, setIsLoading] = useState(true);
   const [showAuditModal, setShowAuditModal] = useState(false);
   const [showPoliciesModal, setShowPoliciesModal] = useState(false);
   const [auditLogs, setAuditLogs] = useState<StaffAuditLogItem[]>([]);

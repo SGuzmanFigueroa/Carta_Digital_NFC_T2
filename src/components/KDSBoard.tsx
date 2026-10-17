@@ -16,8 +16,6 @@ interface KDSBoardProps {
 export const KDSBoard: React.FC<KDSBoardProps> = ({
   tickets,
   runners,
-  onUpdateTickets,
-  onUpdateRunners
 }) => {
   const {
     dispatchTicket: contextDispatchTicket,

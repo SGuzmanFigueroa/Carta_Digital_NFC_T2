@@ -21,7 +21,6 @@ interface GeofenceSettingsProps {
 
 export const GeofenceSettings: React.FC<GeofenceSettingsProps> = ({
   isLight,
-  isHighContrast,
   sectionBg,
   sectionHeaderBorder,
   onShowToast
@@ -90,7 +89,7 @@ export const GeofenceSettings: React.FC<GeofenceSettingsProps> = ({
         setIsDetectingLocation(false);
         onShowToast(`Coordenadas del restaurante detectadas (±${acc}m)`, 'my_location');
       },
-      (err) => {
+      () => {
         setIsDetectingLocation(false);
         onShowToast('No se pudo obtener la ubicación: verifica los permisos del navegador', 'warning');
       },

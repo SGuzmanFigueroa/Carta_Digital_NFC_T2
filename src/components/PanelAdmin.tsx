@@ -3,7 +3,7 @@ import { INITIAL_STATION_LOADS, CATALOG_DISHES } from '../data/initialData';
 import { useRestaurant } from '../context/RestaurantContext';
 
 export const PanelAdmin: React.FC = () => {
-  const { tickets = [], orders = [], tables = [], runners = [] } = useRestaurant();
+  const { tickets = [], orders = [], runners = [] } = useRestaurant();
 
   // 1. Dynamic KPIs
   const kpiData = useMemo(() => {
