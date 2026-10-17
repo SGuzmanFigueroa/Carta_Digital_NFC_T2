@@ -7,6 +7,7 @@
  * Uso:
  *   node scripts/provision-staff-auth.mjs --dry-run   # solo muestra qué haría
  *   node scripts/provision-staff-auth.mjs
+ *   node scripts/provision-staff-auth.mjs --demo-accounts   # cuentas demo (solo desarrollo)
  *
  * Necesita NEXT_PUBLIC_SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY (de .env.local
  * o del entorno). Las contraseñas temporales se escriben SOLO en
@@ -65,6 +66,57 @@ async function findUserByEmail(admin, email) {
   return null;
 }
 
+/**
+ * --demo-accounts: cuentas de acceso rápido para la etapa de desarrollo
+ * (botones demo del login). Aparte del personal real, sin cambio obligatorio
+ * de contraseña (nadie la conoce: se entra con /api/auth/demo-login) y con PIN
+ * de desbloqueo 1234. Bórralas antes de tener clientes reales.
+ */
+const DEMO_ACCOUNTS = [
+  { username: 'demo_admin', name: 'Demo Admin', role: 'admin', roleTitle: 'Administrador (Demo)', station: 'Gerencia & Caja' },
+  { username: 'demo_cocina', name: 'Demo Cocina', role: 'kitchen', roleTitle: 'Jefe de Cocina (Demo)', station: 'Wok & Pase' },
+  { username: 'demo_sala', name: 'Demo Sala', role: 'floor', roleTitle: 'Camarero (Demo)', station: 'Salón Central' },
+  { username: 'demo_barra', name: 'Demo Barra', role: 'bar', roleTitle: 'Bartender (Demo)', station: 'Barra Mixología' }
+];
+const DEMO_PIN = '1234';
+
+async function provisionDemoAccounts(supabase) {
+  let created = 0;
+  for (const demo of DEMO_ACCOUNTS) {
+    const { data: existing, error } = await supabase.from('staff').select('id, auth_user_id').eq('username', demo.username).maybeSingle();
+    if (error) throw error;
+    if (existing?.auth_user_id) continue;
+
+    let staffId = existing?.id;
+    if (!staffId) {
+      const { data: row, error: insertError } = await supabase
+        .from('staff')
+        .insert({ name: demo.name, username: demo.username, role: demo.role, role_title: demo.roleTitle, station: demo.station, status: 'Activo' })
+        .select('id')
+        .single();
+      if (insertError) throw insertError;
+      staffId = row.id;
+    }
+
+    const appMetadata = { ...staffAppMetadata(staffId, demo.role), must_change_password: false };
+    const { data: auth, error: authError } = await supabase.auth.admin.createUser({
+      email: staffAuthEmail(demo.username),
+      password: temporaryPassword() + temporaryPassword(),
+      email_confirm: true,
+      app_metadata: appMetadata
+    });
+    if (authError || !auth.user) throw authError ?? new Error(`No se creó ${demo.username}`);
+
+    const [{ error: linkError }, { error: pinError }] = await Promise.all([
+      supabase.from('staff').update({ auth_user_id: auth.user.id, must_change_password: false }).eq('id', staffId),
+      supabase.rpc('admin_set_staff_pin', { p_staff_id: staffId, p_pin: DEMO_PIN })
+    ]);
+    if (linkError || pinError) throw linkError ?? pinError;
+    created++;
+  }
+  console.log(`Cuentas demo creadas: ${created} (PIN de desbloqueo ${DEMO_PIN}).`);
+}
+
 async function main() {
   loadEnv();
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -75,6 +127,11 @@ async function main() {
   }
 
   const supabase = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  if (process.argv.includes('--demo-accounts')) {
+    if (dryRun) console.log(`Crearía (si faltan): ${DEMO_ACCOUNTS.map((d) => d.username).join(', ')}`);
+    else await provisionDemoAccounts(supabase);
+    return;
+  }
   const { data: staff, error } = await supabase
     .from('staff')
     .select('id, name, username, role, auth_user_id')

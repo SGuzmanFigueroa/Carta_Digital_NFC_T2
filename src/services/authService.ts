@@ -88,11 +88,20 @@ export type LoginResult =
   | { ok: true; user: AuthUser; mustChangePassword: boolean }
   | { ok: false; error: string };
 
-export async function loginStaff(identifier: string, password: string): Promise<LoginResult> {
+export function loginStaff(identifier: string, password: string): Promise<LoginResult> {
+  return openStaffSession('/api/auth/login', { identifier, password });
+}
+
+/** ⚠️ Solo etapa de desarrollo: entra con la cuenta demo del rol (ver /api/auth/demo-login). */
+export function loginDemo(role: 'admin' | 'kitchen' | 'floor' | 'bar'): Promise<LoginResult> {
+  return openStaffSession('/api/auth/demo-login', { role });
+}
+
+async function openStaffSession(url: string, body: unknown): Promise<LoginResult> {
   purgeLegacyStaffCache();
   let result: { ok: boolean; data: Record<string, unknown> };
   try {
-    result = await postJson('/api/auth/login', { identifier, password });
+    result = await postJson(url, body);
   } catch {
     return { ok: false, error: 'Sin conexión con el servidor. Revisa tu red e inténtalo de nuevo.' };
   }
@@ -122,8 +131,15 @@ export async function changeOwnPassword(newPassword: string): Promise<{ ok: bool
   try {
     const { ok, data } = await postJson('/api/auth/change-password', { newPassword });
     if (!ok) return { ok: false, error: (data.error as string) || 'No se pudo cambiar la contraseña.' };
-    // El JWT trae must_change_password: se renueva para que el proxy vea el cambio.
-    await supabase.auth.refreshSession();
+    // Cambiar la contraseña invalida la sesión anterior: el servidor devuelve una
+    // nueva (JWT con must_change_password=false) para que el proxy deje pasar.
+    const session = data.session as { access_token: string; refresh_token: string } | null;
+    if (!session) {
+      await supabase.auth.signOut().catch(() => undefined);
+      return { ok: false, error: 'Contraseña cambiada. Vuelve a iniciar sesión con la nueva.' };
+    }
+    const { error } = await supabase.auth.setSession(session);
+    if (error) return { ok: false, error: 'Contraseña cambiada. Vuelve a iniciar sesión con la nueva.' };
     return { ok: true };
   } catch {
     return { ok: false, error: 'Sin conexión con el servidor.' };

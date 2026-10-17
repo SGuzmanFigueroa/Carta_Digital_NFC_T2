@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { AuditLogger, sanitizeText } from '../utils/security';
 import { kitchenAudio } from '../utils/audio';
 import { AuthUser } from '../types';
-import { changeOwnPassword, loadCurrentStaffUser, loginStaff } from '../services/authService';
+import { changeOwnPassword, loadCurrentStaffUser, loginDemo, loginStaff } from '../services/authService';
 
 interface LoginScreenProps {
   onLoginSuccess: (user: AuthUser) => void;
@@ -16,14 +16,18 @@ interface LoginScreenProps {
   forcePasswordChange?: boolean;
 }
 
-/** Usuarios de supabase/seed.sql: solo se ofrecen en `npm run dev`. */
-const DEV_DEMO_USERS = [
-  { username: 'admin', label: 'Admin / Gerente', dot: 'bg-[#ff5708]' },
-  { username: 'chef_kenji', label: 'Jefe Cocina KDS', dot: 'bg-amber-400' },
-  { username: 'garzon_sofia', label: 'Camarero Sala', dot: 'bg-emerald-400' },
-  { username: 'bar_lucas', label: 'Bartender Barra', dot: 'bg-cyan-400' }
+/**
+ * ⚠️ Acceso rápido de la etapa de desarrollo: entra con un clic a las cuentas
+ * demo (demo_admin, demo_cocina…). Se apaga con NEXT_PUBLIC_DEMO_LOGIN_ENABLED=false
+ * y hay que BORRARLO antes de tener clientes reales (ver /api/auth/demo-login).
+ */
+const DEMO_ROLES = [
+  { role: 'admin', label: 'Admin / Gerente', username: 'demo_admin', dot: 'bg-[#ff5708]' },
+  { role: 'kitchen', label: 'Jefe Cocina KDS', username: 'demo_cocina', dot: 'bg-amber-400' },
+  { role: 'floor', label: 'Camarero Sala', username: 'demo_sala', dot: 'bg-emerald-400' },
+  { role: 'bar', label: 'Bartender Barra', username: 'demo_barra', dot: 'bg-cyan-400' }
 ] as const;
-const SHOW_DEV_DEMO_USERS = process.env.NODE_ENV === 'development';
+const SHOW_DEMO_LOGIN = process.env.NEXT_PUBLIC_DEMO_LOGIN_ENABLED !== 'false';
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({
   onLoginSuccess,
@@ -147,11 +151,24 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     finishLogin(pendingUser);
   };
 
-  const fillDevDemoUser = (username: string) => {
-    setUsernameOrEmail(username);
-    setPassword('');
+  const handleDemoLogin = async (role: (typeof DEMO_ROLES)[number]['role']) => {
+    if (isLoading) return;
     setErrorMessage('');
-    passwordInputRef.current?.focus();
+    setIsLoading(true);
+    const result = await loginDemo(role);
+    setIsLoading(false);
+    if (!result.ok) {
+      setErrorMessage(result.error);
+      return;
+    }
+    AuditLogger.log({
+      eventType: 'LOGIN_SUCCESS',
+      severity: 'INFO',
+      user: result.user.name,
+      role: result.user.role,
+      details: 'Acceso rápido demo'
+    });
+    finishLogin(result.user);
   };
 
   return (
@@ -362,21 +379,22 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               </form>
             )}
 
-            {/* Usuarios demo: solo en desarrollo; rellenan el usuario, la contraseña la escribes tú. */}
-            {SHOW_DEV_DEMO_USERS && view === 'login' && (
+            {/* ⚠️ Acceso rápido demo (etapa de desarrollo): borrar antes de producción. */}
+            {SHOW_DEMO_LOGIN && view === 'login' && (
               <div className="mt-6 pt-5 border-t border-[#353437]/40">
                 <div className="flex items-center justify-between mb-2.5">
                   <span className="font-label-code text-[11px] text-[#ff8c42] uppercase font-bold tracking-wider">
-                    Usuarios demo (solo desarrollo)
+                    Acceso Rápido de Prueba (Demo)
                   </span>
-                  <span className="text-[11px] text-[#c6c5cf]">Rellena el usuario</span>
+                  <span className="text-[11px] text-[#c6c5cf]">Click para entrar · PIN 1234</span>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
-                  {DEV_DEMO_USERS.map((demo) => (
+                  {DEMO_ROLES.map((demo) => (
                     <button
-                      key={demo.username}
+                      key={demo.role}
                       type="button"
-                      onClick={() => fillDevDemoUser(demo.username)}
+                      disabled={isLoading}
+                      onClick={() => handleDemoLogin(demo.role)}
                       className="p-2.5 rounded-xl bg-[#0e0e10] hover:bg-[#201f22] border border-[#353437]/60 hover:border-[#ff5708]/50 text-left transition-all cursor-pointer group"
                     >
                       <div className="flex items-center gap-2">

@@ -1,10 +1,12 @@
 import {
   ServerConfigError,
+  createAnonServerClient,
   createServiceClient,
   getStaffFromRequest,
   isSameOrigin,
   isValidPassword,
-  json
+  json,
+  staffAuthEmail
 } from '@/lib/supabaseServer';
 
 export const runtime = 'nodejs';
@@ -44,8 +46,24 @@ export async function POST(request: Request) {
       // Supabase rechaza, por ejemplo, contraseñas filtradas o demasiado débiles.
       return json({ error: error.message || 'No se pudo cambiar la contraseña.' }, 400);
     }
-    await service.from('staff').update({ must_change_password: false }).eq('id', staff.staffId);
-    return json({ ok: true });
+    const { data: row } = await service
+      .from('staff')
+      .update({ must_change_password: false })
+      .eq('id', staff.staffId)
+      .select('username')
+      .single();
+
+    // Cambiar la contraseña invalida la sesión anterior: se abre una nueva (con
+    // must_change_password=false en el JWT) para que el navegador siga dentro.
+    const { data: fresh, error: signInError } = await createAnonServerClient().auth.signInWithPassword({
+      email: current.user.email ?? staffAuthEmail(row?.username ?? ''),
+      password: body.newPassword
+    });
+    if (signInError || !fresh.session) return json({ ok: true, session: null });
+    return json({
+      ok: true,
+      session: { access_token: fresh.session.access_token, refresh_token: fresh.session.refresh_token }
+    });
   } catch (err) {
     if (err instanceof ServerConfigError) {
       console.error('[auth/change-password]', err.message);
