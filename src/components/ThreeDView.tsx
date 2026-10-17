@@ -124,7 +124,8 @@ export const ThreeDView: React.FC<ThreeDViewProps> = ({
       const loader = new GLTFLoader();
       
       loader.load(
-        `/models/${dishId}.glb`,
+        // Mismo archivo que la RA (models-ar): la vista se ajusta al tamaño del modelo.
+        `/models-ar/${dishId}.glb`,
         (gltf) => {
           if (!isSubscribed) {
             gltf.scene.traverse((child) => {
