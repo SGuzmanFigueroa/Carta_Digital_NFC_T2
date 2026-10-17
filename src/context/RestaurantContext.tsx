@@ -11,6 +11,7 @@ import { fetchTablesFromDb, settleTableInDb, updateTableStateInDb } from '@/serv
 import {
   fetchOrdersFromDb,
   placeOrderInDb,
+  fetchDinerOrderStatuses,
   toPlaceOrderItems,
   OrderRejectedError,
   type PlacedOrder,
@@ -882,6 +883,45 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
     latestStateRef.current = { tickets, orders, tables, dinerActiveTicket };
   }, [tickets, orders, tables, dinerActiveTicket]);
 
+  // El comensal no tiene sesión: RLS le oculta la tabla orders, así que el
+  // realtime de pedidos no le llega. Cada 15 s consulta el estado de SUS
+  // pedidos con la clave que guardó su celular (get_diner_orders).
+  useEffect(() => {
+    if (currentUser) return;
+    let cancelled = false;
+    const poll = async () => {
+      if (document.visibilityState !== 'visible') return;
+      const { orders: current, dinerActiveTicket: diner } = latestStateRef.current;
+      const refs = new Map<string, { id: string; key: string }>();
+      for (const order of [...current, ...(diner ? [diner] : [])]) {
+        if (order.dinerKey && /^cmd-\d+$/.test(order.id)) refs.set(order.id, { id: order.id, key: order.dinerKey });
+      }
+      if (refs.size === 0) return;
+      try {
+        const statuses = await fetchDinerOrderStatuses(Array.from(refs.values()));
+        if (cancelled || statuses.size === 0) return;
+        setOrders((prev) =>
+          prev.map((order) => {
+            const fresh = statuses.get(order.id);
+            if (!fresh || (fresh.status === order.status && (!fresh.paid || order.paymentStatus === 'paid'))) return order;
+            return { ...order, status: fresh.status, paymentStatus: fresh.paid ? 'paid' : order.paymentStatus };
+          })
+        );
+        realtimeCallbacksRef.current.syncDinerTicketStatus(
+          Array.from(statuses, ([id, fresh]) => ({ id, status: fresh.status }) as OrderTicket)
+        );
+      } catch (err) {
+        console.warn('[diner] No se pudo consultar el estado de los pedidos:', err);
+      }
+    };
+    void poll();
+    const intervalId = window.setInterval(poll, 15000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [currentUser]);
+
   // 1. Send Order from Diner Carta Digital NFC (/menu)
   // El servidor (RPC place_order) decide precios, nombres y número de comanda.
   // Sin conexión, el pedido queda en cola con un id provisional y se reconcilia
@@ -980,6 +1020,8 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
 
       const newDinerOrder: OrderTicket = {
         id: orderId,
+        // Clave secreta del pedido: con ella el comensal consulta su estado (RLS).
+        dinerKey: input.idempotencyKey,
         table: safeTable,
         pax: safePax,
         timeAgo: placed ? 'Justo ahora' : 'En cola offline',

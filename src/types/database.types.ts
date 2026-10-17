@@ -533,6 +533,18 @@ export type Database = {
         Args: { p_staff_id: string; p_pin: string }
         Returns: undefined
       }
+      current_staff_role: {
+        Args: Record<PropertyKey, never>
+        Returns: string | null
+      }
+      diner_table_signal: {
+        Args: { p_table: string; p_signal: string; p_payment_method?: string }
+        Returns: boolean
+      }
+      get_diner_orders: {
+        Args: { p_refs: Json }
+        Returns: Json
+      }
       login_retry_after: {
         Args: { p_identifier: string; p_ip: string }
         Returns: number

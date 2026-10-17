@@ -228,49 +228,65 @@ export async function updateOrderStatusInDb(orderId: string, status: OrderTicket
 }
 
 
+/**
+ * El comensal pide la cuenta. No tiene permiso para editar pedidos ni mesas:
+ * la RPC diner_table_signal marca la cuenta pedida en los pedidos abiertos de
+ * su mesa y pone la mesa en 'cuenta', sin tocar montos ni platos.
+ */
 export async function requestTableAccountInDb(
   tableNumber: string,
   paymentMethod: string = 'Efectivo'
 ): Promise<boolean> {
-  try {
-    const digits = tableNumber.replace(/\D/g, '').padStart(2, '0');
-    // 1. Update matching active orders for this table in Supabase
-    const { error: orderErr } = await supabase
-      .from('orders')
-      .update({
-        account_requested: true,
-        payment_method: paymentMethod,
-        updated_at: new Date().toISOString()
-      })
-      .or(`table_number.ilike.%${digits}%,table_number.ilike.%${tableNumber}%`)
-      .neq('status', 'cobrado');
-
-    if (orderErr) {
-      console.warn('Warning updating order for account request in DB:', orderErr.message);
-    }
-
-    // 2. Set table status to 'cuenta' in restaurant_tables
-    await updateTableStateInDb(tableNumber, { status: 'cuenta' });
-
-    return true;
-  } catch (err) {
-    console.error('Error requesting account in DB:', err);
+  const { data, error } = await supabase.rpc('diner_table_signal', {
+    p_table: tableNumber,
+    p_signal: 'bill',
+    p_payment_method: paymentMethod
+  });
+  if (error) {
+    console.error('Error requesting account in DB:', error.message);
     return false;
   }
+  return Boolean(data);
 }
 
+const DINER_STATUS: Record<string, OrderTicket['status']> = {
+  'por-validar': 'por-validar',
+  'en-cocina': 'en-cocina',
+  'pase-listo': 'pase-listo',
+  entregado: 'entregado',
+  cobrado: 'entregado'
+};
+
+/**
+ * Estado actual de los pedidos del comensal. Solo devuelve los que coinciden
+ * con su clave (dinerKey), así nadie puede espiar pedidos de otras mesas.
+ */
+export async function fetchDinerOrderStatuses(
+  refs: { id: string; key: string }[]
+): Promise<Map<string, { status: OrderTicket['status']; paid: boolean }>> {
+  const statuses = new Map<string, { status: OrderTicket['status']; paid: boolean }>();
+  if (refs.length === 0) return statuses;
+  const { data, error } = await supabase.rpc('get_diner_orders', { p_refs: refs.slice(0, 50) });
+  if (error) throw error;
+  for (const row of (data ?? []) as { id: string; status: string }[]) {
+    const status = DINER_STATUS[row.status];
+    if (status) statuses.set(row.id, { status, paid: row.status === 'cobrado' });
+  }
+  return statuses;
+}
+
+/** Marca la mesa como "necesita atención" (RPC acotada: el comensal no edita mesas). */
 export async function callWaiterForTableInDb(
   tableNumber: string,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   reason: string = 'Atención en mesa'
 ): Promise<boolean> {
-  try {
-    // Flag table state in DB with active attention request
-    await updateTableStateInDb(tableNumber, { status: 'demora' });
-    return true;
-  } catch (err) {
-    console.error('Error calling waiter in DB:', err);
+  const { error } = await supabase.rpc('diner_table_signal', { p_table: tableNumber, p_signal: 'waiter' });
+  if (error) {
+    console.error('Error calling waiter in DB:', error.message);
     return false;
   }
+  return true;
 }
 
 export async function settleOrdersForTableInDb(tableNumber: string): Promise<boolean> {

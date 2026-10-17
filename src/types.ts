@@ -114,6 +114,12 @@ export interface OrderTicket {
   paymentMethod?: string;
   accountRequested?: boolean;
   runnerAssigned?: string;
+  /**
+   * Solo en el celular del comensal: la clave con la que creó el pedido
+   * (idempotency_key). Prueba que el pedido es suyo para consultar su estado
+   * sin cuenta (RPC get_diner_orders). Nunca se muestra.
+   */
+  dinerKey?: string;
 }
 
 export type KitchenDishStatus = 'Recibido' | 'En preparación' | 'Listo en pase' | 'Entregado';
