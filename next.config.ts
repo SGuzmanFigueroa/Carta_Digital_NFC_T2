@@ -36,6 +36,10 @@ const nextConfig: NextConfig = {
    * Solo aplica en `next dev`; en producción/`next start` se ignora.
    */
   allowedDevOrigins: ["192.168.1.39"],
+  compiler: {
+    removeConsole:
+      process.env.NODE_ENV === "production" ? { exclude: ["error", "warn"] } : false,
+  },
   async headers() {
     return [
       {
@@ -47,4 +51,3 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
-
