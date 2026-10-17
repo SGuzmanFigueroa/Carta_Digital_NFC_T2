@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
-import { Ticket, OrderTicket, OrderRound, OrderRoundItem, TableStatus, Runner, MenuItem, StationId, TicketItem, AuthUser, WaiterCall } from '../types';
+import { Ticket, OrderTicket, OrderRound, OrderRoundItem, TableStatus, Runner, MenuItem, StationId, TicketItem, AuthUser, WaiterCall, PaymentClaim } from '../types';
 import { INITIAL_RUNNERS } from '../data/initialData';
 import { INITIAL_MENU_ITEMS } from '../data/mockData';
 import { kitchenAudio } from '../utils/audio';
@@ -97,7 +97,7 @@ interface RestaurantContextType {
   updateOrderStatus: (orderId: string, newStatus: OrderTicket['status']) => Promise<void>;
   addOrderNote: (orderId: string, note: string) => void;
   /** CD-28 · `table` = mesa real del comensal (selector / QR); si se omite se usa la de su comanda. */
-  requestTableAccount: (paymentMethod?: string, table?: string) => Promise<boolean>;
+  requestTableAccount: (paymentMethod?: string, table?: string, claim?: PaymentClaim) => Promise<boolean>;
   /** CD-28 · `table` = mesa real del comensal (selector / QR); si se omite se usa la de su comanda. */
   callWaiter: (reason?: string, table?: string) => Promise<boolean>;
   attendWaiterCall: (callId: string) => Promise<void>;
@@ -911,11 +911,32 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
       try {
         const statuses = await fetchDinerOrderStatuses(Array.from(refs.values()));
         if (cancelled || statuses.size === 0) return;
+        // Aviso al comensal cuando el personal revisa su pago Yape/Plin.
+        const reviewed = Array.from(refs.keys())
+          .map((id) => ({ before: current.find((o) => o.id === id)?.paymentVerification, after: statuses.get(id)?.paymentVerification }))
+          .find(({ before, after }) => before === 'pending_verification' && (after === 'verified' || after === 'rejected'));
+        if (reviewed?.after === 'verified') {
+          realtimeCallbacksRef.current.showToast('Tu pago fue confirmado por el personal. ¡Gracias!', 'verified');
+        } else if (reviewed?.after === 'rejected') {
+          realtimeCallbacksRef.current.showToast('No pudimos verificar tu pago. Consulta al personal.', 'error');
+        }
         setOrders((prev) =>
           prev.map((order) => {
             const fresh = statuses.get(order.id);
-            if (!fresh || (fresh.status === order.status && (!fresh.paid || order.paymentStatus === 'paid'))) return order;
-            return { ...order, status: fresh.status, paymentStatus: fresh.paid ? 'paid' : order.paymentStatus };
+            if (
+              !fresh ||
+              (fresh.status === order.status &&
+                (!fresh.paid || order.paymentStatus === 'paid') &&
+                fresh.paymentVerification === (order.paymentVerification ?? 'none'))
+            ) {
+              return order;
+            }
+            return {
+              ...order,
+              status: fresh.status,
+              paymentStatus: fresh.paid ? 'paid' : order.paymentStatus,
+              paymentVerification: fresh.paymentVerification
+            };
           })
         );
         realtimeCallbacksRef.current.syncDinerTicketStatus(
@@ -1768,7 +1789,7 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
 
   // 18. Request Table Account from Mobile Diner Menu
   const requestTableAccount = useCallback(
-    async (paymentMethod: string = 'Efectivo', tableOverride?: string): Promise<boolean> => {
+    async (paymentMethod: string = 'Efectivo', tableOverride?: string, claim?: PaymentClaim): Promise<boolean> => {
       // CD-28 · Mismo defecto hermano del llamado de mozo: la cuenta también se pedía
       // siempre como "MESA 04" cuando el comensal aún no tenía comanda activa.
       const activeTable = tableOverride?.trim() || dinerActiveTicket?.table || 'MESA 04';
@@ -1804,7 +1825,7 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
       }
 
       // Optimistic background sync: no bloquear interfaz del comensal
-      requestTableAccountInDb(activeTable, paymentMethod).catch((err) => {
+      requestTableAccountInDb(activeTable, paymentMethod, claim).catch((err) => {
         console.warn('Background sync error requesting account in DB:', err);
       });
       showToast(`Cuenta solicitada (${paymentMethod}). Garzón en camino.`, 'receipt');

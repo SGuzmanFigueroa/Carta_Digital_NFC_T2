@@ -11,6 +11,8 @@ interface OrdersCentralProps {
   onShowToast: (msg: string, icon?: string) => void;
   onOpenKitchenNoteModal?: (orderId: string) => void;
   onAddOrderNote?: (orderId: string, note: string) => void;
+  /** Confirmar (true) o rechazar (false) el pago Yape/Plin declarado por la mesa. */
+  onReviewPayment?: (table: string, approve: boolean) => Promise<void>;
 }
 
 export const OrdersCentral: React.FC<OrdersCentralProps> = ({
@@ -18,6 +20,7 @@ export const OrdersCentral: React.FC<OrdersCentralProps> = ({
   onUpdateOrderStatus,
   onShowToast,
   onAddOrderNote,
+  onReviewPayment,
   paymentHistoryLoading = false,
   paymentHistoryError = false
 }) => {
@@ -547,6 +550,54 @@ export const OrdersCentral: React.FC<OrdersCentralProps> = ({
                           S/ {ticket.total.toFixed(2)}
                         </span>
                       </div>
+                      {ticket.paymentVerification === 'pending_verification' && (
+                        <div className="mt-1.5 p-2 rounded-lg border border-amber-500/60 bg-amber-950/40 space-y-2" role="status">
+                          <div className="flex items-center gap-1.5 text-amber-200 text-[12px] font-bold">
+                            <span className="material-symbols-outlined text-[16px] text-amber-400">hourglass_top</span>
+                            <span>PAGO POR VERIFICAR</span>
+                          </div>
+                          <p className="text-[11px] text-amber-100/90 leading-snug">
+                            Revisa en tu app de Yape/Plin que llegó el pago
+                            {ticket.paymentReference ? <> con la operación <strong className="font-label-code">{ticket.paymentReference}</strong></> : ' (sin código: pide el voucher)'}.
+                          </p>
+                          {onReviewPayment && (
+                            <div className="grid grid-cols-2 gap-1.5">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  void onReviewPayment(ticket.table, true);
+                                }}
+                                className="py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold cursor-pointer"
+                              >
+                                Confirmar recibido
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  void onReviewPayment(ticket.table, false);
+                                }}
+                                className="py-1.5 rounded-md bg-[#2a2a2c] hover:bg-[#353437] text-red-300 text-[11px] font-bold cursor-pointer border border-red-500/40"
+                              >
+                                No llegó
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {ticket.paymentVerification === 'verified' && (
+                        <div className="mt-1 flex items-center gap-1.5 text-emerald-300 text-[11px] font-bold">
+                          <span className="material-symbols-outlined text-[15px]">verified</span>
+                          <span>Pago digital verificado{ticket.paymentReference ? ` · OP ${ticket.paymentReference}` : ''}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {ticket.paymentVerification === 'rejected' && !ticket.accountRequested && (
+                    <div className="my-1 flex items-center gap-1.5 text-red-300 text-[11px] font-bold" role="status">
+                      <span className="material-symbols-outlined text-[15px]">error</span>
+                      <span>Pago digital rechazado: la mesa debe volver a pagar</span>
                     </div>
                   )}
 

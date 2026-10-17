@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { submitCustomerReview } from '@/services/reviewService';
 import { getPaymentConfig, loadPaymentConfig, PaymentGatewayConfig } from '@/services/paymentConfigService';
 import { useLanguage } from '@/hooks/useLanguage';
+import type { PaymentClaim } from '@/types';
 // CD-31 · Rótulo de mesa visible (ES/EN) sin alterar el valor guardado en la reseña.
 import { localizeTableLabel } from '@/i18n/tableLabel';
 
@@ -15,7 +16,7 @@ interface PaymentModalProps {
   orderId?: string;
   /** Clave del pedido del comensal: verifica la reseña (una por pedido). */
   orderKey?: string;
-  onRequestTableAccount?: (paymentMethod: string) => Promise<boolean> | void;
+  onRequestTableAccount?: (paymentMethod: string, table?: string, claim?: PaymentClaim) => Promise<boolean> | void;
   onShowToast: (msg: string, icon?: string) => void;
 }
 
@@ -205,7 +206,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       // Optimistic UI: disparar en segundo plano sin congelar la interfaz del comensal
       if (onRequestTableAccount) {
         try {
-          const res = onRequestTableAccount(methodLabel);
+          const res = onRequestTableAccount(methodLabel, undefined, {
+            kind: selectedMethod,
+            operationCode: cleanOpDigits || undefined
+          });
           if (res && typeof (res as Promise<boolean>).catch === 'function') {
             (res as Promise<boolean>).catch((err: unknown) => {
               console.warn('Error en sincronización en segundo plano de cuenta:', err);
@@ -220,7 +224,12 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       // al panel del garzón (`methodLabel`) se mantiene en español.
       const displayMethodLabel =
         availableMethods.find((method) => method.id === selectedMethod)?.label ?? methodLabel;
-      onShowToast(t('pay.paid', { method: displayMethodLabel }), 'check_circle');
+      // Yape/Plin no se dan por cobrados: el personal confirma que llegó el dinero.
+      if (selectedMethod === 'yape' || selectedMethod === 'plin') {
+        onShowToast(t('pay.pendingVerification', { method: displayMethodLabel }), 'hourglass_top');
+      } else {
+        onShowToast(t('pay.paid', { method: displayMethodLabel }), 'check_circle');
+      }
       setStep('feedback');
     } catch (err) {
       console.error('Error confirming payment:', err);

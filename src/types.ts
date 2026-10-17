@@ -120,7 +120,14 @@ export interface OrderTicket {
    * sin cuenta (RPC get_diner_orders). Nunca se muestra.
    */
   dinerKey?: string;
+  /** Pago con Yape/Plin: el comensal lo declara y el personal lo verifica. */
+  paymentVerification?: 'none' | 'pending_verification' | 'verified' | 'rejected';
+  /** Código de operación declarado por el comensal. */
+  paymentReference?: string;
 }
+
+/** Datos del pago que declara el comensal al pedir la cuenta. */
+export type PaymentClaim = { kind: 'yape' | 'plin' | 'tarjeta' | 'efectivo'; operationCode?: string };
 
 export type KitchenDishStatus = 'Recibido' | 'En preparación' | 'Listo en pase' | 'Entregado';
 

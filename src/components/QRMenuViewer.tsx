@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MenuItem, OrderRound, OrderTicket, TableStatus, WaiterCallReason } from '../types';
+import { MenuItem, OrderRound, OrderTicket, PaymentClaim, TableStatus, WaiterCallReason } from '../types';
 import { kitchenAudio } from '../utils/audio';
 // CD-27 · Confirmación táctil (vibración de 15 ms) del gesto "agregar al carrito".
 import { hapticAddToCart } from '../utils/haptics';
@@ -204,7 +204,7 @@ interface QRMenuViewerProps {
     orderId: string
   ) => void;
   onCallWaiter?: (reason?: string, table?: string) => Promise<boolean> | void;
-  onRequestTableAccount?: (paymentMethod: string, table?: string) => Promise<boolean> | void;
+  onRequestTableAccount?: (paymentMethod: string, table?: string, claim?: PaymentClaim) => Promise<boolean> | void;
   onDishCreated?: (dish: MenuItem) => void;
   onRefreshDishes?: () => void;
 }

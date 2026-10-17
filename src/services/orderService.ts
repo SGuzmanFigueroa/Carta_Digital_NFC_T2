@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { OrderTicket, OrderItem, MenuItem, StationId } from '@/types';
+import { OrderTicket, OrderItem, MenuItem, PaymentClaim, StationId } from '@/types';
 import { isTemporaryPairingItem } from '@/features/menu/pairing';
 import type { Database } from '@/types/database.types';
 import { limaDate } from '@/features/reports/daily';
@@ -87,7 +87,9 @@ export async function fetchOrdersFromDb(options: { paymentStatus?: 'paid'; throw
       runnerAssigned: o.runner_assigned || undefined,
       accountRequested: Boolean(o.account_requested),
       paymentMethod: o.payment_method || undefined,
-      stationTarget: (o as any).station_target || undefined
+      stationTarget: (o as any).station_target || undefined,
+      paymentVerification: (o.payment_status as OrderTicket['paymentVerification']) || 'none',
+      paymentReference: o.payment_reference || undefined
     }));
   } catch (err) {
     if (options.throwOnError) throw err;
@@ -250,19 +252,30 @@ export async function updateOrderStatusInDb(orderId: string, status: OrderTicket
  */
 export async function requestTableAccountInDb(
   tableNumber: string,
-  paymentMethod: string = 'Efectivo'
+  paymentMethod: string = 'Efectivo',
+  claim?: PaymentClaim
 ): Promise<boolean> {
   const { data, error } = await supabase.rpc('diner_table_signal', {
     p_table: tableNumber,
     p_signal: 'bill',
     p_payment_method: paymentMethod,
-    p_table_token: getTableToken(tableNumber)
+    p_table_token: getTableToken(tableNumber),
+    // Yape/Plin quedan "pendientes de verificación" hasta que el personal confirme.
+    p_payment_kind: claim?.kind,
+    p_operation_code: claim?.operationCode
   });
   if (error) {
     console.error('Error requesting account in DB:', error.message);
     return false;
   }
   return Boolean(data);
+}
+
+/** El personal confirma (o rechaza) el pago Yape/Plin declarado por una mesa. */
+export async function reviewTablePaymentInDb(tableNumber: string, approve: boolean): Promise<number> {
+  const { data, error } = await supabase.rpc('review_table_payment', { p_table: tableNumber, p_approve: approve });
+  if (error) throw error;
+  return data ?? 0;
 }
 
 const DINER_STATUS: Record<string, OrderTicket['status']> = {
@@ -273,20 +286,32 @@ const DINER_STATUS: Record<string, OrderTicket['status']> = {
   cobrado: 'entregado'
 };
 
+export type DinerOrderStatus = {
+  status: OrderTicket['status'];
+  paid: boolean;
+  paymentVerification: NonNullable<OrderTicket['paymentVerification']>;
+};
+
 /**
  * Estado actual de los pedidos del comensal. Solo devuelve los que coinciden
  * con su clave (dinerKey), así nadie puede espiar pedidos de otras mesas.
  */
 export async function fetchDinerOrderStatuses(
   refs: { id: string; key: string }[]
-): Promise<Map<string, { status: OrderTicket['status']; paid: boolean }>> {
-  const statuses = new Map<string, { status: OrderTicket['status']; paid: boolean }>();
+): Promise<Map<string, DinerOrderStatus>> {
+  const statuses = new Map<string, DinerOrderStatus>();
   if (refs.length === 0) return statuses;
   const { data, error } = await supabase.rpc('get_diner_orders', { p_refs: refs.slice(0, 50) });
   if (error) throw error;
-  for (const row of (data ?? []) as { id: string; status: string }[]) {
+  for (const row of (data ?? []) as { id: string; status: string; payment_status?: string }[]) {
     const status = DINER_STATUS[row.status];
-    if (status) statuses.set(row.id, { status, paid: row.status === 'cobrado' });
+    if (status) {
+      statuses.set(row.id, {
+        status,
+        paid: row.status === 'cobrado',
+        paymentVerification: (row.payment_status as OrderTicket['paymentVerification']) ?? 'none'
+      });
+    }
   }
   return statuses;
 }

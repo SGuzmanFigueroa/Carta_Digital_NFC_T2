@@ -8,6 +8,7 @@ import { OrderTicket } from '@/types';
 import { useRouter } from 'next/navigation';
 import { usePaidOrderHistory } from '@/hooks/usePaidOrderHistory';
 import { mergePaymentOrders } from '@/features/orders/paymentFilter';
+import { reviewTablePaymentInDb } from '@/services/orderService';
 
 export default function PedidosPage() {
   const router = useRouter();
@@ -18,6 +19,23 @@ export default function PedidosPage() {
   const handleUpdateStatus = (orderId: string, newStatus: OrderTicket['status']) => {
     updateOrderStatus(orderId, newStatus);
     showToast(`Comanda actualizada a estado: ${newStatus}`, 'check_circle');
+  };
+
+  // Pago Yape/Plin declarado por el comensal: se confirma solo tras verlo en la app del banco.
+  const handleReviewPayment = async (table: string, approve: boolean) => {
+    try {
+      const count = await reviewTablePaymentInDb(table, approve);
+      showToast(
+        count === 0
+          ? `${table}: no hay pagos pendientes de verificar`
+          : approve
+          ? `Pago de ${table} confirmado`
+          : `Pago de ${table} rechazado: la mesa debe volver a pagar`,
+        approve ? 'verified' : 'error'
+      );
+    } catch {
+      showToast('No se pudo registrar la verificación del pago', 'error');
+    }
   };
 
   const handleSelectTab = (tab: string) => {
@@ -44,6 +62,7 @@ export default function PedidosPage() {
           onUpdateOrderStatus={handleUpdateStatus}
           onShowToast={showToast}
           onAddOrderNote={addOrderNote}
+          onReviewPayment={handleReviewPayment}
         />
       </main>
 

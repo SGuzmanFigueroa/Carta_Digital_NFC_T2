@@ -187,6 +187,11 @@ export type Database = {
       }
       orders: {
         Row: {
+          payment_claimed_at: string | null
+          payment_reference: string | null
+          payment_reviewed_at: string | null
+          payment_reviewed_by: string | null
+          payment_status: string
           account_requested: boolean | null
           created_at: string | null
           id: string
@@ -206,6 +211,11 @@ export type Database = {
           waiter: string | null
         }
         Insert: {
+          payment_claimed_at?: string | null
+          payment_reference?: string | null
+          payment_reviewed_at?: string | null
+          payment_reviewed_by?: string | null
+          payment_status?: string
           account_requested?: boolean | null
           created_at?: string | null
           id: string
@@ -225,6 +235,11 @@ export type Database = {
           waiter?: string | null
         }
         Update: {
+          payment_claimed_at?: string | null
+          payment_reference?: string | null
+          payment_reviewed_at?: string | null
+          payment_reviewed_by?: string | null
+          payment_status?: string
           account_requested?: boolean | null
           created_at?: string | null
           id?: string
@@ -560,12 +575,23 @@ export type Database = {
         Returns: string | null
       }
       diner_table_signal: {
-        Args: { p_table: string; p_signal: string; p_payment_method?: string; p_table_token?: string }
+        Args: {
+          p_table: string
+          p_signal: string
+          p_payment_method?: string
+          p_table_token?: string
+          p_payment_kind?: string
+          p_operation_code?: string
+        }
         Returns: boolean
       }
       get_table_qr_tokens: {
         Args: { p_count: number }
         Returns: Json
+      }
+      review_table_payment: {
+        Args: { p_table: string; p_approve: boolean }
+        Returns: number
       }
       rotate_table_qr_tokens: {
         Args: { p_tables?: number[] }
