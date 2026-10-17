@@ -2,6 +2,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { Minus, Plus, X } from 'lucide-react';
+import { useDialog } from '@/hooks/useDialog';
 
 export interface SplitBillItem {
   id: string;
@@ -50,6 +51,8 @@ export function SplitBillModal({
     return roundToCents(totalAmount);
   }, [items, mode, people, selectedItems, totalAmount]);
 
+  const dialog = useDialog<HTMLElement>(isOpen, onClose);
+
   if (!isOpen) return null;
 
   const toggleItem = (itemId: string) => {
@@ -75,8 +78,7 @@ export function SplitBillModal({
       }}
     >
       <section
-        role="dialog"
-        aria-modal="true"
+        {...dialog}
         aria-labelledby="split-bill-title"
         className="w-full max-w-md space-y-5 rounded-t-3xl bg-white p-5 text-[#0f172a] shadow-2xl dark:bg-[#15161c] dark:text-white sm:rounded-2xl"
       >

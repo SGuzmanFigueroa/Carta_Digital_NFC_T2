@@ -5,6 +5,7 @@ import { MenuItem } from '../types';
 import { createDishInDb } from '@/services/menuService';
 import { ThreeDView } from './ThreeDView';
 import { UploadedImage } from './UploadedImage';
+import { useDialog } from '@/hooks/useDialog';
 
 interface Dish3DScannerModalProps {
   onClose: () => void;
@@ -329,8 +330,10 @@ export const Dish3DScannerModal: React.FC<Dish3DScannerModalProps> = ({
     }
   };
 
+  const dialog = useDialog(true, onClose);
+
   return (
-    <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-xl flex flex-col justify-between animate-fadeIn text-[#e5e1e4] overflow-hidden">
+    <div {...dialog} aria-label="Escáner 3D del plato" className="fixed inset-0 z-50 bg-black/90 backdrop-blur-xl flex flex-col justify-between animate-fadeIn text-[#e5e1e4] overflow-hidden">
       {/* Hidden processing canvas */}
       <canvas ref={canvasRef} className="hidden" />
 

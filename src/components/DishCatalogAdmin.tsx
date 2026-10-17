@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { MenuItem } from '../types';
 import { updateDishPrice, deleteDishFromDb } from '@/services/menuService';
 import { DishImage } from './menu/DishImage';
+import { useDialog } from '@/hooks/useDialog';
 
 interface DishCatalogAdminProps {
   dishes: MenuItem[];
@@ -59,9 +60,13 @@ export const DishCatalogAdmin: React.FC<DishCatalogAdminProps> = ({
     }
   };
 
+  const dialog = useDialog(true, onClose);
+
   return (
     <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 animate-fadeIn text-[#e5e1e4]">
       <div 
+        {...dialog}
+        aria-label="Catálogo de platos"
         className="bg-[#15161c] border border-[#2d2e38] rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >

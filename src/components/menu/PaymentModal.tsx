@@ -8,6 +8,7 @@ import type { PaymentClaim } from '@/types';
 // CD-31 · Rótulo de mesa visible (ES/EN) sin alterar el valor guardado en la reseña.
 import { localizeTableLabel } from '@/i18n/tableLabel';
 import { UploadedImage } from '../UploadedImage';
+import { useDialog } from '@/hooks/useDialog';
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -149,6 +150,9 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     setSelectedMethod(availableMethods[0].id);
   }
 
+  // Mientras se envía el pago, Esc no cierra (evita perder la confirmación).
+  const dialog = useDialog(isOpen, isSubmitting ? undefined : onClose);
+
   if (!isOpen) return null;
 
   const phoneAccount = paymentConfig.phoneNumber || '987 654 321';
@@ -283,7 +287,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
-      <div className="bg-white dark:bg-[#15161c] w-full max-w-lg rounded-t-3xl sm:rounded-2xl border border-[#e2e8f0] dark:border-primary/30 shadow-2xl p-4 sm:p-6 pb-8 sm:pb-6 space-y-4 max-h-[92vh] overflow-y-auto overscroll-contain">
+      <div {...dialog} aria-label={t('pay.title')} className="bg-white dark:bg-[#15161c] w-full max-w-lg rounded-t-3xl sm:rounded-2xl border border-[#e2e8f0] dark:border-primary/30 shadow-2xl p-4 sm:p-6 pb-8 sm:pb-6 space-y-4 max-h-[92vh] overflow-y-auto overscroll-contain">
         
         {/* ========================================================================= */}
         {/* PASO 1: PASARELA DE PAGO DIGITAL QR                                       */}

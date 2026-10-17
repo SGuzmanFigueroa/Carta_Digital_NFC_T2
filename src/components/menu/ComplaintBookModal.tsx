@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {submitComplaintToDb,fetchComplaintProvider,getLocalComplaints,retryPendingComplaint,type SubmissionResult} from '@/services/complaintService';
 import {validateComplaint,type ComplaintInput,type ComplaintReceipt,type ComplaintProvider,type ComplaintErrors} from '@/features/complaints/validation';
 import {ComplaintResult} from './ComplaintResult';
+import { useDialog } from '@/hooks/useDialog';
 
 interface ComplaintBookModalProps {
   isOpen: boolean;
@@ -59,6 +60,7 @@ export function ComplaintBookModal({
     }).catch(error=>{if(alive)setSubmitError(error.message);});
     return()=>{alive=false;};
   },[isOpen]);
+  const dialog = useDialog(isOpen, onClose);
   if (!isOpen) return null;
   const applyResult=(result:SubmissionResult)=>{
     if(result.success){setReceipt(result.receipt);setSubmittedEntry(result.entry);setStep('registered');setSubmitError('');onShowToast(`Hoja ${result.receipt.claimCode} registrada. Guarda tu copia.`,'verified');}
@@ -101,7 +103,7 @@ export function ComplaintBookModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto animate-fadeIn">
-      <div className="bg-white dark:bg-[#13141a] text-[#0f172a] dark:text-[#e2e8f0] w-full max-w-2xl rounded-t-3xl sm:rounded-2xl border border-[#cbd5e1] dark:border-[#2d2e38] shadow-2xl overflow-hidden max-h-[92vh] flex flex-col">
+      <div {...dialog} aria-label="Libro de Reclamaciones" className="bg-white dark:bg-[#13141a] text-[#0f172a] dark:text-[#e2e8f0] w-full max-w-2xl rounded-t-3xl sm:rounded-2xl border border-[#cbd5e1] dark:border-[#2d2e38] shadow-2xl overflow-hidden max-h-[92vh] flex flex-col">
         {/* Header */}
         <div className="px-5 py-4 bg-gradient-to-r from-[#0f172a] to-[#1e293b] dark:from-[#0d0e12] dark:to-[#161822] text-white flex items-center justify-between border-b border-white/10 shrink-0">
           <div className="flex items-center gap-3">

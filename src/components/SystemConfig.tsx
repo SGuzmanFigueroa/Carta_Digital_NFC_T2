@@ -28,6 +28,7 @@ import { fetchTableQrTokens, rotateTableQrTokens } from '@/services/tableService
 import { qrDataUrl, tableMenuUrl, tableNumberFromLabel } from '@/utils/tableQr';
 import {ComplaintBookSettings} from './ComplaintBookSettings';
 import { UploadedImage } from './UploadedImage';
+import { useDialog } from '@/hooks/useDialog';
 
 interface SystemConfigProps {
   config: SystemConfigState;
@@ -899,6 +900,9 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
       );
     }, 700);
   };
+
+  const qrGridDialog = useDialog(showAllQRsModal, () => setShowAllQRsModal(false));
+  const logoDialog = useDialog(showLogoModal, () => setShowLogoModal(false));
 
   return (
     <div className="w-full flex flex-col px-4 lg:px-8 py-6 max-w-[1400px] mx-auto gap-6 lg:gap-8 selection:bg-[#FF5A1F] selection:text-[#0F0F0F] transition-colors duration-200 overflow-x-clip">
@@ -2664,7 +2668,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
       {/* Modal de Cuadrícula de Todas las Mesas */}
       {showAllQRsModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-          <div className={`border rounded-2xl shadow-2xl max-w-4xl w-full p-4 sm:p-6 space-y-5 max-h-[90vh] flex flex-col ${
+          <div {...qrGridDialog} aria-label="QR de todas las mesas" className={`border rounded-2xl shadow-2xl max-w-4xl w-full p-4 sm:p-6 space-y-5 max-h-[90vh] flex flex-col ${
             isLight ? 'bg-white border-[#cbd5e1] text-[#0f172a]' : 'bg-[#18181b] border-[#3f3f46] text-[#e5e1e4]'
           }`}>
             <div className={`flex items-center justify-between flex-wrap gap-2 pb-3 border-b shrink-0 ${isLight ? 'border-[#e2e8f0]' : 'border-[#27272a]'}`}>
@@ -2783,7 +2787,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
       {/* Modal de Cambio de Logo */}
       {showLogoModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-          <div className={`border rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-5 ${
+          <div {...logoDialog} aria-label="Cambiar logo" className={`border rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-5 ${
             isLight ? 'bg-white border-[#cbd5e1] text-[#0f172a]' : 'bg-[#18181b] border-[#3f3f46] text-[#e5e1e4]'
           }`}>
             <div className={`flex items-center justify-between pb-3 border-b ${isLight ? 'border-[#e2e8f0]' : 'border-[#27272a]'}`}>

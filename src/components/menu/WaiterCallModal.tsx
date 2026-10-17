@@ -3,6 +3,7 @@
 import React from 'react';
 import { WAITER_CALL_OPTIONS } from '@/services/waiterCallService';
 import { WaiterCallReason } from '@/types';
+import { useDialog } from '@/hooks/useDialog';
 
 interface WaiterCallModalProps {
   isOpen: boolean;
@@ -25,16 +26,15 @@ export const WaiterCallModal: React.FC<WaiterCallModalProps> = ({
   onSelect,
   tableNumber
 }) => {
+  const dialog = useDialog(isOpen, onClose);
   if (!isOpen) return null;
 
   return (
     <div
       className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Solicitar asistencia en mesa"
+      role="presentation"
     >
-      <div className="bg-white dark:bg-[#15161c] w-full max-w-md rounded-t-3xl sm:rounded-2xl border border-[#e2e8f0] dark:border-[#24252e] shadow-2xl pt-4 pb-8 sm:pb-5 max-h-[92vh] overflow-y-auto overscroll-contain">
+      <div {...dialog} aria-label="Solicitar asistencia en mesa" className="bg-white dark:bg-[#15161c] w-full max-w-md rounded-t-3xl sm:rounded-2xl border border-[#e2e8f0] dark:border-[#24252e] shadow-2xl pt-4 pb-8 sm:pb-5 max-h-[92vh] overflow-y-auto overscroll-contain">
         {/* Cabecera del sheet (sin contenedor extra) */}
         <div className="flex items-center justify-between gap-3 px-5 pb-3 border-b border-[#e2e8f0] dark:border-[#24252e]">
           <div className="flex items-center gap-2.5 min-w-0">

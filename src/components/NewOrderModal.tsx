@@ -5,6 +5,7 @@ import { fetchDishesFromDb } from '@/services/menuService';
 import { fetchTablesFromDb } from '@/services/tableService';
 import { getPersistedStaffList } from '@/services/authService';
 import { DishImage } from './menu/DishImage';
+import { useDialog } from '@/hooks/useDialog';
 
 interface NewOrderModalProps {
   onClose: () => void;
@@ -169,9 +170,13 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
     if (created !== false) onClose();
   };
 
+  const dialog = useDialog(true, isSubmitting ? undefined : onClose);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
       <div 
+        {...dialog}
+        aria-label="Nueva comanda"
         className="bg-[#18181b] border border-[#3f3f46] rounded-xl shadow-2xl max-w-3xl w-full overflow-hidden text-[#e5e1e4] flex flex-col max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
       >

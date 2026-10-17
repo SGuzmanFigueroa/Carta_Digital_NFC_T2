@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { OrderTicket } from '../types';
 import { OrderPaymentFilters } from '@/components/OrderPaymentFilters';
 import { filterOrdersByPayment, paymentFilterCounts, orderPaymentStatus, type PaymentFilter } from '@/features/orders/paymentFilter';
+import { useDialog } from '@/hooks/useDialog';
 
 interface OrdersCentralProps {
   orders: OrderTicket[];
@@ -122,6 +123,8 @@ export const OrdersCentral: React.FC<OrdersCentralProps> = ({
     setIsNoteModalOpen(false);
     setNoteInput('');
   };
+
+  const noteDialog = useDialog(isNoteModalOpen, () => setIsNoteModalOpen(false));
 
   return (
     <div className="w-full flex flex-col px-4 lg:px-6 py-4 max-w-[1680px] mx-auto">
@@ -844,7 +847,7 @@ export const OrdersCentral: React.FC<OrdersCentralProps> = ({
       {/* MODAL NATIVO: AGREGAR NOTA ESPECIAL DE COCINA */}
       {isNoteModalOpen && activeTicket && orderPaymentStatus(activeTicket) === 'pending' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-[#1c1b1d] border border-[#353437] rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-150">
+          <div {...noteDialog} aria-label="Nota especial de cocina" className="bg-[#1c1b1d] border border-[#353437] rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-150">
             {/* Header */}
             <div className="p-4 bg-[#201f22] border-b border-[#353437]/50 flex items-center justify-between">
               <div className="flex items-center gap-2.5">

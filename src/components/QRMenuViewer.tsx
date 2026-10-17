@@ -67,6 +67,7 @@ import { DishImage } from './menu/DishImage';
 import { DietaryFilters, DIETARY_FILTERS, getDietaryPreferences } from './menu/DietaryFilters';
 import type { DietaryPreference } from '../types';
 import { getArDishDimensionCm } from '@/config/arDishProfiles';
+import { useDialog } from '@/hooks/useDialog';
 
 /**
  * CD-31 · Fallback del visor 3D: componente propio (y no un literal dentro de
@@ -1318,6 +1319,10 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
 
   const heroItem: LocalizedMenuItem = localizeMenuItem(menuItems[0], language);
 
+  const cartDialog = useDialog(isCartOpen, () => setIsCartOpen(false));
+  const dishDialog = useDialog(Boolean(selectedDishForModal), () => setSelectedDishForModal(null));
+  const arDialog = useDialog(isArModalOpen, () => setIsArModalOpen(false));
+
   return (
     <div className="w-full min-h-screen bg-[#f4f5f7] text-[#0f172a] dark:bg-[#0b0c0e] dark:text-[#e5e1e4] pb-44 sm:pb-36 selection:bg-primary selection:text-white transition-colors duration-300">
       {/* ========================================================================= */}
@@ -2033,11 +2038,11 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       {/* ========================================================================= */}
       {isCartOpen && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
-          <div className="bg-white dark:bg-[#15161c] w-full max-w-lg rounded-t-3xl sm:rounded-2xl border border-[#e2e8f0] dark:border-[#2d2e38] shadow-2xl p-5 space-y-4 max-h-[88vh] overflow-y-auto">
+          <div {...cartDialog} aria-labelledby="cart-dialog-title" className="bg-white dark:bg-[#15161c] w-full max-w-lg rounded-t-3xl sm:rounded-2xl border border-[#e2e8f0] dark:border-[#2d2e38] shadow-2xl p-5 space-y-4 max-h-[88vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-2 border-b border-[#e2e8f0] dark:border-[#24252e]">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary text-[20px]">receipt_long</span>
-                <h3 className="text-[16px] font-bold text-[#0f172a] dark:text-white">{t('cart.title', { table: localizeTableLabel(selectedTable, language) })}</h3>
+                <h3 id="cart-dialog-title" className="text-[16px] font-bold text-[#0f172a] dark:text-white">{t('cart.title', { table: localizeTableLabel(selectedTable, language) })}</h3>
               </div>
               <button
                 type="button"
@@ -2198,7 +2203,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       {/* ========================================================================= */}
       {selectedDishForModal && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
-          <div className="bg-white dark:bg-[#15161c] w-full max-w-lg rounded-t-3xl sm:rounded-2xl border border-primary/40 shadow-2xl p-4 sm:p-5 space-y-3.5">
+          <div {...dishDialog} aria-label={t('dish.threeDTitle', { dish: selectedDishForModal.name })} className="bg-white dark:bg-[#15161c] w-full max-w-lg rounded-t-3xl sm:rounded-2xl border border-primary/40 shadow-2xl p-4 sm:p-5 space-y-3.5">
             <div className="flex items-center justify-between pb-2 border-b border-[#e2e8f0] dark:border-[#24252e]">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary text-[20px]">view_in_ar</span>
@@ -2268,7 +2273,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       {/*  REAL CAMERA AUGMENTED REALITY (AR) VISOR OVERLAY */}
       {/* ========================================================================= */}
       {isArModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black flex flex-col justify-between animate-fadeIn overflow-hidden">
+        <div {...arDialog} aria-label={t('ar.title')} className="fixed inset-0 z-50 bg-black flex flex-col justify-between animate-fadeIn overflow-hidden">
           {/* Live Phone Camera Video Stream */}
           <video
             ref={videoRef}

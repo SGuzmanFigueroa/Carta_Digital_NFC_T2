@@ -1,6 +1,7 @@
 import React from 'react';
 import { TicketItem } from '../types';
 import { DishImage } from './menu/DishImage';
+import { useDialog } from '@/hooks/useDialog';
 
 interface DishDetailModalProps {
   item: TicketItem | null;
@@ -17,11 +18,14 @@ export const DishDetailModal: React.FC<DishDetailModalProps> = ({
   onClose,
   onToggleReady
 }) => {
+  const dialog = useDialog(Boolean(item), onClose);
   if (!item) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
       <div 
+        {...dialog}
+        aria-label={item.name}
         className="bg-[#18181b] border border-[#3f3f46] rounded-xl shadow-2xl max-w-2xl w-full overflow-hidden text-[#e5e1e4] relative"
         onClick={(e) => e.stopPropagation()}
       >

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Runner } from '../types';
 import { DishImage } from './menu/DishImage';
+import { useDialog } from '@/hooks/useDialog';
 
 interface RunnersModalProps {
   runners: Runner[];
@@ -15,9 +16,12 @@ export const RunnersModal: React.FC<RunnersModalProps> = ({
   onCallAllRunners,
   onUpdateRunnerStatus
 }) => {
+  const dialog = useDialog(true, onClose);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
       <div 
+        {...dialog}
+        aria-label="Runners en turno"
         className="bg-[#18181b] border border-[#3f3f46] rounded-xl shadow-2xl max-w-2xl w-full overflow-hidden text-[#e5e1e4] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >

@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { useLanguage } from '@/hooks/useLanguage';
+import { useDialog } from '@/hooks/useDialog';
 
 interface GeofenceWarningModalProps {
   isOpen: boolean;
@@ -32,12 +33,15 @@ export const GeofenceWarningModal: React.FC<GeofenceWarningModalProps> = ({
 }) => {
   // CD-31 · Idioma de la carta (el hook se invoca SIEMPRE, antes de cualquier salida).
   const { t } = useLanguage();
+  const dialog = useDialog(isOpen, onClose);
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
       <div
+        {...dialog}
+        aria-labelledby="geofence-warning-title"
         className={`w-full max-w-md rounded-2xl border p-6 shadow-2xl space-y-5 transition-all ${
           isLight ? 'bg-white border-[#cbd5e1] text-[#0f172a]' : 'bg-[#18181b] border-[#3f3f46] text-[#e5e1e4]'
         }`}
@@ -50,7 +54,7 @@ export const GeofenceWarningModal: React.FC<GeofenceWarningModalProps> = ({
             </svg>
           </div>
           <div>
-            <h3 className={`text-lg font-bold ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>
+            <h3 id="geofence-warning-title" className={`text-lg font-bold ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>
               {t('geofence.modalTitle')}
             </h3>
             <p className={`text-xs ${isLight ? 'text-[#64748b]' : 'text-gray-400'}`}>

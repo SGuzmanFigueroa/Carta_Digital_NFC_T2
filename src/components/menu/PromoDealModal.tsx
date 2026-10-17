@@ -9,6 +9,7 @@ import { getPromoMechanic } from '@/utils/promoOffers';
 import { buildMenuPromoSubtitle, buildPromoSecondDishAltText } from '@/i18n/menuContent';
 import { useLanguage } from '@/hooks/useLanguage';
 import { DishImage } from './DishImage';
+import { useDialog } from '@/hooks/useDialog';
 
 interface PromoDealModalProps {
   isOpen: boolean;
@@ -657,25 +658,16 @@ export function PromoDealModal({
 
   // Al abrir: bloquea el scroll de fondo, habilita el cierre con Esc y lleva el
   // foco al botón de cierre (garantiza usabilidad táctil y de teclado).
+  const dialog = useDialog(isOpen, onClose);
+
   useEffect(() => {
     if (!isOpen) return;
-
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-
-    const focusTimer = window.setTimeout(() => closeButtonRef.current?.focus(), 140);
-
     return () => {
       document.body.style.overflow = previousOverflow;
-      window.removeEventListener('keydown', handleKeyDown);
-      window.clearTimeout(focusTimer);
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   // ⌨️ Flechas ←/→: pasan de oferta sin soltar el teclado. Efecto independiente
   // del de apertura para que cambiar de oferta no vuelva a robar el foco al ✕.
@@ -724,13 +716,13 @@ export function PromoDealModal({
   // recorta mientras el comensal desliza de una oferta a otra.
   return (
     <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby={titleId}
+      role="presentation"
       onClick={onClose}
       className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 bg-slate-400/45 dark:bg-black/80 backdrop-blur-md overflow-y-auto overscroll-contain animate-fadeIn"
     >
       <div
+        {...dialog}
+        aria-labelledby={titleId}
         onClick={(event) => event.stopPropagation()}
         className="animate-fadeIn relative my-auto flex w-full max-w-[384px] max-h-[92dvh] flex-col rounded-[28px] overflow-hidden bg-white dark:bg-[#131418] border border-primary/35 shadow-[0_25px_60px_-15px] shadow-primary/25 dark:shadow-[0_25px_60px_-15px] dark:shadow-primary/45"
       >

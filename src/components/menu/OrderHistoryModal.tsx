@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Clock3, History, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { OrderRound } from '@/types';
+import { useDialog } from '@/hooks/useDialog';
 
 interface OrderHistoryModalProps {
   isOpen: boolean;
@@ -24,30 +25,14 @@ const calculateRoundSubtotal = (round: OrderRound): number =>
   round.items.reduce((subtotal, item) => subtotal + item.price * item.quantity, 0);
 
 export function OrderHistoryModal({ isOpen, onClose, tableNumber, rounds }: OrderHistoryModalProps) {
-  const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const onCloseRef = useRef(onClose);
-
-  useEffect(() => {
-    onCloseRef.current = onClose;
-  }, [onClose]);
+  const dialog = useDialog<HTMLElement>(isOpen, onClose);
 
   useEffect(() => {
     if (!isOpen) return;
-
-    const previousActiveElement = document.activeElement;
     const previousBodyOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    closeButtonRef.current?.focus();
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onCloseRef.current();
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = previousBodyOverflow;
-      if (previousActiveElement instanceof HTMLElement) previousActiveElement.focus();
     };
   }, [isOpen]);
 
@@ -67,15 +52,14 @@ export function OrderHistoryModal({ isOpen, onClose, tableNumber, rounds }: Orde
           role="presentation"
         >
           <motion.aside
+            {...dialog}
             aria-labelledby="order-history-title"
-            aria-modal="true"
             className="flex h-full w-full max-w-xl flex-col border-l border-white/60 bg-white/90 text-gray-900 shadow-2xl backdrop-blur-2xl dark:border-white/10 dark:bg-[#111318]/95 dark:text-white"
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ duration: 0.24, ease: 'easeOut' }}
             onClick={(event) => event.stopPropagation()}
-            role="dialog"
           >
             <header className="flex items-center justify-between gap-4 border-b border-gray-200/80 p-5 dark:border-white/10 sm:p-7">
               <div className="flex min-w-0 items-center gap-3">
@@ -92,7 +76,7 @@ export function OrderHistoryModal({ isOpen, onClose, tableNumber, rounds }: Orde
                 </div>
               </div>
               <button
-                ref={closeButtonRef}
+                
                 type="button"
                 onClick={onClose}
                 aria-label="Cerrar historial de pedidos"

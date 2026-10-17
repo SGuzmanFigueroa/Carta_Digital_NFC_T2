@@ -6,6 +6,7 @@ import { AuditLogger, sanitizeText } from '../utils/security';
 import { kitchenAudio } from '../utils/audio';
 import { AuthUser } from '../types';
 import { changeOwnPassword, loadCurrentStaffUser, loginDemo, loginStaff } from '../services/authService';
+import { useDialog } from '@/hooks/useDialog';
 
 interface LoginScreenProps {
   onLoginSuccess: (user: AuthUser) => void;
@@ -241,6 +242,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     });
     finishLogin(result.user);
   };
+
+  const recoverDialog = useDialog(showRecoverModal, () => setShowRecoverModal(false));
 
   return (
     <div className="min-h-screen bg-[#0e0e10] text-[#e5e1e4] flex flex-col justify-between relative overflow-hidden font-sans">
@@ -517,7 +520,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       {/* Recuperación: la contraseña la restablece el administrador */}
       {showRecoverModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div role="dialog" aria-modal="true" aria-labelledby="recover-title" className="bg-[#161619] p-6 rounded-2xl w-full max-w-sm border border-[#353437] shadow-2xl animate-fadeIn">
+          <div {...recoverDialog} aria-labelledby="recover-title" className="bg-[#161619] p-6 rounded-2xl w-full max-w-sm border border-[#353437] shadow-2xl animate-fadeIn">
             <h3 id="recover-title" className="text-xl font-bold text-[#e5e1e4] mb-2">Restablecer accesos</h3>
             <p className="text-sm text-[#c6c5cf] mb-4">
               Pide al administrador del restaurante que te asigne una contraseña temporal desde

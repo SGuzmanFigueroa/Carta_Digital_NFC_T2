@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { RolePermissionsMatrix } from './RolePermissionsMatrix';
 import { StaffMember } from '../types';
+import { useDialog } from '@/hooks/useDialog';
 
 interface StaffManagementProps {
   staffList: StaffMember[];
@@ -191,6 +192,12 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
     onDeleteStaff(deletingStaff.id);
     setDeletingStaff(null);
   };
+
+  const createDialog = useDialog(isCreateModalOpen, () => setIsCreateModalOpen(false));
+  const editDialog = useDialog(Boolean(editingStaff), () => setEditingStaff(null));
+  const pinDialog = useDialog(Boolean(changingPinStaff), () => setChangingPinStaff(null));
+  const permissionsDialog = useDialog(Boolean(viewingPermissionsStaff), () => setViewingPermissionsStaff(null));
+  const deleteDialog = useDialog(Boolean(deletingStaff), () => setDeletingStaff(null));
 
   return (
     <div className="w-full flex flex-col px-4 lg:px-6 py-4 max-w-[1680px] mx-auto gap-6" onClick={() => setOpenMenuStaffId(null)}>
@@ -459,7 +466,7 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
       {/* ===================================================================== */}
       {isCreateModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-start sm:items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-[#1c1b1d] max-w-md w-full rounded-2xl border border-[#ff5708]/40 shadow-2xl my-8 flex flex-col max-h-[90vh]">
+          <div {...createDialog} aria-label="Nuevo miembro del personal" className="bg-[#1c1b1d] max-w-md w-full rounded-2xl border border-[#ff5708]/40 shadow-2xl my-8 flex flex-col max-h-[90vh]">
             <div className="flex items-center justify-between p-6 pb-3 border-b border-[#2d2e38] shrink-0">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-[#ff5708] text-[22px]">person_add</span>
@@ -592,7 +599,7 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
       {/* ===================================================================== */}
       {editingStaff && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-start sm:items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-[#1c1b1d] max-w-md w-full rounded-2xl border border-white/20 shadow-2xl my-8 flex flex-col max-h-[90vh]">
+          <div {...editDialog} aria-label={`Editar a ${editingStaff.name}`} className="bg-[#1c1b1d] max-w-md w-full rounded-2xl border border-white/20 shadow-2xl my-8 flex flex-col max-h-[90vh]">
             <div className="flex items-center justify-between p-6 pb-3 border-b border-[#2d2e38] shrink-0">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-[#00FF88] text-[22px]">edit</span>
@@ -722,7 +729,7 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
       {/* ===================================================================== */}
       {changingPinStaff && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-start sm:items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-[#1c1b1d] max-w-sm w-full rounded-2xl border border-[#ff5708]/40 p-6 space-y-4 shadow-2xl text-center my-8 max-h-[90vh] overflow-y-auto">
+          <div {...pinDialog} aria-label={`Cambiar PIN de ${changingPinStaff.name}`} className="bg-[#1c1b1d] max-w-sm w-full rounded-2xl border border-[#ff5708]/40 p-6 space-y-4 shadow-2xl text-center my-8 max-h-[90vh] overflow-y-auto">
             <div className="w-12 h-12 rounded-full bg-[#ff5708]/10 text-[#ff5708] flex items-center justify-center mx-auto border border-[#ff5708]/30">
               <span className="material-symbols-outlined text-[24px]">pin</span>
             </div>
@@ -784,7 +791,7 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
       {/* ===================================================================== */}
       {viewingPermissionsStaff && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-start sm:items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-[#1c1b1d] max-w-xl w-full rounded-2xl border border-[#38bdf8]/40 shadow-2xl my-8 flex flex-col max-h-[90vh]">
+          <div {...permissionsDialog} aria-label={`Permisos de ${viewingPermissionsStaff.name}`} className="bg-[#1c1b1d] max-w-xl w-full rounded-2xl border border-[#38bdf8]/40 shadow-2xl my-8 flex flex-col max-h-[90vh]">
             {/* Header fijo */}
             <div className="flex items-center justify-between p-6 pb-3 border-b border-[#2d2e38] shrink-0">
               <div className="flex items-center gap-2.5">
@@ -934,7 +941,7 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
       {/* ===================================================================== */}
       {deletingStaff && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-start sm:items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-[#1c1b1d] max-w-sm w-full rounded-2xl border border-rose-500/40 p-6 space-y-4 shadow-2xl text-center my-8 max-h-[90vh] overflow-y-auto">
+          <div {...deleteDialog} aria-label={`Eliminar a ${deletingStaff.name}`} className="bg-[#1c1b1d] max-w-sm w-full rounded-2xl border border-rose-500/40 p-6 space-y-4 shadow-2xl text-center my-8 max-h-[90vh] overflow-y-auto">
             <div className="w-12 h-12 rounded-full bg-rose-500/10 text-rose-400 flex items-center justify-center mx-auto border border-rose-500/30">
               <span className="material-symbols-outlined text-[24px]">person_remove</span>
             </div>

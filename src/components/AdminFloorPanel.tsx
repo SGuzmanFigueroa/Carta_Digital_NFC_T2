@@ -4,6 +4,7 @@ import { INITIAL_MENU_ITEMS } from '../data/mockData';
 import { DishImage } from './menu/DishImage';
 // CD-28 · Llamados de mesa en vivo (KDS + Salón comparten el mismo estado realtime).
 import { useRestaurant } from '../context/RestaurantContext';
+import { useDialog } from '@/hooks/useDialog';
 
 const getTableDigits = (num: string): string => {
   const digits = num.replace(/^[^\d]+/i, '').trim();
@@ -294,6 +295,8 @@ export const AdminFloorPanel: React.FC<AdminFloorPanelProps> = ({
   const handleCheckIn = (tableNum: string, guest: string) => {
     onShowToast(`Check-In completado para reserva de ${guest} en ${formatTableTitle(tableNum)}`, 'how_to_reg');
   };
+
+  const tableDialog = useDialog(Boolean(selectedTableDetail), () => setSelectedTableDetail(null));
 
   return (
     <div className="w-full flex flex-col px-4 lg:px-6 py-4 max-w-[1680px] mx-auto gap-6">
@@ -1047,7 +1050,7 @@ export const AdminFloorPanel: React.FC<AdminFloorPanelProps> = ({
       {/* Interactive Table Operation Modal */}
       {selectedTableDetail && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#1c1b1d] w-full max-w-md rounded-2xl border border-[#ff5708]/40 p-5 space-y-4 shadow-2xl animate-fadeIn">
+          <div {...tableDialog} aria-label={`Mesa ${selectedTableDetail.number}`} className="bg-[#1c1b1d] w-full max-w-md rounded-2xl border border-[#ff5708]/40 p-5 space-y-4 shadow-2xl animate-fadeIn">
             <div className="flex items-center justify-between pb-2 border-b border-[#353437]">
               <div className="flex items-center gap-2">
                 <span className="w-10 h-10 rounded-xl bg-[#ff5708] text-[#511500] font-bold font-label-code text-[18px] flex items-center justify-center">

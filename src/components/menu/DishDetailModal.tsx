@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AlertTriangle, X } from 'lucide-react';
 import Image from 'next/image';
 import { createPortal } from 'react-dom';
 import { MenuItem } from '@/types';
 import { PairingSuggestion } from './PairingSuggestion';
+import { useDialog } from '@/hooks/useDialog';
 
 interface DishDetailModalProps {
   item: MenuItem | null;
@@ -19,30 +20,14 @@ export function DishDetailModal({
   onClose,
   onAddPairing
 }: DishDetailModalProps) {
-  const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const onCloseRef = useRef(onClose);
-
-  useEffect(() => {
-    onCloseRef.current = onClose;
-  }, [onClose]);
+  const dialog = useDialog<HTMLElement>(Boolean(item), onClose);
 
   useEffect(() => {
     if (!item) return;
-
-    const previousActiveElement = document.activeElement;
     const previousBodyOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    closeButtonRef.current?.focus();
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onCloseRef.current();
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = previousBodyOverflow;
-      if (previousActiveElement instanceof HTMLElement) previousActiveElement.focus();
     };
   }, [item]);
 
@@ -60,20 +45,18 @@ export function DishDetailModal({
             role="presentation"
           >
             <motion.section
+              {...dialog}
               aria-labelledby="dish-detail-title"
               aria-describedby="dish-detail-description"
-              aria-modal="true"
               className="relative max-h-[92vh] w-full max-w-2xl overflow-hidden rounded-3xl border border-gray-200/50 bg-white/90 text-gray-900 shadow-[0_24px_60px_-24px_rgba(15,23,42,0.16),0_8px_24px_-12px_rgba(15,23,42,0.08)] ring-1 ring-black/[0.04] backdrop-blur-2xl dark:border-white/10 dark:bg-[#111318]/95 dark:text-white dark:shadow-[0_0_40px_rgba(255,255,255,0.05)] dark:ring-white/5"
               initial={{ opacity: 0, scale: 0.94, y: 16 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 10 }}
               transition={{ duration: 0.22, ease: 'easeOut' }}
               onClick={(event) => event.stopPropagation()}
-              role="dialog"
             >
               <button
                 type="button"
-                ref={closeButtonRef}
                 onClick={onClose}
                 aria-label="Cerrar ficha del plato"
                 className="absolute right-3 top-3 z-10 flex h-11 w-11 items-center justify-center rounded-full border border-white/70 bg-black/45 text-white backdrop-blur-md transition hover:bg-black/70 dark:border-white/20"

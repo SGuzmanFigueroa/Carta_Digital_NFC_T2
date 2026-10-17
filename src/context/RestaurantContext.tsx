@@ -42,6 +42,7 @@ import {
   readAuthSession,
   AUTH_SESSION_CHANGE_EVENT
 } from '../utils/security';
+import { useDialog } from '@/hooks/useDialog';
 
 interface RestaurantContextType {
   // State
@@ -1884,6 +1885,8 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
     []
   );
 
+  const lockDialog = useDialog(Boolean(isTerminalLocked && currentUser && isOnStaffRoute));
+
   return (
     <RestaurantContext.Provider
       value={{
@@ -1938,7 +1941,7 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
       {/* Terminal Inactivity Quick Lock Screen Overlay (EXCLUSIVO para terminales del staff: /kds, /pedidos, etc.) */}
       {isTerminalLocked && currentUser && isStaffManagementRoute(pathname || (typeof window !== 'undefined' ? window.location.pathname : '')) && (
         <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-xl flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-[#161619] max-w-sm w-full rounded-2xl border border-[#ff5708]/50 p-6 space-y-5 text-center shadow-[0_0_50px_rgba(255,87,8,0.25)]">
+          <div {...lockDialog} aria-label="Terminal bloqueada por inactividad" className="bg-[#161619] max-w-sm w-full rounded-2xl border border-[#ff5708]/50 p-6 space-y-5 text-center shadow-[0_0_50px_rgba(255,87,8,0.25)]">
             <div className="w-14 h-14 mx-auto rounded-2xl bg-[#ff5708]/20 border border-[#ff5708]/40 flex items-center justify-center text-[#ff5708]">
               <span className="material-symbols-outlined text-[32px]">lock</span>
             </div>

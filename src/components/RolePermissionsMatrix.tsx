@@ -9,6 +9,7 @@ import {
   createAuditLogInDb,
   DEFAULT_ROLE_PERMISSIONS
 } from '@/services/authService';
+import { useDialog } from '@/hooks/useDialog';
 
 interface RolePermissionsMatrixProps {
   onShowToast?: (message: string, icon?: string) => void;
@@ -120,6 +121,9 @@ export const RolePermissionsMatrix: React.FC<RolePermissionsMatrixProps> = ({ on
       'warning'
     );
   };
+
+  const policiesDialog = useDialog(showPoliciesModal, () => setShowPoliciesModal(false));
+  const auditDialog = useDialog(showAuditModal, () => setShowAuditModal(false));
 
   return (
     <div className="w-full bg-[#18181b] rounded-2xl border border-[#27272a] shadow-xl p-5 md:p-6 space-y-5 text-[#e5e1e4]">
@@ -275,7 +279,7 @@ export const RolePermissionsMatrix: React.FC<RolePermissionsMatrixProps> = ({ on
       {/* Global Policies Modal */}
       {showPoliciesModal && (
         <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
-          <div className="bg-[#18181b] border border-[#3f3f46] rounded-2xl shadow-2xl max-w-md w-full p-6 text-[#e5e1e4] space-y-5 animate-in fade-in zoom-in-95 duration-200 my-8 max-h-[90vh] overflow-y-auto">
+          <div {...policiesDialog} aria-label="Políticas globales" className="bg-[#18181b] border border-[#3f3f46] rounded-2xl shadow-2xl max-w-md w-full p-6 text-[#e5e1e4] space-y-5 animate-in fade-in zoom-in-95 duration-200 my-8 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-[#27272a]">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-[#ff5708] text-[22px]">tune</span>
@@ -365,7 +369,7 @@ export const RolePermissionsMatrix: React.FC<RolePermissionsMatrixProps> = ({ on
       {/* Audit Logs Modal */}
       {showAuditModal && (
         <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
-          <div className="bg-[#18181b] border border-[#3f3f46] rounded-2xl shadow-2xl max-w-2xl w-full p-6 text-[#e5e1e4] space-y-4 animate-in fade-in zoom-in-95 duration-200 my-8 max-h-[90vh] flex flex-col">
+          <div {...auditDialog} aria-label="Registro de auditoría" className="bg-[#18181b] border border-[#3f3f46] rounded-2xl shadow-2xl max-w-2xl w-full p-6 text-[#e5e1e4] space-y-4 animate-in fade-in zoom-in-95 duration-200 my-8 max-h-[90vh] flex flex-col">
             <div className="flex items-center justify-between pb-3 border-b border-[#27272a] shrink-0">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-[#ff5708] text-[22px]">history</span>
