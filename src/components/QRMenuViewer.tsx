@@ -61,6 +61,7 @@ import { GeofenceWarningModal } from './menu/GeofenceWarningModal';
 import { WaiterCallModal } from './menu/WaiterCallModal';
 import { formatSoles } from '@/utils/promo';
 import { fetchPromoOffers, rowToPromoOffer } from '@/services/promoService';
+import { saveTableAccess } from '@/utils/tableAccess';
 import { DietaryFilters, DIETARY_FILTERS, getDietaryPreferences } from './menu/DietaryFilters';
 import type { DietaryPreference } from '../types';
 import { getArDishDimensionCm } from '@/config/arDishProfiles';
@@ -381,6 +382,14 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
           formatted = `MESA ${formatted}`;
         }
         setSelectedTable(formatted);
+        // Código secreto del QR de la mesa (&t=…): sin él el servidor no acepta pedidos.
+        saveTableAccess(formatted, params.get('t'));
+        if (params.has('t')) {
+          // No dejar el código a la vista (capturas, URL compartida); ya quedó guardado.
+          params.delete('t');
+          const query = params.toString();
+          window.history.replaceState(window.history.state, '', window.location.pathname + (query ? `?${query}` : ''));
+        }
         try {
           sessionStorage.setItem('gastropulse_active_table', formatted);
           localStorage.setItem('gastropulse_active_table', formatted);

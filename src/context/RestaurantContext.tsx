@@ -24,6 +24,7 @@ import {
   updateOrderItemCheckInDb
 } from '@/services/orderService';
 import { queuePendingOrder } from '@/services/offlineSyncService';
+import { getRecentDinerPosition, getTableToken } from '@/utils/tableAccess';
 // CD-28 · Llamados de mesa persistentes (KDS + Salón vía postgres_changes).
 import {
   fetchWaiterCallsFromDb,
@@ -955,7 +956,10 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
         tableNumber: safeTable,
         items: toPlaceOrderItems(safeCart).map((item, idx) => ({ ...item, station: routes[idx].station })),
         idempotencyKey: crypto.randomUUID(),
-        pax: safePax
+        pax: safePax,
+        // Código del QR de la mesa y ubicación: el servidor los exige al comensal.
+        tableToken: getTableToken(safeTable),
+        position: getRecentDinerPosition()
       };
 
       let placed: PlacedOrder | null = null;

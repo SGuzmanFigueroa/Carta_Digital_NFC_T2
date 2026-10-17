@@ -73,3 +73,22 @@ export async function settleTableInDb(tableNumber: string): Promise<boolean> {
     waiter: null
   });
 }
+
+/**
+ * Códigos secretos de los QR de mesa (solo admin, RPC get_table_qr_tokens).
+ * Devuelve { númeroDeMesa: código }; crea los que falten.
+ */
+export async function fetchTableQrTokens(count: number): Promise<Record<number, string>> {
+  const { data, error } = await supabase.rpc('get_table_qr_tokens', { p_count: Math.min(300, Math.max(1, count)) });
+  if (error) throw error;
+  const tokens: Record<number, string> = {};
+  for (const row of (data ?? []) as { table: number; token: string }[]) tokens[row.table] = row.token;
+  return tokens;
+}
+
+/** Invalida los QR impresos generando códigos nuevos (todas las mesas). */
+export async function rotateTableQrTokens(): Promise<number> {
+  const { data, error } = await supabase.rpc('rotate_table_qr_tokens', {});
+  if (error) throw error;
+  return data ?? 0;
+}

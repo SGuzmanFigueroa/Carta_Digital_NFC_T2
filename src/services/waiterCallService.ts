@@ -2,6 +2,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { Database } from '@/types/database.types';
 import { WaiterCall, WaiterCallReason, WaiterCallStatus } from '@/types';
+import { getTableToken } from '@/utils/tableAccess';
 
 /**
  * GastroPulse OS · CD-28 · Llamar al Mozo / Asistencia en Mesa
@@ -173,14 +174,15 @@ export async function createWaiterCall(
   reason: WaiterCallReason
 ): Promise<boolean> {
   try {
-    const { error } = await waiterCallsDb.from('waiter_calls').insert({
-      table_number: normalizeTableLabel(tableNumber),
-      reason,
-      status: OPEN_STATUS
+    // RPC: el comensal debe traer el código del QR de su mesa (el personal con
+    // sesión no). Un llamado ya abierto para la mesa cuenta como éxito.
+    const { error } = await supabase.rpc('create_waiter_call', {
+      p_table: normalizeTableLabel(tableNumber),
+      p_reason: reason,
+      p_table_token: getTableToken(tableNumber)
     });
 
-    const errorCode = (error as { code?: string } | null)?.code;
-    if (error && errorCode !== '23505') {
+    if (error) {
       console.warn('Error registrando llamado de mozo:', error.message);
       return false;
     }

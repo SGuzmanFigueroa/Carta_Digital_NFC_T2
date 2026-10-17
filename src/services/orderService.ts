@@ -3,6 +3,7 @@ import { OrderTicket, OrderItem, MenuItem, StationId } from '@/types';
 import { isTemporaryPairingItem } from '@/features/menu/pairing';
 import type { Database } from '@/types/database.types';
 import { limaDate } from '@/features/reports/daily';
+import { getTableToken } from '@/utils/tableAccess';
 
 /** Número de mesa sin texto ni ceros: "MESA 04 (Terraza)" → 4. */
 const tableDigits = (value: string | null | undefined) => {
@@ -115,6 +116,10 @@ export type PlaceOrderInput = {
   pax?: number;
   origin?: 'QR COMENSAL' | 'GARZÓN';
   waiter?: string;
+  /** Código secreto del QR de la mesa (obligatorio para el comensal sin sesión). */
+  tableToken?: string;
+  /** Ubicación del comensal: el servidor la compara con la geocerca. */
+  position?: { lat: number; lng: number; accuracy: number };
 };
 
 export type PlacedOrder = {
@@ -186,7 +191,11 @@ export async function placeOrderInDb(input: PlaceOrderInput): Promise<PlacedOrde
     p_idempotency_key: input.idempotencyKey,
     p_pax: input.pax ?? 2,
     p_origin: input.origin ?? 'QR COMENSAL',
-    p_waiter: input.waiter
+    p_waiter: input.waiter,
+    p_table_token: input.tableToken,
+    p_lat: input.position?.lat,
+    p_lng: input.position?.lng,
+    p_accuracy: input.position?.accuracy
   });
 
   if (error) {
@@ -246,7 +255,8 @@ export async function requestTableAccountInDb(
   const { data, error } = await supabase.rpc('diner_table_signal', {
     p_table: tableNumber,
     p_signal: 'bill',
-    p_payment_method: paymentMethod
+    p_payment_method: paymentMethod,
+    p_table_token: getTableToken(tableNumber)
   });
   if (error) {
     console.error('Error requesting account in DB:', error.message);
@@ -287,7 +297,11 @@ export async function callWaiterForTableInDb(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   reason: string = 'Atención en mesa'
 ): Promise<boolean> {
-  const { error } = await supabase.rpc('diner_table_signal', { p_table: tableNumber, p_signal: 'waiter' });
+  const { error } = await supabase.rpc('diner_table_signal', {
+    p_table: tableNumber,
+    p_signal: 'waiter',
+    p_table_token: getTableToken(tableNumber)
+  });
   if (error) {
     console.error('Error calling waiter in DB:', error.message);
     return false;

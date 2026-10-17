@@ -7,6 +7,7 @@
 import { supabase } from '@/lib/supabase';
 import type { Json } from '@/types/database.types';
 import { CONFIG_SYNC_ERROR_EVENT } from '@/services/paymentConfigService';
+import { rememberDinerPosition } from '@/utils/tableAccess';
 
 export interface GeofenceConfig {
   enabled: boolean;
@@ -220,8 +221,11 @@ export async function validateDinerGeofence(
         const userLon = pos.coords.longitude;
         const accuracy = pos.coords.accuracy || 10;
         const distance = calculateHaversineDistance(userLat, userLon, config.latitude, config.longitude);
+        // El servidor vuelve a comprobarla al recibir el pedido (place_order).
+        rememberDinerPosition({ latitude: userLat, longitude: userLon, accuracy });
 
-        if (distance <= config.radiusMeters) {
+        // Mismo criterio que el servidor: margen por la precisión del GPS (máx. 100 m).
+        if (distance <= config.radiusMeters + Math.min(Math.max(accuracy, 0), 100)) {
           resolve({
             allowed: true,
             distanceMeters: distance,

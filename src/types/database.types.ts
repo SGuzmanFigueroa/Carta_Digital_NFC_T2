@@ -551,13 +551,25 @@ export type Database = {
         Args: { p_staff_id: string; p_pin: string }
         Returns: undefined
       }
+      create_waiter_call: {
+        Args: { p_table: string; p_reason: string; p_table_token?: string }
+        Returns: boolean
+      }
       current_staff_role: {
         Args: Record<PropertyKey, never>
         Returns: string | null
       }
       diner_table_signal: {
-        Args: { p_table: string; p_signal: string; p_payment_method?: string }
+        Args: { p_table: string; p_signal: string; p_payment_method?: string; p_table_token?: string }
         Returns: boolean
+      }
+      get_table_qr_tokens: {
+        Args: { p_count: number }
+        Returns: Json
+      }
+      rotate_table_qr_tokens: {
+        Args: { p_tables?: number[] }
+        Returns: number
       }
       get_diner_orders: {
         Args: { p_refs: Json }
@@ -597,6 +609,10 @@ export type Database = {
           p_pax?: number
           p_origin?: string
           p_waiter?: string
+          p_table_token?: string
+          p_lat?: number
+          p_lng?: number
+          p_accuracy?: number
         }
         Returns: Json
       }

@@ -20,6 +20,9 @@ import { DishCatalogAdmin } from './DishCatalogAdmin';
 // CD-17 · Sección 09: Gestión de Ofertas Flash (formulario + vista previa móvil).
 import { PromoOffersManager } from './PromoOffersManager';
 import { GeofenceSettings } from './GeofenceSettings';
+import { TableQrImage } from './TableQrImage';
+import { fetchTableQrTokens, rotateTableQrTokens } from '@/services/tableService';
+import { qrDataUrl, tableMenuUrl, tableNumberFromLabel } from '@/utils/tableQr';
 import {ComplaintBookSettings} from './ComplaintBookSettings';
 
 interface SystemConfigProps {
@@ -44,11 +47,57 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
   const [customTableName, setCustomTableName] = useState('');
   const [showAllQRsModal, setShowAllQRsModal] = useState(false);
   const [qrColor, setQrColor] = useState<'black' | 'brand'>('brand');
+  // Códigos secretos de los QR de mesa (Tarea 9): sin ellos el servidor no
+  // acepta pedidos del comensal. Solo el admin puede obtenerlos.
+  const [qrTokens, setQrTokens] = useState<Record<number, string>>({});
+  const [qrTokensError, setQrTokensError] = useState('');
+  const [isRotatingQr, setIsRotatingQr] = useState(false);
   const [includeLogoInQR, setIncludeLogoInQR] = useState(true);
   const [totalTablesCount, setTotalTablesCount] = useState<number>(24);
   const [tableSearchFilter, setTableSearchFilter] = useState('');
   const [modalZoneFilter, setModalZoneFilter] = useState<string>('all');
   const [paymentGatewayConfig, setPaymentGatewayConfig] = useState<PaymentGatewayConfig>(() => getPaymentConfig());
+
+  const qrTokenCount = Math.min(300, Math.max(totalTablesCount, 60));
+  useEffect(() => {
+    let cancelled = false;
+    fetchTableQrTokens(qrTokenCount)
+      .then((tokens) => {
+        if (cancelled) return;
+        setQrTokens(tokens);
+        setQrTokensError('');
+      })
+      .catch((err) => {
+        console.warn('[qr] No se obtuvieron los códigos de mesa:', err);
+        if (!cancelled) setQrTokensError('No se pudieron cargar los códigos de mesa: los QR no servirán para pedir hasta que vuelvas a iniciar sesión como administrador.');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [qrTokenCount]);
+
+  /** URL firmada de la mesa (lleva su código secreto). */
+  const signedTableUrl = (tableLabel: string, zone?: string) =>
+    tableMenuUrl(
+      typeof window !== 'undefined' ? window.location.origin : '',
+      tableLabel,
+      qrTokens[tableNumberFromLabel(tableLabel) ?? -1],
+      zone
+    );
+
+  const handleRotateQrTokens = async () => {
+    if (!window.confirm('Se generarán códigos nuevos para TODAS las mesas y los QR impresos dejarán de funcionar. ¿Continuar?')) return;
+    setIsRotatingQr(true);
+    try {
+      const count = await rotateTableQrTokens();
+      setQrTokens(await fetchTableQrTokens(qrTokenCount));
+      onShowToast(`Códigos regenerados (${count} mesas). Imprime los QR nuevos.`, 'qr_code_2');
+    } catch {
+      onShowToast('No se pudieron regenerar los códigos QR', 'error');
+    } finally {
+      setIsRotatingQr(false);
+    }
+  };
 
   // Datos de pago y geocerca viven en Supabase (system_config): se cargan al abrir
   // y, si un guardado falla (p. ej. sesión vencida), se avisa en vez de fingir éxito.
@@ -274,11 +323,11 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
   };
 
   // Función para imprimir únicamente el atril / standee físico de mesa en 1 sola hoja limpia
-  const handlePrintStandee = () => {
+  const handlePrintStandee = async () => {
     const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
     const tableName = customTableName.trim() || ('MESA ' + selectedTableNumber);
-    const targetMenuUrl = `${origin}/menu?mesa=${encodeURIComponent(tableName)}&zona=${encodeURIComponent(selectedZone)}`;
-    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&color=${qrColor === 'brand' ? 'ff5a1f' : '000000'}&bgcolor=ffffff&data=${encodeURIComponent(targetMenuUrl)}`;
+    const targetMenuUrl = signedTableUrl(tableName, selectedZone);
+    const qrCodeUrl = await qrDataUrl(targetMenuUrl, 500, qrColor);
     const branchName = formData.branchName || 'AUREA Bistro';
     const logoUrl = formData.logoUrl || '/logo.png';
     const instructions = t.scan_to_order || 'Escanea con la cámara de tu celular para ver la carta y hacer tu pedido';
@@ -503,7 +552,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
   };
 
   // Función para imprimir lote de mesas en cuadrícula A4 optimizada para corte
-  const handlePrintAllTables = (customList?: string[], customTitle?: string) => {
+  const handlePrintAllTables = async (customList?: string[], customTitle?: string) => {
     const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
     const branchName = formData.branchName || 'AUREA Bistro';
     const logoUrl = formData.logoUrl || '/logo.png';
@@ -534,8 +583,8 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
 
     onShowToast(`Preparando impresión de lote (${filteredForPrint.length} mesas)...`, 'print');
 
-    const cardsHtml = filteredForPrint.map((tbl) => {
-      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=350x350&color=${qrColor === 'brand' ? 'ff5a1f' : '000000'}&bgcolor=ffffff&data=${encodeURIComponent(origin + '/menu?mesa=' + encodeURIComponent(tbl))}`;
+    const cardsHtml = (await Promise.all(filteredForPrint.map(async (tbl) => {
+      const qrUrl = await qrDataUrl(signedTableUrl(tbl), 350, qrColor);
       return `
         <div class="batch-card">
           <div class="batch-header">
@@ -554,7 +603,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
           <div class="batch-nfc">● NTAG213 NFC LINKED</div>
         </div>
       `;
-    }).join('');
+    }))).join('');
 
     const htmlContent = `<!DOCTYPE html>
 <html lang="es">
@@ -1895,7 +1944,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                     <input
                       type="text"
                       readOnly
-                      value={`${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/menu?mesa=${encodeURIComponent(customTableName.trim() || ('MESA ' + selectedTableNumber))}&zona=${encodeURIComponent(selectedZone)}`}
+                      value={signedTableUrl(customTableName.trim() || ('MESA ' + selectedTableNumber), selectedZone)}
                       className={`flex-1 min-w-0 w-full sm:w-auto rounded p-2.5 text-[12px] font-mono tracking-tight cursor-default ${
                         isLight ? 'bg-[#f1f5f9] border border-[#cbd5e1] text-[#334155]' : 'bg-[#141414] border border-[#2A2A2A] text-gray-300'
                       }`}
@@ -1903,7 +1952,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                     <button
                       type="button"
                       onClick={() => {
-                        const url = `${window.location.origin}/menu?mesa=${encodeURIComponent(customTableName.trim() || ('MESA ' + selectedTableNumber))}&zona=${encodeURIComponent(selectedZone)}`;
+                        const url = signedTableUrl(customTableName.trim() || ('MESA ' + selectedTableNumber), selectedZone);
                         navigator.clipboard.writeText(url);
                         onShowToast('Enlace de la mesa copiado al portapapeles', 'content_copy');
                       }}
@@ -1916,7 +1965,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                     <button
                       type="button"
                       onClick={() => {
-                        const url = `${window.location.origin}/menu?mesa=${encodeURIComponent(customTableName.trim() || ('MESA ' + selectedTableNumber))}&zona=${encodeURIComponent(selectedZone)}`;
+                        const url = signedTableUrl(customTableName.trim() || ('MESA ' + selectedTableNumber), selectedZone);
                         window.open(url, '_blank');
                       }}
                       className={`flex-1 sm:flex-none justify-center px-3 py-2 rounded border text-[12px] font-semibold flex items-center gap-1 cursor-pointer shrink-0 transition-colors ${
@@ -1953,6 +2002,20 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                         <span>Logotipo central</span>
                       </label>
                     </div>
+                    <p className={`text-[11px] leading-snug max-w-[360px] ${descColor}`}>
+                      Cada QR lleva un código secreto de su mesa: sin él no se puede pedir desde fuera del local.
+                    </p>
+                    {qrTokensError && <p className="text-[11px] text-red-400 max-w-[360px]" role="alert">{qrTokensError}</p>}
+                    <button
+                      type="button"
+                      onClick={handleRotateQrTokens}
+                      disabled={isRotatingQr}
+                      className="self-start text-[11px] font-semibold text-[#FF5A1F] hover:underline disabled:opacity-50 cursor-pointer flex items-center gap-1"
+                      title="Usar si un QR impreso fue fotografiado o robado"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">autorenew</span>
+                      {isRotatingQr ? 'Regenerando…' : 'Invalidar QR impresos y generar nuevos'}
+                    </button>
                   </div>
 
                   <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -2006,12 +2069,10 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
 
                 {/* Tarjeta de Código QR */}
                 <div className="p-3 bg-white rounded-xl shadow-md border border-gray-200 relative group flex items-center justify-center">
-                  <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&color=${qrColor === 'brand' ? 'ff5a1f' : '000000'}&bgcolor=ffffff&data=${encodeURIComponent(
-                      (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000') +
-                      '/menu?mesa=' + encodeURIComponent(customTableName.trim() || ('MESA ' + selectedTableNumber)) +
-                      '&zona=' + encodeURIComponent(selectedZone)
-                    )}`}
+                  <TableQrImage
+                    value={signedTableUrl(customTableName.trim() || ('MESA ' + selectedTableNumber), selectedZone)}
+                    size={220}
+                    color={qrColor}
                     alt="Código QR de la Mesa"
                     className="w-[180px] h-[180px] object-contain rounded"
                   />
@@ -2043,20 +2104,14 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                       type="button"
                       onClick={async () => {
                         try {
-                          const targetUrl = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&color=${qrColor === 'brand' ? 'ff5a1f' : '000000'}&bgcolor=ffffff&data=${encodeURIComponent(
-                            window.location.origin + '/menu?mesa=' + encodeURIComponent(customTableName.trim() || ('MESA ' + selectedTableNumber))
-                          )}`;
-                          const res = await fetch(targetUrl);
-                          const blob = await res.blob();
-                          const blobUrl = URL.createObjectURL(blob);
+                          const tableName = customTableName.trim() || ('MESA ' + selectedTableNumber);
                           const a = document.createElement('a');
-                          a.href = blobUrl;
-                          a.download = `QR-${(customTableName.trim() || ('MESA_' + selectedTableNumber)).replace(/\s+/g, '_')}.png`;
+                          a.href = await qrDataUrl(signedTableUrl(tableName, selectedZone), 1000, qrColor);
+                          a.download = `QR-${tableName.replace(/\s+/g, '_')}.png`;
                           a.click();
-                          URL.revokeObjectURL(blobUrl);
                           onShowToast('Imagen QR descargada en alta resolución', 'download');
                         } catch {
-                          window.open(`https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(window.location.origin + '/menu?mesa=' + (customTableName.trim() || selectedTableNumber))}`, '_blank');
+                          onShowToast('No se pudo generar la imagen del QR', 'error');
                         }
                       }}
                       className={`py-2 px-2 rounded-lg border text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer transition-colors ${
@@ -2671,9 +2726,6 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
 
             <div className="flex-1 overflow-y-auto pr-2 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
               {filteredModalTables.map((tableLabel) => {
-                const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&color=${qrColor === 'brand' ? 'ff5a1f' : '000000'}&bgcolor=ffffff&data=${encodeURIComponent(
-                  (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000') + '/menu?mesa=' + encodeURIComponent(tableLabel)
-                )}`;
                 return (
                   <div
                     key={tableLabel}
@@ -2686,7 +2738,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                     </div>
                     <div className={`text-[13px] font-bold mb-2 ${titleColor}`}>{tableLabel}</div>
                     <div className="p-2 bg-white rounded-lg shadow-sm border border-gray-200">
-                      <img src={qrUrl} alt={tableLabel} className="w-24 h-24 object-contain" />
+                      <TableQrImage value={signedTableUrl(tableLabel)} size={200} color={qrColor} alt={tableLabel} className="w-24 h-24 object-contain" />
                     </div>
                     <span className="text-[9px] text-emerald-400 mt-2 font-mono">(( · )) NFC LINKED</span>
                   </div>
