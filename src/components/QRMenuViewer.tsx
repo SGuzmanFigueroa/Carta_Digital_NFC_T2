@@ -3,24 +3,8 @@ import { MenuItem, OrderRound, OrderTicket, PaymentClaim, TableStatus, WaiterCal
 import { kitchenAudio } from '../utils/audio';
 // CD-27 · Confirmación táctil (vibración de 15 ms) del gesto "agregar al carrito".
 import { hapticAddToCart } from '../utils/haptics';
-//import { ThreeDView } from './ThreeDView';
-import dynamic from 'next/dynamic';
-
-// Importación dinámica: Obliga a Next.js a no incluir Three.js en la carga inicial.
-// Como tu componente usa "export const ThreeDView" (exportación nombrada), usamos .then()
-const ThreeDView = dynamic(
-  () => import('./ThreeDView').then((mod) => mod.ThreeDView),
-  {
-    ssr: false, // Fundamental: Three.js necesita el objeto 'window', no puede renderizarse en el servidor
-    // CD-31 · El fallback es un componente propio para que su copy respete el idioma.
-    loading: () => <ThreeDLoading />
-  }
-);
-
-// Visores de RA con Three.js (~600 KB): se descargan recién al abrir la cámara RA,
-// no al cargar la carta.
-const DishARViewer = dynamic(() => import('./DishARViewer').then((m) => m.DishARViewer), { ssr: false });
-const WebXRDishLauncher = dynamic(() => import('./WebXRDishLauncher').then((m) => m.WebXRDishLauncher), { ssr: false });
+// Visores 3D/RA con Three.js: se descargan recién al abrirlos.
+import { ThreeDView } from './qr-menu/lazyViewers';
 // CD-13 · Componentes del tema Claro/Oscuro y navegación inferior del comensal.
 import { ThemeToggle } from './menu/ThemeToggle';
 // CD-31 · Selector de idioma [ES | EN] de la carta del comensal.
@@ -66,24 +50,11 @@ import { saveTableAccess } from '@/utils/tableAccess';
 import { DishImage } from './menu/DishImage';
 import { DietaryFilters, DIETARY_FILTERS, getDietaryPreferences } from './menu/DietaryFilters';
 import type { DietaryPreference } from '../types';
-import { getArDishDimensionCm } from '@/config/arDishProfiles';
-import { useDialog } from '@/hooks/useDialog';
-
-/**
- * CD-31 · Fallback del visor 3D: componente propio (y no un literal dentro de
- * `dynamic()`) porque necesita el hook de idioma para traducir su copy.
- */
-function ThreeDLoading() {
-  const { t } = useLanguage();
-  return (
-    <div className="flex items-center justify-center w-full h-64 bg-[#131418] rounded-xl border border-[#24252e]">
-      <div className="flex flex-col items-center gap-2">
-        <span className="w-6 h-6 border-2 border-[#ff5708] border-t-transparent rounded-full animate-spin"></span>
-        <span className="text-[#ff5708] font-mono-code text-[11px] animate-pulse">{t('dish.loading3d')}</span>
-      </div>
-    </div>
-  );
-}
+import { getModelId, useArViewer } from './qr-menu/useArViewer';
+import { cartLineKey, type MenuCartItem } from './qr-menu/cart';
+import { ArVisorOverlay } from './qr-menu/ArVisorOverlay';
+import { CartDrawer } from './qr-menu/CartDrawer';
+import { Dish3DInspectorModal } from './qr-menu/Dish3DInspectorModal';
 
 /**
  * CD-31 · Mensaje del aviso GPS antifraude en el idioma de la carta.
@@ -153,26 +124,6 @@ const PROMO_DEAL_SEEN_KEY = 'gastropulse_promo_seen';
  * ("una vez por sesión").
  */
 const IS_DEV = process.env.NODE_ENV !== 'production';
-const DEFAULT_AR_SCALE = 1;
-const NATIVE_AR_RETURN_KEY = 'gastropulse_native_ar_return';
-
-const canLaunchAndroidSceneViewer = () => {
-  if (typeof window === 'undefined') return false;
-  return /android/i.test(window.navigator.userAgent);
-};
-
-const getModelId = (dish: MenuItem) => dish.id;
-
-const buildAndroidSceneViewerIntent = (dish: MenuItem, modelId: string) => {
-  const modelUrl = new URL(`/models-ar/${modelId}.glb`, window.location.origin).href;
-  const fallbackUrl = new URL(window.location.href);
-  fallbackUrl.searchParams.set('arFallback', modelId);
-  fallbackUrl.searchParams.set('arName', dish.name);
-
-  const title = `${dish.name} · ${getArDishDimensionCm(modelId)} cm · mueve lento`;
-  return `intent://arvr.google.com/scene-viewer/1.0?file=${encodeURIComponent(modelUrl)}&mode=ar_preferred&title=${encodeURIComponent(title)}&resizable=false#Intent;scheme=https;package=com.google.android.googlequicksearchbox;action=android.intent.action.VIEW;S.browser_fallback_url=${encodeURIComponent(fallbackUrl.href)};end;`;
-};
-
 const normalizeStr = (str: string) =>
   str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
 
@@ -181,11 +132,6 @@ const normalizeTable = (table: string) => normalizeStr(table).replace(/\s+/g, '-
 
 
 
-type MenuCartItem = { item: MenuItem; quantity: number; notes?: string };
-
-/** Un mismo plato puede estar dos veces en el carrito: a precio de carta y en oferta. */
-const cartLineKey = (item: MenuItem) =>
-  item.appliedPromoOfferId ? `${item.id}|promo:${item.appliedPromoOfferId}` : item.id;
 
 interface QRMenuViewerProps {
   menuItems: MenuItem[];
@@ -276,18 +222,9 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   // 3D Inspector Modal
   const [selectedDishForModal, setSelectedDishForModal] = useState<MenuItem | null>(null);
 
-  // Real Camera AR Modal
-  const [isArModalOpen, setIsArModalOpen] = useState(false);
-  const [arCameraActive, setArCameraActive] = useState(false);
-  const [arCameraMessage, setArCameraMessage] = useState<string | null>(null);
-  const [arCameraHelp, setArCameraHelp] = useState<string | null>(null);
-  const [isArCameraRequesting, setIsArCameraRequesting] = useState(false);
-  const [arCameraAttempted, setArCameraAttempted] = useState(false);
-  const [arScale, setArScale] = useState(DEFAULT_AR_SCALE);
-  const [arTrackingStatus, setArTrackingStatus] = useState(() => t('ar.waiting'));
-  const [isArDishAnchored, setIsArDishAnchored] = useState(false);
-  const [isRealArAvailable, setIsRealArAvailable] = useState(false);
-  const [arDish, setArDish] = useState<MenuItem>(menuItems[0]); // default to Chaufa or current
+  // Cámara y visor de realidad aumentada.
+  const arViewer = useArViewer(menuItems, t, onShowToast);
+  const { isArModalOpen, openArViewer } = arViewer;
 
   // Re-order / Welcome Back feature for returning diners
   interface LastOrderRecord {
@@ -342,11 +279,6 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     setIsCartOpen(true);
     onShowToast(t('toast.repeatLoaded'), 'receipt_long');
   };
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const mediaStreamRef = useRef<MediaStream | null>(null);
-  const pendingArStreamRef = useRef<MediaStream | null>(null);
-  const arVideoFrameRef = useRef({ lastFrame: -1, lastTime: -1, stuckTicks: 0, reconnecting: false });
-  const nativeArReturnHandledRef = useRef(false);
 
   const selectedTableKey = normalizeTable(selectedTable);
   const cart = cartsByTable[selectedTableKey] || [];
@@ -409,430 +341,6 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al montar: el QR de la mesa se lee una vez
   }, []);
-  const stopArCamera = React.useCallback(() => {
-    if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach((t) => t.stop());
-      mediaStreamRef.current = null;
-    }
-    if (pendingArStreamRef.current) {
-      pendingArStreamRef.current.getTracks().forEach((t) => t.stop());
-      pendingArStreamRef.current = null;
-    }
-    if (videoRef.current) {
-      videoRef.current.pause();
-      videoRef.current.srcObject = null;
-    }
-    arVideoFrameRef.current = { lastFrame: -1, lastTime: -1, stuckTicks: 0, reconnecting: false };
-    setArCameraActive(false);
-  }, []);
-
-  const configureArVideoElement = React.useCallback((video: HTMLVideoElement, stream: MediaStream) => {
-    video.muted = true;
-    video.autoplay = true;
-    video.playsInline = true;
-    video.setAttribute('playsinline', 'true');
-    video.setAttribute('webkit-playsinline', 'true');
-    if (video.srcObject !== stream) {
-      video.srcObject = stream;
-    }
-  }, []);
-
-  const waitForArVideoFrame = React.useCallback((video: HTMLVideoElement, timeoutMs = 4200) => {
-    if (!video.paused && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-      return Promise.resolve();
-    }
-
-    return new Promise<void>((resolve, reject) => {
-      let settled = false;
-      const cleanup = () => {
-        video.removeEventListener('playing', onReady);
-        video.removeEventListener('timeupdate', onReady);
-        video.removeEventListener('loadeddata', onReady);
-        video.removeEventListener('error', onError);
-        window.clearTimeout(timeoutId);
-      };
-      const finish = (callback: () => void) => {
-        if (settled) return;
-        settled = true;
-        cleanup();
-        callback();
-      };
-      const onReady = () => finish(resolve);
-      const onError = () => finish(() => reject(new DOMException('Camera video element failed', 'AbortError')));
-      const timeoutId = window.setTimeout(
-        () => finish(() => reject(new DOMException('Camera video did not render frames', 'AbortError'))),
-        timeoutMs
-      );
-
-      video.addEventListener('playing', onReady, { once: true });
-      video.addEventListener('timeupdate', onReady, { once: true });
-      video.addEventListener('loadeddata', onReady, { once: true });
-      video.addEventListener('error', onError, { once: true });
-    });
-  }, []);
-
-  const playArVideoStream = React.useCallback(async (stream: MediaStream) => {
-    const video = videoRef.current;
-    if (!video) return false;
-
-    configureArVideoElement(video, stream);
-    try {
-      await video.play();
-      await waitForArVideoFrame(video);
-      arVideoFrameRef.current = { lastFrame: -1, lastTime: -1, stuckTicks: 0, reconnecting: false };
-      return true;
-    } catch (error) {
-      console.warn('AR camera stream was granted but video playback did not start:', error);
-      return false;
-    }
-  }, [configureArVideoElement, waitForArVideoFrame]);
-
-  const requestArCameraStream = React.useCallback(async () => {
-    if (typeof window === 'undefined') {
-      throw new DOMException('Browser window is not available', 'NotFoundError');
-    }
-
-    const isLocalhost = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
-    if (!window.isSecureContext && !isLocalhost) {
-      throw new DOMException('Camera requires HTTPS', 'SecurityError');
-    }
-
-    if (!navigator.mediaDevices?.getUserMedia) {
-      throw new DOMException('Camera API is not available', 'NotFoundError');
-    }
-
-    const requestWithTimeout = (constraints: MediaStreamConstraints, timeoutMs = 9000) => {
-      let settled = false;
-      let timeoutId = 0;
-      const streamPromise = navigator.mediaDevices.getUserMedia(constraints);
-
-      const timeoutPromise = new Promise<MediaStream>((_, reject) => {
-        timeoutId = window.setTimeout(() => {
-          settled = true;
-          reject(new DOMException('Camera permission request timed out', 'AbortError'));
-        }, timeoutMs);
-      });
-
-      streamPromise
-        .then((stream) => {
-          if (settled) {
-            stream.getTracks().forEach((track) => track.stop());
-          }
-        })
-        .catch(() => undefined);
-
-      return Promise.race([streamPromise, timeoutPromise]).finally(() => {
-        settled = true;
-        window.clearTimeout(timeoutId);
-      });
-    };
-
-    const cameraAttempts: MediaStreamConstraints[] = [
-      {
-        video: {
-          facingMode: { ideal: 'environment' },
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        },
-        audio: false
-      },
-      {
-        video: {
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        },
-        audio: false
-      },
-      {
-        video: true,
-        audio: false
-      }
-    ];
-
-    let lastCameraError: unknown = null;
-
-    for (const constraints of cameraAttempts) {
-      try {
-        return await requestWithTimeout(constraints);
-      } catch (err) {
-        lastCameraError = err;
-        const errorName = err instanceof DOMException ? err.name : '';
-        if (errorName === 'NotAllowedError' || errorName === 'SecurityError') {
-          throw err;
-        }
-      }
-    }
-
-    throw lastCameraError ?? new DOMException('No camera stream available', 'NotFoundError');
-  }, []);
-
-  const showBlockedCameraMessage = React.useCallback(() => {
-    setArCameraMessage(t('ar.blocked'));
-    setArCameraHelp(t('ar.blockedHelp'));
-    onShowToast(t('toast.cameraNotActivated'), 'info');
-  }, [onShowToast, t]);
-
-  const attachArCameraStream = React.useCallback(async (stream: MediaStream) => {
-    pendingArStreamRef.current = stream;
-    mediaStreamRef.current = stream;
-
-    if (!videoRef.current) {
-      setArCameraMessage(t('ar.activatingCamera'));
-      setArCameraHelp(null);
-      return;
-    }
-
-    const started = await playArVideoStream(stream);
-    if (!started) {
-      throw new DOMException('Camera stream could not be attached to live video', 'AbortError');
-    }
-
-    pendingArStreamRef.current = null;
-    setArCameraActive(true);
-    setArCameraMessage(null);
-    setArCameraHelp(null);
-    onShowToast(t('toast.cameraOn'), 'view_in_ar');
-  }, [onShowToast, playArVideoStream, t]);
-
-  const handleCameraError = React.useCallback((err: unknown) => {
-    console.warn('Camera access error or denied:', err);
-    stopArCamera();
-    const errorName = err instanceof DOMException ? err.name : '';
-
-    if (errorName === 'NotAllowedError' || errorName === 'SecurityError') {
-      showBlockedCameraMessage();
-      return;
-    }
-
-    if (errorName === 'NotFoundError' || errorName === 'OverconstrainedError') {
-      setArCameraMessage(t('ar.noCamera'));
-      setArCameraHelp(t('ar.noCameraHelp'));
-      return;
-    }
-
-    setArCameraMessage(t('ar.blocked'));
-    setArCameraHelp(t('ar.failedHelp'));
-  }, [showBlockedCameraMessage, stopArCamera, t]);
-
-  const startArCamera = React.useCallback(async () => {
-    setArCameraAttempted(true);
-    setArCameraMessage(t('ar.requestingPermission'));
-    setArCameraHelp(null);
-    setIsArCameraRequesting(true);
-
-    try {
-      stopArCamera();
-      const stream = await requestArCameraStream();
-      await attachArCameraStream(stream);
-    } catch (err) {
-      handleCameraError(err);
-    } finally {
-      setIsArCameraRequesting(false);
-    }
-  }, [attachArCameraStream, handleCameraError, requestArCameraStream, stopArCamera, t]);
-
-  useEffect(() => {
-    if (isArModalOpen) return;
-
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- al cerrar el modal se apaga la cámara (sistema externo) y se limpia su estado
-    stopArCamera();
-    setArCameraMessage(null);
-    setArCameraHelp(null);
-    setArCameraAttempted(false);
-    setIsArCameraRequesting(false);
-    setArTrackingStatus(t('ar.waiting'));
-    setIsArDishAnchored(false);
-  }, [isArModalOpen, stopArCamera, t]);
-
-  useEffect(() => {
-    if (!isArModalOpen) return;
-
-    if (pendingArStreamRef.current && videoRef.current) {
-      const stream = pendingArStreamRef.current;
-      attachArCameraStream(stream).catch(handleCameraError);
-      return;
-    }
-
-    if (!arCameraActive && !isArCameraRequesting && !arCameraMessage) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- mensaje según el estado real de la cámara
-      setArCameraMessage(t('ar.tapToActivate'));
-      setArCameraHelp(t('ar.permissionOnce'));
-    }
-  }, [arCameraActive, arCameraMessage, attachArCameraStream, handleCameraError, isArCameraRequesting, isArModalOpen, t]);
-
-  useEffect(() => {
-    if (!isArModalOpen || !arCameraActive) return;
-
-    const getVideoFrameCount = (video: HTMLVideoElement) => {
-      if (typeof video.getVideoPlaybackQuality === 'function') {
-        return video.getVideoPlaybackQuality().totalVideoFrames;
-      }
-      return Math.floor(video.currentTime * 10);
-    };
-
-    const reconnectLiveVideo = async () => {
-      if (arVideoFrameRef.current.reconnecting) return;
-      const video = videoRef.current;
-      const stream = mediaStreamRef.current;
-      if (!video || !stream) return;
-
-      arVideoFrameRef.current.reconnecting = true;
-      setArTrackingStatus('Reactivando cámara');
-      try {
-        video.pause();
-        video.srcObject = null;
-        await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
-        const restarted = await playArVideoStream(stream);
-        if (restarted) {
-          setArCameraMessage(null);
-          setArCameraHelp(null);
-          setArTrackingStatus('Cámara activa');
-        }
-      } finally {
-        arVideoFrameRef.current.reconnecting = false;
-        arVideoFrameRef.current.lastFrame = -1;
-        arVideoFrameRef.current.lastTime = -1;
-        arVideoFrameRef.current.stuckTicks = 0;
-      }
-    };
-
-    const verifyLiveCamera = () => {
-      const video = videoRef.current;
-      const stream = mediaStreamRef.current;
-      if (!video || !stream) return;
-
-      const hasLiveTrack = stream.getVideoTracks().some((track) => track.readyState === 'live');
-      if (!hasLiveTrack) {
-        setArCameraActive(false);
-        setArCameraMessage(t('ar.blocked'));
-        setArCameraHelp(t('ar.failedHelp'));
-        return;
-      }
-
-      configureArVideoElement(video, stream);
-      if (video.paused || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
-        void playArVideoStream(stream);
-        return;
-      }
-
-      const frameCount = getVideoFrameCount(video);
-      const currentTime = video.currentTime;
-      const last = arVideoFrameRef.current;
-      const sameFrame = frameCount === last.lastFrame && Math.abs(currentTime - last.lastTime) < 0.04;
-
-      last.stuckTicks = sameFrame ? last.stuckTicks + 1 : 0;
-      last.lastFrame = frameCount;
-      last.lastTime = currentTime;
-
-      if (last.stuckTicks >= 3) {
-        void reconnectLiveVideo();
-      }
-    };
-
-    const intervalId = window.setInterval(verifyLiveCamera, 1200);
-    const onVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        arVideoFrameRef.current.lastFrame = -1;
-        arVideoFrameRef.current.lastTime = -1;
-        arVideoFrameRef.current.stuckTicks = 0;
-        verifyLiveCamera();
-      }
-    };
-
-    document.addEventListener('visibilitychange', onVisibilityChange);
-    verifyLiveCamera();
-
-    return () => {
-      window.clearInterval(intervalId);
-      document.removeEventListener('visibilitychange', onVisibilityChange);
-    };
-  }, [arCameraActive, configureArVideoElement, isArModalOpen, playArVideoStream, t]);
-
-  const openAssistedArViewer = React.useCallback(async (dish: MenuItem, autoStartCamera = true) => {
-    setArDish(dish);
-    setArScale(DEFAULT_AR_SCALE);
-    setArTrackingStatus(t('ar.waiting'));
-    setIsArDishAnchored(false);
-    setIsRealArAvailable(false);
-    setIsArModalOpen(true);
-    setArCameraAttempted(autoStartCamera);
-    setArCameraMessage(autoStartCamera ? t('ar.requestingPermission') : t('ar.nativeFallbackTitle'));
-    setArCameraHelp(autoStartCamera ? null : t('ar.nativeFallbackHelp'));
-
-    if (!autoStartCamera) return;
-
-    setIsArCameraRequesting(true);
-    try {
-      stopArCamera();
-      const stream = await requestArCameraStream();
-      await attachArCameraStream(stream);
-    } catch (err) {
-      handleCameraError(err);
-    } finally {
-      setIsArCameraRequesting(false);
-    }
-  }, [attachArCameraStream, handleCameraError, requestArCameraStream, stopArCamera, t]);
-
-  const openArViewer = React.useCallback(async (dish: MenuItem) => {
-    const modelId = getModelId(dish);
-    setArDish(dish);
-    setArScale(DEFAULT_AR_SCALE);
-    setArTrackingStatus(t('ar.openingNative', { dish: dish.name }));
-    setIsArDishAnchored(false);
-    setIsRealArAvailable(false);
-
-    if (canLaunchAndroidSceneViewer()) {
-      try {
-        nativeArReturnHandledRef.current = false;
-        sessionStorage.setItem(NATIVE_AR_RETURN_KEY, JSON.stringify({ dishId: modelId, launchedAt: Date.now() }));
-      } catch {}
-      onShowToast(t('ar.openingNative', { dish: dish.name }), 'view_in_ar');
-      window.location.href = buildAndroidSceneViewerIntent(dish, modelId);
-      return;
-    }
-
-    await openAssistedArViewer(dish);
-  }, [onShowToast, openAssistedArViewer, t]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const openFallbackIfNeeded = () => {
-      if (document.visibilityState !== 'visible' || isArModalOpen || nativeArReturnHandledRef.current) return;
-
-      let stored: { dishId?: string; launchedAt?: number } | null = null;
-      try {
-        const raw = sessionStorage.getItem(NATIVE_AR_RETURN_KEY);
-        stored = raw ? JSON.parse(raw) : null;
-      } catch {
-        stored = null;
-      }
-
-      if (!stored?.dishId || !stored.launchedAt) return;
-      const elapsed = Date.now() - stored.launchedAt;
-      if (elapsed < 800 || elapsed > 180000) return;
-
-      const fallbackDish = menuItems.find((item) => getModelId(item) === stored.dishId);
-      if (!fallbackDish) return;
-
-      nativeArReturnHandledRef.current = true;
-      try {
-        sessionStorage.removeItem(NATIVE_AR_RETURN_KEY);
-      } catch {}
-      void openAssistedArViewer(fallbackDish, false);
-      onShowToast(t('toast.nativeArFallbackReady'), 'view_in_ar');
-    };
-
-    window.addEventListener('focus', openFallbackIfNeeded);
-    window.addEventListener('pageshow', openFallbackIfNeeded);
-    document.addEventListener('visibilitychange', openFallbackIfNeeded);
-
-    return () => {
-      window.removeEventListener('focus', openFallbackIfNeeded);
-      window.removeEventListener('pageshow', openFallbackIfNeeded);
-      document.removeEventListener('visibilitychange', openFallbackIfNeeded);
-    };
-  }, [isArModalOpen, menuItems, onShowToast, openAssistedArViewer, t]);
 
   const toggleDietaryFilter = (filter: DietaryPreference) => {
     setSelectedDietaryFilters((previous) =>
@@ -1319,9 +827,6 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
 
   const heroItem: LocalizedMenuItem = localizeMenuItem(menuItems[0], language);
 
-  const cartDialog = useDialog(isCartOpen, () => setIsCartOpen(false));
-  const dishDialog = useDialog(Boolean(selectedDishForModal), () => setSelectedDishForModal(null));
-  const arDialog = useDialog(isArModalOpen, () => setIsArModalOpen(false));
 
   return (
     <div className="w-full min-h-screen bg-[#f4f5f7] text-[#0f172a] dark:bg-[#0b0c0e] dark:text-[#e5e1e4] pb-44 sm:pb-36 selection:bg-primary selection:text-white transition-colors duration-300">
@@ -2036,391 +1541,37 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       {/* ========================================================================= */}
       {/* ️ CART DRAWER / REVIEW MODAL */}
       {/* ========================================================================= */}
-      {isCartOpen && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
-          <div {...cartDialog} aria-labelledby="cart-dialog-title" className="bg-white dark:bg-[#15161c] w-full max-w-lg rounded-t-3xl sm:rounded-2xl border border-[#e2e8f0] dark:border-[#2d2e38] shadow-2xl p-5 space-y-4 max-h-[88vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-2 border-b border-[#e2e8f0] dark:border-[#24252e]">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary text-[20px]">receipt_long</span>
-                <h3 id="cart-dialog-title" className="text-[16px] font-bold text-[#0f172a] dark:text-white">{t('cart.title', { table: localizeTableLabel(selectedTable, language) })}</h3>
-              </div>
-              <button
-                type="button"
-                aria-label={t('cart.close')}
-                onClick={() => setIsCartOpen(false)}
-                className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-[#475569] dark:text-[#a1a1aa] hover:text-[#0f172a] dark:hover:text-white hover:bg-[#f1f5f9] dark:hover:bg-[#24252e] cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[20px]">close</span>
-              </button>
-            </div>
-
-            <div className="space-y-2.5">
-              {cart.map((c) => (
-                <div
-                  key={cartLineKey(c.item)}
-                  className="bg-[#f8fafc] dark:bg-[#1e1f28] p-3 rounded-xl border border-[#e2e8f0] dark:border-[#2a2b36] space-y-2"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <h4 className="text-[13px] sm:text-[14px] font-semibold text-[#0f172a] dark:text-white truncate">
-                        {localizeMenuItemName(c.item, language)}
-                      </h4>
-                      <span className="font-mono-code text-[12px] text-primary font-bold">
-                        S/ {(c.item.price * c.quantity).toFixed(2)}
-                      </span>
-                    </div>
-
-                    <div className="inline-flex items-center rounded-xl bg-[#f1f5f9] dark:bg-[#15161c] border border-[#cbd5e1] dark:border-[#2d2e38] p-0.5 shadow-sm">
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveFromCart(cartLineKey(c.item))}
-                        className="w-7 h-7 rounded-lg flex items-center justify-center text-[#475569] dark:text-[#a1a1aa] hover:bg-primary hover:text-white active:scale-90 transition-all font-bold text-[15px] cursor-pointer select-none"
-                        title={t('cart.decrease')}
-                      >
-                        -
-                      </button>
-                      <span className="min-w-[24px] text-center font-mono-code text-[12px] font-bold text-[#0f172a] dark:text-white select-none">
-                        {c.quantity}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleAddToCart(c.item)}
-                        className="w-7 h-7 rounded-lg flex items-center justify-center text-[#475569] dark:text-[#a1a1aa] hover:bg-primary hover:text-white active:scale-90 transition-all font-bold text-[15px] cursor-pointer select-none"
-                        title={t('cart.increase')}
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
-
-                  {Boolean(activeNoteItemId[cartLineKey(c.item)] || (c.notes && c.notes.trim().length > 0)) ? (
-                    <div className="relative flex items-center">
-                      <input
-                        type="text"
-                        maxLength={60}
-                        placeholder={t('cart.notePlaceholder')}
-                        value={c.notes || ''}
-                        onChange={(e) => handleUpdateNotes(cartLineKey(c.item), e.target.value)}
-                        className="w-full bg-white dark:bg-[#15161c] text-[#0f172a] dark:text-[#e5e1e4] pl-2.5 pr-8 py-2 min-h-[44px] rounded-lg text-[11px] placeholder:text-[#94a3b8] dark:placeholder:text-[#71717a] border border-[#e2e8f0] dark:border-[#2d2e38] focus:outline-none focus:border-primary"
-                        autoFocus={Boolean(activeNoteItemId[cartLineKey(c.item)] && !c.notes)}
-                      />
-                      {(!c.notes || c.notes.length === 0) ? (
-                        <button
-                          type="button"
-                          onClick={() => setActiveNoteItemId((prev) => ({ ...prev, [cartLineKey(c.item)]: false }))}
-                          aria-label={t('cart.closeNote')}
-                          className="absolute right-2 text-[#94a3b8] hover:text-[#475569] dark:hover:text-white p-1 cursor-pointer"
-                        >
-                          <span className="material-symbols-outlined text-[16px]">close</span>
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            handleUpdateNotes(cartLineKey(c.item), '');
-                            setActiveNoteItemId((prev) => ({ ...prev, [cartLineKey(c.item)]: false }));
-                          }}
-                          title={t('cart.removeNote')}
-                          aria-label={t('cart.removeNote')}
-                          className="absolute right-2 text-[#94a3b8] hover:text-rose-500 p-1 cursor-pointer"
-                        >
-                          <span className="material-symbols-outlined text-[16px]">delete</span>
-                        </button>
-                      )}
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setActiveNoteItemId((prev) => ({ ...prev, [cartLineKey(c.item)]: true }))}
-                      className="w-full flex items-center justify-start gap-1.5 px-2.5 py-1.5 text-[11px] font-medium text-[#64748b] dark:text-[#94a3b8] hover:text-primary dark:hover:text-primary hover:bg-[#f1f5f9] dark:hover:bg-[#181920] rounded-lg border border-dashed border-[#cbd5e1] dark:border-[#2a2b36] transition-colors cursor-pointer"
-                    >
-                      <span className="material-symbols-outlined text-[15px]">edit_note</span>
-                      <span>{t('cart.addNote')}</span>
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {/* CD-27 · Resumen del pedido: los tres importes cuentan a 60 FPS
-                (misma duración y easing, así el subtotal + IGV siguen sumando
-                exactamente el total en todos los frames intermedios). */}
-            <div className="p-3 bg-[#f1f5f9] dark:bg-[#0e0e10] rounded-xl space-y-1.5 text-[11px] sm:text-[12px] font-mono-code">
-              <div className="flex justify-between text-[#475569] dark:text-[#a1a1aa]">
-                <span>{t('cart.subtotalNoIgv')}</span>
-                <span><AnimatedSoles value={cartTotal / 1.18} /></span>
-              </div>
-              <div className="flex justify-between text-[#475569] dark:text-[#a1a1aa]">
-                <span>{t('cart.igv')}</span>
-                <span><AnimatedSoles value={cartTotal - cartTotal / 1.18} /></span>
-              </div>
-              <div className="flex justify-between text-[#0f172a] dark:text-white font-bold text-[14px] sm:text-[15px] pt-1.5 border-t border-[#e2e8f0] dark:border-[#24252e]">
-                <span>{t('cart.totalToPay')}</span>
-                <span className="text-primary font-bold"><AnimatedSoles value={cartTotal} /></span>
-              </div>
-            </div>
-
-            <div className="space-y-2 pt-1">
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsCartOpen(false)}
-                  className="flex-1 py-2.5 min-h-[44px] rounded-xl bg-[#f1f5f9] text-[#0f172a] border border-[#cbd5e1] dark:border-transparent dark:bg-[#24252e] dark:text-[#e5e1e4] font-medium text-[13px] hover:bg-[#e2e8f0] dark:hover:bg-[#2d2e3a] cursor-pointer"
-                >
-                  {t('cart.keepOrdering')}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSendOrder}
-                  disabled={isVerifyingGeofence}
-                  aria-busy={isVerifyingGeofence}
-                  className="disabled:opacity-60 disabled:cursor-wait flex-1 py-2.5 min-h-[44px] rounded-xl bg-primary text-on-primary font-bold text-[13px] flex items-center justify-center gap-1.5 hover:brightness-110 shadow-lg cursor-pointer"
-                >
-                  <span>{t('cart.confirmSend')}</span>
-                  <span className="material-symbols-outlined text-[16px]">send</span>
-                </button>
-              </div>
-
-              {/* CD-10 · Botón directo para pedir la cuenta y pagar con QR */}
-              <button
-                type="button"
-                onClick={() => {
-                  setIsCartOpen(false);
-                  handleOpenSplitBill();
-                }}
-                className="w-full py-2.5 min-h-[44px] rounded-xl border border-primary/40 bg-primary/10 text-primary hover:bg-primary/20 font-bold text-[12px] flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
-              >
-                <span className="material-symbols-outlined text-[17px]">qr_code_2</span>
-                <span>{t('cart.requestAccount')}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <CartDrawer
+        isCartOpen={isCartOpen}
+        onClose={() => setIsCartOpen(false)}
+        selectedTable={selectedTable}
+        cart={cart}
+        cartTotal={cartTotal}
+        isVerifyingGeofence={isVerifyingGeofence}
+        activeNoteItemId={activeNoteItemId}
+        setActiveNoteItemId={setActiveNoteItemId}
+        onAddToCart={handleAddToCart}
+        onRemoveFromCart={handleRemoveFromCart}
+        onUpdateNotes={handleUpdateNotes}
+        onSendOrder={handleSendOrder}
+        onOpenSplitBill={handleOpenSplitBill}
+      />
 
       {/* ========================================================================= */}
       {/*  SPECIFIC DISH 3D INSPECTOR MODAL */}
       {/* ========================================================================= */}
-      {selectedDishForModal && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
-          <div {...dishDialog} aria-label={t('dish.threeDTitle', { dish: selectedDishForModal.name })} className="bg-white dark:bg-[#15161c] w-full max-w-lg rounded-t-3xl sm:rounded-2xl border border-primary/40 shadow-2xl p-4 sm:p-5 space-y-3.5">
-            <div className="flex items-center justify-between pb-2 border-b border-[#e2e8f0] dark:border-[#24252e]">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary text-[20px]">view_in_ar</span>
-                <h3 className="text-[15px] sm:text-[16px] font-bold text-[#0f172a] dark:text-white truncate">
-                  {t('dish.threeDTitle', { dish: selectedDishForModal.name })}
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedDishForModal(null)}
-                className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-[#475569] dark:text-[#a1a1aa] hover:text-[#0f172a] dark:hover:text-white cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[20px]">close</span>
-              </button>
-            </div>
-
-            {/* Custom 3D canvas tailored to this specific dish! */}
-            <ThreeDView
-              dishId={getModelId(selectedDishForModal)}
-              heightClass="h-64 sm:h-72"
-              onInteract={() => onShowToast(t('toast.inspecting', { dish: selectedDishForModal.name }), '3d_rotation')}
-            />
-
-            <div className="space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-mono-code text-primary font-bold">{selectedDishForModal.tag}</span>
-                <span className="text-[18px] font-mono-code font-bold text-primary">
-                  S/ {selectedDishForModal.price.toFixed(2)}
-                </span>
-              </div>
-              <p className="text-[12px] text-[#475569] dark:text-[#a1a1aa] leading-relaxed">
-                {selectedDishForModal.description}
-              </p>
-            </div>
-
-            <div className="pt-1 flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  openArViewer(selectedDishForModal);
-                  setSelectedDishForModal(null);
-                }}
-                className="px-3.5 py-2.5 min-h-[44px] rounded-xl bg-[#f1f5f9] hover:bg-[#e2e8f0] text-[#1d4ed8] border border-[#cbd5e1] dark:bg-[#1e1f28] dark:hover:bg-[#282935] dark:text-[#a1c9ff] dark:border-[#353642] text-[12px] flex items-center gap-1.5 cursor-pointer"
-                title={t('dish.projectArTableTitle')}
-              >
-                <span className="material-symbols-outlined text-[16px]">view_in_ar</span>
-                <span>{t('dish.arViewer')}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  handleAddToCart(selectedDishForModal);
-                  setSelectedDishForModal(null);
-                }}
-                className="flex-1 py-2.5 min-h-[44px] rounded-xl bg-primary text-on-primary font-bold text-[13px] flex items-center justify-center gap-1.5 shadow-lg hover:brightness-110 cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[16px]">add_shopping_cart</span>
-                <span>{t('dish.orderPrice', { price: `S/ ${selectedDishForModal.price.toFixed(2)}` })}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Dish3DInspectorModal
+        selectedDishForModal={selectedDishForModal}
+        onClose={() => setSelectedDishForModal(null)}
+        onAddToCart={handleAddToCart}
+        onShowToast={onShowToast}
+        onOpenAr={openArViewer}
+      />
 
       {/* ========================================================================= */}
       {/*  REAL CAMERA AUGMENTED REALITY (AR) VISOR OVERLAY */}
       {/* ========================================================================= */}
-      {isArModalOpen && (
-        <div {...arDialog} aria-label={t('ar.title')} className="fixed inset-0 z-50 bg-black flex flex-col justify-between animate-fadeIn overflow-hidden">
-          {/* Live Phone Camera Video Stream */}
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            aria-hidden={!arCameraActive}
-            onLoadedMetadata={() => mediaStreamRef.current && void playArVideoStream(mediaStreamRef.current)}
-            onCanPlay={() => mediaStreamRef.current && void playArVideoStream(mediaStreamRef.current)}
-            onPause={() => mediaStreamRef.current && void playArVideoStream(mediaStreamRef.current)}
-            onStalled={() => mediaStreamRef.current && void playArVideoStream(mediaStreamRef.current)}
-            onSuspend={() => mediaStreamRef.current && void playArVideoStream(mediaStreamRef.current)}
-            className={`absolute inset-0 w-full h-full object-cover z-0 transition-opacity duration-200 ${arCameraActive ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-          />
-
-          {/* Superficie de mesa simulada con iluminación cálida cuando no hay cámara activa */}
-          {!arCameraActive && (
-            <div className="absolute inset-0 z-0 bg-gradient-to-b from-[#111216] via-[#161820] to-[#0c0d10] flex flex-col items-center justify-center pointer-events-none">
-              <div className="w-80 h-80 rounded-full bg-primary/8 blur-3xl" />
-            </div>
-          )}
-
-          {!arCameraActive && arCameraMessage && (
-            <div className="absolute left-4 right-4 bottom-36 z-30 rounded-2xl border border-primary/45 bg-black/80 backdrop-blur-md p-4 text-white shadow-2xl sm:left-1/2 sm:right-auto sm:w-[380px] sm:-translate-x-1/2">
-              <div className="flex items-start gap-2.5">
-                <span className="material-symbols-outlined text-primary text-[22px] shrink-0">photo_camera</span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[13px] font-bold leading-snug text-white">{arCameraMessage}</p>
-                  {arCameraHelp && <p className="mt-1.5 text-[11px] leading-snug text-white/75">{arCameraHelp}</p>}
-                  <button
-                    type="button"
-                    onClick={startArCamera}
-                    disabled={isArCameraRequesting}
-                    className="mt-3 min-h-[42px] rounded-xl bg-primary px-4 py-2 text-[13px] font-black text-on-primary shadow-lg active:scale-95 disabled:cursor-wait disabled:opacity-70"
-                  >
-                    {isArCameraRequesting ? t('ar.activatingCamera') : arCameraAttempted ? t('ar.retryCamera') : t('ar.activateCamera')}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-          {/* Top Bar Overlay */}
-          <div className="relative z-20 px-4 pt-safe pt-4 flex items-center justify-between bg-gradient-to-b from-black/80 to-transparent pb-6">
-            <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-[24px] text-primary">view_in_ar</span>
-              <div className="flex flex-col">
-                <span className="text-[13px] font-bold text-white leading-tight">{t('ar.title')}</span>
-                <span className="text-[10px] font-mono-code text-emerald-400 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
-                  <span>{arCameraActive ? arTrackingStatus : isArCameraRequesting ? t('ar.activating') : t('ar.waiting')}</span>
-                </span>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              aria-label={t('ar.close')}
-              onClick={() => setIsArModalOpen(false)}
-              className="w-11 h-11 min-h-[44px] min-w-[44px] rounded-full bg-black/60 backdrop-blur-md border border-white/20 flex items-center justify-center text-white hover:bg-white/20 transition-colors cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-[20px]">close</span>
-            </button>
-          </div>
-
-          {/* AR surface detector + anchored transparent 3D dish layer */}
-          <div className="absolute inset-0 z-10 pointer-events-auto">
-            <DishARViewer
-              dishId={getModelId(arDish)}
-              scale={arScale}
-              isCameraActive={arCameraActive}
-              onStatusChange={setArTrackingStatus}
-              onAnchorChange={setIsArDishAnchored}
-              onShowToast={onShowToast}
-              preferRealAR={isRealArAvailable && !isArDishAnchored}
-            />
-          </div>
-
-          <WebXRDishLauncher
-            dishId={getModelId(arDish)}
-            scale={arScale}
-            isCameraActive={arCameraActive}
-            isAnchored={isArDishAnchored}
-            onStatusChange={setArTrackingStatus}
-            onShowToast={onShowToast}
-            onAvailabilityChange={setIsRealArAvailable}
-            onBeforeStart={() => {
-              stopArCamera();
-              setArCameraMessage(null);
-              setArCameraHelp(null);
-              setArTrackingStatus('AR real iniciando');
-            }}
-            onSessionEnd={() => {
-              setArCameraMessage(t('ar.tapToActivate'));
-              setArCameraHelp(t('ar.permissionOnce'));
-            }}
-          />
-
-          {/* Bottom Floating AR Controls */}
-          <div className="relative z-20 px-4 pb-safe pb-5 bg-gradient-to-t from-black/90 via-black/60 to-transparent pt-4 space-y-3">
-            {/* Scale controls */}
-            <div className="flex items-center justify-between bg-black/70 backdrop-blur-md px-3 py-2 rounded-xl border border-white/15 text-[11px] font-mono-code">
-              <span className="text-[#a1a1aa]">{isArDishAnchored ? t('ar.anchored') : t('ar.realScale')}</span>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  aria-label={t('ar.scaleDown')}
-                  onClick={() => setArScale((s) => Math.max(0.7, s - 0.1))}
-                  className="w-11 h-11 min-h-[44px] min-w-[44px] rounded bg-[#2a2b36] text-white flex items-center justify-center font-bold cursor-pointer"
-                >
-                  -
-                </button>
-                <span className="text-primary font-bold">
-                  {(getArDishDimensionCm(getModelId(arDish)) * arScale).toFixed(0)} cm
-                </span>
-                <button
-                  type="button"
-                  aria-label={t('ar.scaleUp')}
-                  onClick={() => setArScale((s) => Math.min(1.3, s + 0.1))}
-                  className="w-11 h-11 min-h-[44px] min-w-[44px] rounded bg-[#2a2b36] text-white flex items-center justify-center font-bold cursor-pointer"
-                >
-                  +
-                </button>
-              </div>
-            </div>
-
-            {/* Dish Info & Add to Cart button */}
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex flex-col min-w-0">
-                <span className="text-[14px] font-bold text-white truncate">{arDish.name}</span>
-                <span className="text-[12px] font-mono-code text-primary font-bold">S/ {arDish.price.toFixed(2)}</span>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => {
-                  handleAddToCart(arDish);
-                  setIsArModalOpen(false);
-                }}
-                className="px-4 py-2.5 min-h-[44px] rounded-xl bg-primary text-on-primary font-bold text-[13px] flex items-center gap-1.5 shadow-lg hover:brightness-110 active:scale-95 cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[17px]">add_shopping_cart</span>
-                <span>{t('dish.orderThisDish')}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ArVisorOverlay arViewer={arViewer} onAddToCart={handleAddToCart} onShowToast={onShowToast} />
       {/* ========================================================================= */}
       {/*  CD-13 · BARRA DE NAVEGACIÓN INFERIOR MÓVIL (touch targets de 44px)      */}
       {/* ========================================================================= */}
