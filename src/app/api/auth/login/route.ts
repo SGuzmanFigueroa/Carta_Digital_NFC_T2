@@ -51,7 +51,7 @@ export async function POST(request: Request) {
     if (retryAfter > 0) {
       const minutes = Math.ceil(retryAfter / 60);
       return json(
-        { error: `Demasiados intentos fallidos. Vuelve a intentarlo en ${minutes} min.` },
+        { error: `Demasiados intentos fallidos. Vuelve a intentarlo en ${minutes} min.`, retryAfter },
         429,
         { 'Retry-After': String(retryAfter) }
       );
@@ -76,6 +76,15 @@ export async function POST(request: Request) {
     const signedInAs = data.user?.id;
     if (error || !data.session || !staff || signedInAs !== staff.auth_user_id) {
       await service.rpc('record_login_attempt', { p_identifier: identifier, p_ip: ip, p_success: false });
+      // Si este fallo activó el bloqueo, se avisa ya (la pantalla inicia la cuenta regresiva).
+      const { data: lockedFor } = await service.rpc('login_retry_after', { p_identifier: identifier, p_ip: ip });
+      if (lockedFor && lockedFor > 0) {
+        return json(
+          { error: 'Demasiados intentos fallidos. Espera para volver a intentarlo.', retryAfter: lockedFor },
+          429,
+          { 'Retry-After': String(lockedFor) }
+        );
+      }
       return json({ error: WRONG_CREDENTIALS }, 401);
     }
 

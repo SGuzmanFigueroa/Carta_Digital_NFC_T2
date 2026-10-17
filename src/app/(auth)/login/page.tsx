@@ -19,6 +19,8 @@ function LoginContent() {
     const reason = searchParams.get('reason');
     if (reason === 'unauthenticated') {
       showToast('Acceso restringido. Inicia sesión con tus credenciales de personal.', 'lock');
+    } else if (reason === 'session_closed') {
+      showToast('Tu sesión se cerró al cerrar el navegador. Vuelve a iniciar sesión.', 'logout');
     } else if (reason === 'change_password') {
       showToast('Antes de continuar, elige una contraseña nueva.', 'key');
     } else if (reason === 'unauthorized' || searchParams.get('denied')) {

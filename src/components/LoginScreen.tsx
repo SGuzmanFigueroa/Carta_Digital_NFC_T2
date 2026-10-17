@@ -29,6 +29,40 @@ const DEMO_ROLES = [
 ] as const;
 const SHOW_DEMO_LOGIN = process.env.NEXT_PUBLIC_DEMO_LOGIN_ENABLED !== 'false';
 
+/**
+ * Bloqueo por intentos fallidos. Lo decide el servidor (5 fallos = 15 min por
+ * usuario); aquí solo se recuerda hasta cuándo, para mostrar la cuenta
+ * regresiva aunque se recargue la página. Se guarda por usuario: en una
+ * terminal compartida, el bloqueo de uno no impide entrar a otro.
+ */
+const LOGIN_LOCK_KEY = 'gastropulse_login_lock';
+type LoginLock = { identifier: string; until: number };
+
+function readLoginLock(): LoginLock | null {
+  try {
+    const raw = sessionStorage.getItem(LOGIN_LOCK_KEY);
+    const lock = raw ? (JSON.parse(raw) as LoginLock) : null;
+    return lock && lock.until > Date.now() ? lock : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveLoginLock(lock: LoginLock | null) {
+  try {
+    if (lock) sessionStorage.setItem(LOGIN_LOCK_KEY, JSON.stringify(lock));
+    else sessionStorage.removeItem(LOGIN_LOCK_KEY);
+  } catch {}
+}
+
+const normalizeIdentifier = (value: string) => value.trim().toLowerCase();
+
+function formatCountdown(totalSeconds: number): string {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
+}
+
 export const LoginScreen: React.FC<LoginScreenProps> = ({
   onLoginSuccess,
   onExploreAsGuest,
@@ -43,6 +77,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   const [usernameOrEmail, setUsernameOrEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  // Desmarcado: la sesión se cierra al cerrar el navegador (equipos compartidos).
+  const [rememberMe, setRememberMe] = useState(true);
+  // Bloqueo vigente tras recargar (sessionStorage). Solo se muestra si el usuario
+  // escrito coincide, así el primer render es igual en servidor y navegador.
+  const [loginLock, setLoginLock] = useState<LoginLock | null>(() =>
+    typeof window === 'undefined' ? null : readLoginLock()
+  );
+  const [now, setNow] = useState(() => Date.now());
   const [errorMessage, setErrorMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showRecoverModal, setShowRecoverModal] = useState(false);
@@ -51,6 +93,27 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   const [pendingUser, setPendingUser] = useState<AuthUser | null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+
+  // Cuenta regresiva: un tick por segundo mientras haya bloqueo.
+  useEffect(() => {
+    if (!loginLock) return;
+    const timer = setInterval(() => {
+      const current = Date.now();
+      setNow(current);
+      if (current >= loginLock.until) {
+        setLoginLock(null);
+        saveLoginLock(null);
+        setErrorMessage('');
+      }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [loginLock]);
+
+  // El bloqueo aplica al usuario que lo provocó, no a cualquiera que use la terminal.
+  const lockSeconds =
+    loginLock && loginLock.identifier === normalizeIdentifier(usernameOrEmail)
+      ? Math.max(0, Math.ceil((loginLock.until - now) / 1000))
+      : 0;
 
   useEffect(() => {
     if (!forcePasswordChange) return;
@@ -85,7 +148,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
   const handleCredentialsLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isLoading) return;
+    if (isLoading || lockSeconds > 0) return;
     setErrorMessage('');
 
     const identifier = sanitizeText(usernameOrEmail, 120);
@@ -95,10 +158,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     }
 
     setIsLoading(true);
-    const result = await loginStaff(identifier, password);
+    const result = await loginStaff(identifier, password, rememberMe);
     setIsLoading(false);
 
     if (!result.ok) {
+      if (result.retryAfterSeconds) {
+        const lock = { identifier: normalizeIdentifier(identifier), until: Date.now() + result.retryAfterSeconds * 1000 };
+        setNow(Date.now());
+        setLoginLock(lock);
+        saveLoginLock(lock);
+      }
       // El servidor limita los intentos por usuario e IP y responde un mensaje genérico.
       AuditLogger.log({ eventType: 'LOGIN_FAILED', severity: 'WARN', details: 'Inicio de sesión rechazado' });
       kitchenAudio.playAllergyWarning();
@@ -115,6 +184,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       details: 'Inicio de sesión con Supabase Auth'
     });
     setPassword('');
+    setLoginLock(null);
+    saveLoginLock(null);
 
     if (result.mustChangePassword) {
       setPendingUser(result.user);
@@ -300,7 +371,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               <form onSubmit={handleCredentialsLogin} className="space-y-4">
                 <div>
                   <label htmlFor="login-username" className="block text-[12px] font-medium text-[#c6c5cf] mb-1.5">
-                    Usuario
+                    Usuario o correo
                   </label>
                   <div className="relative">
                     <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#c6c5cf] material-symbols-outlined text-[18px]">
@@ -312,7 +383,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                       required
                       autoComplete="username"
                       autoCapitalize="none"
-                      placeholder="ej. garzon_sofia"
+                      placeholder="ej. garzon_sofia o sofia@correo.com"
                       value={usernameOrEmail}
                       onChange={(e) => setUsernameOrEmail(e.target.value)}
                       className="w-full bg-[#0e0e10] text-[#e5e1e4] pl-10 pr-3.5 py-2.5 rounded-xl border border-[#353437] focus:border-[#ff5708] focus:outline-none focus:ring-1 focus:ring-[#ff5708] transition-all text-[13px]"
@@ -359,12 +430,44 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   </div>
                 </div>
 
+                <div className="pt-1">
+                  <label className="flex items-center gap-2 text-[12px] text-[#c6c5cf] cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      className="w-4 h-4 rounded accent-[#ff5708]"
+                    />
+                    <span>Recordar sesión en este terminal</span>
+                  </label>
+                  {!rememberMe && (
+                    <p className="mt-1 pl-6 text-[11px] text-[#c6c5cf]/80">
+                      La sesión se cerrará al cerrar el navegador. Úsalo en equipos compartidos.
+                    </p>
+                  )}
+                </div>
+
+                {lockSeconds > 0 && (
+                  <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-500/60 text-amber-200 text-[12px] flex items-center gap-2" role="status" aria-live="polite">
+                    <span className="material-symbols-outlined text-amber-400 text-[18px]">timer</span>
+                    <span>
+                      Demasiados intentos para este usuario. Podrás volver a intentarlo en{' '}
+                      <strong className="font-label-code text-amber-100">{formatCountdown(lockSeconds)}</strong>.
+                    </span>
+                  </div>
+                )}
+
                 <button
                   type="submit"
-                  disabled={isLoading}
-                  className="w-full py-3 px-4 rounded-xl bg-[#ff5708] hover:bg-[#ff6922] text-[#511500] font-bold text-[14px] transition-all shadow-[0_0_20px_rgba(255,87,8,0.3)] active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                  disabled={isLoading || lockSeconds > 0}
+                  className="w-full py-3 px-4 rounded-xl bg-[#ff5708] hover:bg-[#ff6922] text-[#511500] font-bold text-[14px] transition-all shadow-[0_0_20px_rgba(255,87,8,0.3)] active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  {isLoading ? (
+                  {lockSeconds > 0 ? (
+                    <>
+                      <span className="material-symbols-outlined text-[19px]">lock_clock</span>
+                      <span>Bloqueado · {formatCountdown(lockSeconds)}</span>
+                    </>
+                  ) : isLoading ? (
                     <>
                       <span className="w-4 h-4 border-2 border-[#511500] border-t-transparent rounded-full animate-spin" />
                       <span>Validando credenciales...</span>

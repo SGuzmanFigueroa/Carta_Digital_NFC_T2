@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
+import { SESSION_ALIVE_COOKIE, SESSION_EPHEMERAL_COOKIE, isEphemeralSessionExpired } from '@/utils/sessionPersistence';
 
 const STAFF_ROLES = ['admin', 'kitchen', 'floor', 'bar', 'runner'];
 
@@ -12,6 +13,19 @@ const STAFF_ROLES = ['admin', 'kitchen', 'floor', 'bar', 'runner'];
  */
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // "Recordar sesión" desmarcado y el navegador se cerró: la sesión se termina
+  // aquí, en el servidor, aunque las cookies de Supabase sigan guardadas.
+  if (isEphemeralSessionExpired(request.cookies)) {
+    const closed = redirectToLogin(request, pathname, 'session_closed');
+    request.cookies.getAll().forEach(({ name }) => {
+      if (name.startsWith('sb-') || name === SESSION_EPHEMERAL_COOKIE || name === SESSION_ALIVE_COOKIE) {
+        closed.cookies.delete(name);
+      }
+    });
+    return closed;
+  }
+
   let response = NextResponse.next({ request });
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;

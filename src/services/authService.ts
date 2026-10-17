@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { AuthUser, StaffMember, RolePermissionItem, StaffAuditLogItem, PermissionState } from '@/types';
 import { cacheAuthProfile, clearAuthProfile } from '@/utils/security';
+import { clearSessionChoice, isBrowserSessionExpired, rememberSessionChoice } from '@/utils/sessionPersistence';
 
 // ==========================================
 // Sesión del personal (Supabase Auth)
@@ -71,6 +72,11 @@ async function postJson(url: string, body: unknown, method = 'POST'): Promise<{ 
 
 /** Perfil del colaborador con sesión activa (o null si no hay sesión válida). */
 export async function loadCurrentStaffUser(): Promise<AuthUser | null> {
+  // "Recordar sesión" desmarcado y el navegador se cerró: la sesión termina aquí.
+  if (isBrowserSessionExpired()) {
+    await logoutStaff();
+    return null;
+  }
   const { data: claimsData } = await supabase.auth.getClaims();
   const userId = claimsData?.claims?.sub;
   if (!userId) {
@@ -86,18 +92,19 @@ export async function loadCurrentStaffUser(): Promise<AuthUser | null> {
 
 export type LoginResult =
   | { ok: true; user: AuthUser; mustChangePassword: boolean }
-  | { ok: false; error: string };
+  | { ok: false; error: string; /** Bloqueo por intentos: segundos que faltan. */ retryAfterSeconds?: number };
 
-export function loginStaff(identifier: string, password: string): Promise<LoginResult> {
-  return openStaffSession('/api/auth/login', { identifier, password });
+/** `remember=false`: la sesión se cierra al cerrar el navegador. */
+export function loginStaff(identifier: string, password: string, remember = true): Promise<LoginResult> {
+  return openStaffSession('/api/auth/login', { identifier, password }, remember);
 }
 
 /** ⚠️ Solo etapa de desarrollo: entra con la cuenta demo del rol (ver /api/auth/demo-login). */
 export function loginDemo(role: 'admin' | 'kitchen' | 'floor' | 'bar'): Promise<LoginResult> {
-  return openStaffSession('/api/auth/demo-login', { role });
+  return openStaffSession('/api/auth/demo-login', { role }, true);
 }
 
-async function openStaffSession(url: string, body: unknown): Promise<LoginResult> {
+async function openStaffSession(url: string, body: unknown, remember: boolean): Promise<LoginResult> {
   purgeLegacyStaffCache();
   let result: { ok: boolean; data: Record<string, unknown> };
   try {
@@ -106,12 +113,18 @@ async function openStaffSession(url: string, body: unknown): Promise<LoginResult
     return { ok: false, error: 'Sin conexión con el servidor. Revisa tu red e inténtalo de nuevo.' };
   }
   if (!result.ok) {
-    return { ok: false, error: (result.data.error as string) || 'No se pudo iniciar sesión.' };
+    const retryAfter = Number(result.data.retryAfter);
+    return {
+      ok: false,
+      error: (result.data.error as string) || 'No se pudo iniciar sesión.',
+      retryAfterSeconds: Number.isFinite(retryAfter) && retryAfter > 0 ? Math.ceil(retryAfter) : undefined
+    };
   }
 
   const session = result.data.session as { access_token: string; refresh_token: string };
   const { error } = await supabase.auth.setSession(session);
   if (error) return { ok: false, error: 'No se pudo guardar la sesión en este dispositivo.' };
+  rememberSessionChoice(remember);
 
   const user = await loadCurrentStaffUser();
   if (!user) {
@@ -123,6 +136,7 @@ async function openStaffSession(url: string, body: unknown): Promise<LoginResult
 
 export async function logoutStaff(): Promise<void> {
   clearAuthProfile();
+  clearSessionChoice();
   purgeLegacyStaffCache();
   await supabase.auth.signOut().catch(() => undefined);
 }
