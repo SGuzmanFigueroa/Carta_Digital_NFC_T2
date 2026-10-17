@@ -60,6 +60,21 @@ export const OrdersCentral: React.FC<OrdersCentralProps> = ({
   const paseListo = filteredOrders.filter((o) => o.status === 'pase-listo' && orderPaymentStatus(o) === 'pending');
   const closedOrDining = filteredOrders.filter(o => o.status === 'entregado' || orderPaymentStatus(o) === 'paid');
 
+  // Pagos Yape/Plin por verificar, agrupados por mesa. Van en una franja propia
+  // porque el comensal puede pedir la cuenta en cualquier estado del pedido.
+  const pendingPayments = Object.values(
+    orders
+      .filter((o) => o.paymentVerification === 'pending_verification')
+      .reduce<Record<string, { table: string; total: number; references: Set<string>; count: number }>>((acc, o) => {
+        const key = o.table.replace(/\D/g, '') || o.table;
+        acc[key] ??= { table: o.table, total: 0, references: new Set(), count: 0 };
+        acc[key].total += o.total;
+        acc[key].count += 1;
+        if (o.paymentReference) acc[key].references.add(o.paymentReference);
+        return acc;
+      }, {})
+  );
+
   // Contadores por partida / estación para feedback operacional en vivo
   const activeOrders = orders.filter((o) =>
     orderPaymentStatus(o) === 'pending' && (o.status === 'por-validar' || o.status === 'en-cocina' || o.status === 'pase-listo')
@@ -232,6 +247,50 @@ export const OrdersCentral: React.FC<OrdersCentralProps> = ({
       {paymentHistoryLoading && <p role="status" className="text-[12px] text-[#c6c5cf] mb-3">Cargando cuentas cobradas…</p>}
       {paymentHistoryError && <p role="status" className="text-[12px] text-[#ffb59c] mb-3">No se pudo actualizar el historial de cobros. Las comandas activas siguen disponibles.</p>}
       {filteredOrders.length === 0 && <p role="status" className="text-[13px] text-[#c6c5cf] mb-4">No hay comandas que coincidan con estos filtros.</p>}
+
+      {pendingPayments.length > 0 && (
+        <section aria-label="Pagos por verificar" className="mb-4 p-3 rounded-xl border border-amber-500/60 bg-amber-950/30">
+          <div className="flex items-center gap-2 mb-2 text-amber-200 text-[13px] font-bold">
+            <span className="material-symbols-outlined text-[18px] text-amber-400">hourglass_top</span>
+            <span>PAGOS POR VERIFICAR ({pendingPayments.length})</span>
+            <span className="font-normal text-[11px] text-amber-100/80">Revisa en la app de Yape/Plin que llegó el dinero antes de confirmar.</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
+            {pendingPayments.map((payment) => (
+              <div key={payment.table} className="p-2.5 rounded-lg bg-[#1c1b1d] border border-amber-500/40 flex flex-col gap-2" role="status">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-[15px] font-bold text-[#e5e1e4]">{payment.table}</span>
+                  <span className="font-label-code text-[15px] font-bold text-[#ff5708]">S/ {payment.total.toFixed(2)}</span>
+                </div>
+                <span className="text-[11px] text-[#c6c5cf]">
+                  {payment.references.size > 0
+                    ? <>Operación: <strong className="font-label-code text-[#e5e1e4]">{[...payment.references].join(', ')}</strong></>
+                    : 'Sin código de operación: pide el voucher'}
+                  {payment.count > 1 && ` · ${payment.count} pedidos`}
+                </span>
+                {onReviewPayment && (
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => void onReviewPayment(payment.table, true)}
+                      className="py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white text-[12px] font-bold cursor-pointer"
+                    >
+                      Confirmar recibido
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void onReviewPayment(payment.table, false)}
+                      className="py-1.5 rounded-md bg-[#2a2a2c] hover:bg-[#353437] text-red-300 text-[12px] font-bold cursor-pointer border border-red-500/40"
+                    >
+                      No llegó
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Main Kanban Grid + ESC/POS Inspector */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
@@ -551,39 +610,9 @@ export const OrdersCentral: React.FC<OrdersCentralProps> = ({
                         </span>
                       </div>
                       {ticket.paymentVerification === 'pending_verification' && (
-                        <div className="mt-1.5 p-2 rounded-lg border border-amber-500/60 bg-amber-950/40 space-y-2" role="status">
-                          <div className="flex items-center gap-1.5 text-amber-200 text-[12px] font-bold">
-                            <span className="material-symbols-outlined text-[16px] text-amber-400">hourglass_top</span>
-                            <span>PAGO POR VERIFICAR</span>
-                          </div>
-                          <p className="text-[11px] text-amber-100/90 leading-snug">
-                            Revisa en tu app de Yape/Plin que llegó el pago
-                            {ticket.paymentReference ? <> con la operación <strong className="font-label-code">{ticket.paymentReference}</strong></> : ' (sin código: pide el voucher)'}.
-                          </p>
-                          {onReviewPayment && (
-                            <div className="grid grid-cols-2 gap-1.5">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  void onReviewPayment(ticket.table, true);
-                                }}
-                                className="py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold cursor-pointer"
-                              >
-                                Confirmar recibido
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  void onReviewPayment(ticket.table, false);
-                                }}
-                                className="py-1.5 rounded-md bg-[#2a2a2c] hover:bg-[#353437] text-red-300 text-[11px] font-bold cursor-pointer border border-red-500/40"
-                              >
-                                No llegó
-                              </button>
-                            </div>
-                          )}
+                        <div className="mt-1 flex items-center gap-1.5 text-amber-300 text-[11px] font-bold">
+                          <span className="material-symbols-outlined text-[15px]">hourglass_top</span>
+                          <span>Pago por verificar (arriba)</span>
                         </div>
                       )}
                       {ticket.paymentVerification === 'verified' && (
