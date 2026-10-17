@@ -1,116 +1,169 @@
 import { supabase } from '@/lib/supabase';
 import { AuthUser, StaffMember, RolePermissionItem, StaffAuditLogItem, PermissionState } from '@/types';
+import { cacheAuthProfile, clearAuthProfile } from '@/utils/security';
 
-export async function loginStaffWithPin(pin: string): Promise<AuthUser | null> {
+// ==========================================
+// Sesión del personal (Supabase Auth)
+// ==========================================
+// El login pasa por /api/auth/login (límite de intentos en el servidor). La
+// sesión vive en cookies de Supabase (@supabase/ssr) y el rol viaja firmado en
+// el JWT (app_metadata.staff_role); el proxy y RLS confían en eso, no en la UI.
+
+/** Columnas públicas de staff (las sensibles ya no existen o viven en `private`). */
+const STAFF_COLUMNS =
+  'id, name, username, role, role_title, status, station, avatar_url, email, custom_permissions, created_at, auth_user_id, must_change_password';
+
+type StaffRow = {
+  id: string;
+  name: string;
+  username: string;
+  role: string;
+  role_title: string | null;
+  status: string | null;
+  station: string | null;
+  avatar_url: string | null;
+  email: string | null;
+  custom_permissions: unknown;
+  must_change_password: boolean;
+};
+
+const LEGACY_STAFF_CACHE_KEY = 'gastropulse_staff_list_v1';
+
+/** Versiones anteriores guardaban la lista de personal con PIN y contraseñas en claro. */
+function purgeLegacyStaffCache() {
+  if (typeof window === 'undefined') return;
   try {
-    const { data, error } = await supabase
-      .from('staff')
-      .select('*')
-      .eq('pin', pin.trim())
-      .limit(1)
-      .maybeSingle();
+    localStorage.removeItem(LEGACY_STAFF_CACHE_KEY);
+  } catch {}
+}
 
-    if (error || !data) {
-      return null;
-    }
+function toAuthUser(row: StaffRow): AuthUser {
+  return {
+    id: row.id,
+    name: row.name,
+    username: row.username,
+    email: row.email || '',
+    role: (row.role?.toLowerCase().trim() as AuthUser['role']) || 'floor',
+    roleTitle: row.role_title || 'Personal GastroPulse',
+    pin: '',
+    assignment: row.station || 'General',
+    terminal: 'TPV-01 (Principal)',
+    loginTime: new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
+  };
+}
 
-    const authUser: AuthUser = {
-      id: data.id,
-      name: data.name,
-      username: data.username,
-      email: `${data.username}@aureabistro.pe`,
-      role: (data.role?.toLowerCase().trim() as AuthUser['role']) || 'kitchen',
-      roleTitle: data.role_title || 'Personal GastroPulse',
-      pin: data.pin,
-      assignment: data.station || 'General',
-      terminal: 'TPV-01 (Principal)',
-      loginTime: new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
-    };
+/** Bearer token de la sesión actual para las rutas /api protegidas. */
+async function authHeaders(): Promise<Record<string, string>> {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
-    return authUser;
-  } catch (err) {
-    console.error('Error logging in with PIN:', err);
+async function postJson(url: string, body: unknown, method = 'POST'): Promise<{ ok: boolean; data: Record<string, unknown> }> {
+  const response = await fetch(url, {
+    method,
+    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+    body: body === undefined ? undefined : JSON.stringify(body)
+  });
+  const data = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+  return { ok: response.ok, data };
+}
+
+/** Perfil del colaborador con sesión activa (o null si no hay sesión válida). */
+export async function loadCurrentStaffUser(): Promise<AuthUser | null> {
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const userId = claimsData?.claims?.sub;
+  if (!userId) {
+    clearAuthProfile();
     return null;
   }
+  const { data, error } = await supabase.from('staff').select(STAFF_COLUMNS).eq('auth_user_id', userId).maybeSingle();
+  if (error || !data) return null;
+  const user = toAuthUser(data as StaffRow);
+  cacheAuthProfile(user);
+  return user;
 }
 
-export async function loginStaffWithCredentials(
-  userOrEmail: string,
-  plainPassword: string
-): Promise<{ success: boolean; user?: AuthUser; error?: string }> {
+export type LoginResult =
+  | { ok: true; user: AuthUser; mustChangePassword: boolean }
+  | { ok: false; error: string };
+
+export async function loginStaff(identifier: string, password: string): Promise<LoginResult> {
+  purgeLegacyStaffCache();
+  let result: { ok: boolean; data: Record<string, unknown> };
   try {
-    const clean = userOrEmail.trim().toLowerCase();
-    const { data, error } = await supabase
-      .from('staff')
-      .select('*')
-      .or(`email.ilike.${clean},username.ilike.${clean},name.ilike.${clean}`)
-      .limit(1)
-      .maybeSingle();
+    result = await postJson('/api/auth/login', { identifier, password });
+  } catch {
+    return { ok: false, error: 'Sin conexión con el servidor. Revisa tu red e inténtalo de nuevo.' };
+  }
+  if (!result.ok) {
+    return { ok: false, error: (result.data.error as string) || 'No se pudo iniciar sesión.' };
+  }
 
-    if (error) {
-      console.warn('[AuthService] Error querying staff in Supabase:', error.message);
-      return { success: false, error: 'Error de conexión con la base de datos de autenticación.' };
-    }
+  const session = result.data.session as { access_token: string; refresh_token: string };
+  const { error } = await supabase.auth.setSession(session);
+  if (error) return { ok: false, error: 'No se pudo guardar la sesión en este dispositivo.' };
 
-    if (!data) {
-      return { success: false, error: 'Usuario o correo no encontrado en el sistema.' };
-    }
+  const user = await loadCurrentStaffUser();
+  if (!user) {
+    await supabase.auth.signOut();
+    return { ok: false, error: 'Tu cuenta no está vinculada a un colaborador. Contacta al administrador.' };
+  }
+  return { ok: true, user, mustChangePassword: result.data.mustChangePassword === true };
+}
 
-    if (['inactivo', 'inactive', 'disabled', 'desactivado', 'suspended'].includes(data.status?.trim().toLowerCase() || '')) {
-      return { success: false, error: 'Cuenta inactiva. Por favor contacta al administrador del restaurante.' };
-    }
+export async function logoutStaff(): Promise<void> {
+  clearAuthProfile();
+  purgeLegacyStaffCache();
+  await supabase.auth.signOut().catch(() => undefined);
+}
 
-    const staffRecord = data as any;
-    const isValidPass = (staffRecord.password && staffRecord.password === plainPassword) || (data.pin && data.pin === plainPassword);
-    if (!isValidPass) {
-      return { success: false, error: 'Contraseña o credenciales incorrectas.' };
-    }
-
-    const authUser: AuthUser = {
-      id: data.id,
-      name: data.name,
-      username: data.username,
-      email: (data as any).email || `${data.username}@aureabistro.pe`,
-      role: (data.role?.toLowerCase().trim() as AuthUser['role']) || 'floor',
-      roleTitle: data.role_title || 'Personal GastroPulse',
-      pin: data.pin || '1234',
-      assignment: data.station || 'Salón Principal',
-      terminal: 'TERM-04',
-      loginTime: new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
-    };
-
-    return { success: true, user: authUser };
-  } catch (err: any) {
-    console.error('Error during staff credentials login:', err);
-    return { success: false, error: 'Error inesperado durante la autenticación.' };
+export async function changeOwnPassword(newPassword: string): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const { ok, data } = await postJson('/api/auth/change-password', { newPassword });
+    if (!ok) return { ok: false, error: (data.error as string) || 'No se pudo cambiar la contraseña.' };
+    // El JWT trae must_change_password: se renueva para que el proxy vea el cambio.
+    await supabase.auth.refreshSession();
+    return { ok: true };
+  } catch {
+    return { ok: false, error: 'Sin conexión con el servidor.' };
   }
 }
 
+export type PinCheck = { ok: boolean; reason?: 'wrong_pin' | 'locked' | 'no_pin'; remaining?: number; lockedUntil?: string };
+
+/** Desbloqueo de terminal: el servidor compara el PIN (bcrypt) y bloquea tras 5 fallos. */
+export async function verifyMyPin(pin: string): Promise<PinCheck> {
+  const { data, error } = await supabase.rpc('verify_my_pin', { p_pin: pin });
+  if (error) throw error;
+  const result = data as { ok: boolean; reason?: PinCheck['reason']; remaining?: number; locked_until?: string };
+  return { ok: result.ok, reason: result.reason, remaining: result.remaining, lockedUntil: result.locked_until };
+}
+
+// ==========================================
+// Gestión de personal (admin → /api/staff)
+// ==========================================
+
 export async function fetchStaffFromDb(): Promise<StaffMember[]> {
+  purgeLegacyStaffCache();
   try {
-    const { data, error } = await supabase
-      .from('staff')
-      .select('*')
-      .order('created_at', { ascending: true });
+    const { data, error } = await supabase.from('staff').select(STAFF_COLUMNS).order('created_at', { ascending: true });
+    if (error || !data) return [];
 
-    if (error || !data || data.length === 0) return [];
-
-    return data.map((s: any) => ({
+    return (data as StaffRow[]).map((s) => ({
       id: s.id,
       name: s.name,
       initials: s.name.charAt(0).toUpperCase(),
       username: s.username,
       role: s.role,
       roleTitle: s.role_title || undefined,
-      pin: s.pin,
       status: s.status || 'Activo',
       station: s.station || undefined,
       assignment: s.station || 'Salón Principal',
       permissions: s.custom_permissions ? 'Permisos Personalizados' : 'Acceso Estándar TPV & Comandas',
       avatarUrl: s.avatar_url || undefined,
-      email: s.email || `${s.username}@aureabistro.pe`,
-      customPermissions: s.custom_permissions || undefined,
-      password: s.password || s.pin || '1234'
+      email: s.email || undefined,
+      customPermissions: (s.custom_permissions as StaffMember['customPermissions']) || undefined
     }));
   } catch (err) {
     console.error('Error fetching staff from DB:', err);
@@ -118,211 +171,51 @@ export async function fetchStaffFromDb(): Promise<StaffMember[]> {
   }
 }
 
-export async function createStaffMemberInDb(staff: StaffMember): Promise<boolean> {
+/** Lista de personal (solo con sesión de staff; RLS la oculta al público). */
+export const getPersistedStaffList = fetchStaffFromDb;
+
+function staffPayload(staff: Partial<StaffMember>) {
+  return {
+    name: staff.name,
+    username: staff.username,
+    role: staff.role,
+    roleTitle: staff.roleTitle,
+    station: staff.assignment || staff.station,
+    status: staff.status,
+    email: staff.email,
+    avatarUrl: staff.avatarUrl,
+    customPermissions: staff.customPermissions,
+    // Solo de escritura: vacíos = no cambiar. Nunca se leen de vuelta.
+    pin: staff.pin || undefined,
+    password: staff.password || undefined
+  };
+}
+
+export type StaffMutationResult = { ok: boolean; error?: string };
+
+async function mutateStaff(url: string, method: string, body?: unknown): Promise<StaffMutationResult> {
   try {
-    const basePayload = {
-      name: staff.name,
-      username: staff.username || staff.name.toLowerCase().replace(/\s+/g, '.'),
-      role: staff.role as any,
-      role_title: staff.roleTitle || 'Personal GastroPulse',
-      pin: staff.pin || '1234',
-      status: staff.status || 'Activo',
-      station: staff.assignment || staff.station || 'General',
-      avatar_url: staff.avatarUrl || null
-    };
-
-    let { error } = await supabase
-      .from('staff')
-      .insert({
-        ...basePayload,
-        email: staff.email || null,
-        custom_permissions: staff.customPermissions || null,
-        password: staff.password || staff.pin || null
-      } as any);
-
-    if (error && (error as any).code === 'PGRST204') {
-      const retryNoPass = await supabase
-        .from('staff')
-        .insert({
-          ...basePayload,
-          email: staff.email || null,
-          custom_permissions: staff.customPermissions || null
-        } as any);
-      error = retryNoPass.error;
-    }
-
-    if (error && (error as any).code === 'PGRST204') {
-      const fallbackRes = await supabase
-        .from('staff')
-        .insert(basePayload as any);
-      error = fallbackRes.error;
-    }
-
-    if (error) {
-      console.error('Error inserting staff to Supabase:', error);
-      return false;
-    }
-    return true;
-  } catch (err) {
-    console.error('Error in createStaffMemberInDb:', err);
-    return false;
+    const { ok, data } = await postJson(url, body, method);
+    return ok ? { ok: true } : { ok: false, error: (data.error as string) || 'No se pudo guardar el cambio.' };
+  } catch {
+    return { ok: false, error: 'Sin conexión con el servidor.' };
   }
 }
 
-export async function updateStaffStatusInDb(staffId: string, status: string): Promise<boolean> {
-  try {
-    const { error } = await supabase
-      .from('staff')
-      .update({ status })
-      .eq('id', staffId);
-
-    return !error;
-  } catch (err) {
-    console.error('Error updating staff status in DB:', err);
-    return false;
-  }
+export function createStaffMemberInDb(staff: StaffMember): Promise<StaffMutationResult> {
+  return mutateStaff('/api/staff', 'POST', staffPayload(staff));
 }
 
-
-export async function updateStaffMemberInDb(staff: StaffMember): Promise<boolean> {
-  try {
-    const basePayload = {
-      name: staff.name,
-      username: staff.username,
-      role: staff.role as any,
-      role_title: staff.roleTitle,
-      pin: staff.pin,
-      status: staff.status,
-      station: staff.assignment || staff.station
-    };
-
-    let { error } = await supabase
-      .from('staff')
-      .update({
-        ...basePayload,
-        email: staff.email,
-        custom_permissions: staff.customPermissions,
-        password: staff.password
-      } as any)
-      .eq('id', staff.id);
-
-    if (error && (error as any).code === 'PGRST204') {
-      const retryRes = await supabase
-        .from('staff')
-        .update({
-          ...basePayload,
-          email: staff.email,
-          custom_permissions: staff.customPermissions
-        } as any)
-        .eq('id', staff.id);
-      error = retryRes.error;
-
-      if (error && (error as any).code === 'PGRST204') {
-        const fallbackRes = await supabase
-          .from('staff')
-          .update(basePayload as any)
-          .eq('id', staff.id);
-        error = fallbackRes.error;
-      }
-    }
-
-    return !error;
-  } catch (err) {
-    console.error('Error updating staff member in DB:', err);
-    return false;
-  }
+export function updateStaffMemberInDb(staff: StaffMember): Promise<StaffMutationResult> {
+  return mutateStaff(`/api/staff/${encodeURIComponent(staff.id)}`, 'PATCH', staffPayload(staff));
 }
 
-export async function deleteStaffMemberFromDb(staffId: string): Promise<boolean> {
-  try {
-    const { error } = await supabase
-      .from('staff')
-      .delete()
-      .eq('id', staffId);
-
-    return !error;
-  } catch (err) {
-    console.error('Error deleting staff member from DB:', err);
-    return false;
-  }
+export function updateStaffStatusInDb(staffId: string, status: string): Promise<StaffMutationResult> {
+  return mutateStaff(`/api/staff/${encodeURIComponent(staffId)}`, 'PATCH', { status });
 }
 
-const STORAGE_KEY_STAFF = 'gastropulse_staff_list_v1';
-
-export async function getPersistedStaffList(): Promise<StaffMember[]> {
-  try {
-    let localSaved: StaffMember[] = [];
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(STORAGE_KEY_STAFF);
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            localSaved = parsed;
-          }
-        } catch {}
-      }
-    }
-
-    const dbStaff = await fetchStaffFromDb();
-    if (dbStaff && dbStaff.length > 0) {
-      const mergedStaff: StaffMember[] = dbStaff.map((dbMember): StaffMember => {
-        const localMatch = localSaved.find(
-          (loc) => loc.id === dbMember.id || loc.username === dbMember.username
-        );
-        const res: StaffMember = {
-          ...dbMember
-        };
-        if (localMatch?.email || dbMember.email) {
-          res.email = localMatch?.email || dbMember.email;
-        }
-        if (localMatch?.customPermissions || dbMember.customPermissions) {
-          res.customPermissions = localMatch?.customPermissions || dbMember.customPermissions;
-        }
-        if (localMatch?.password || dbMember.password) {
-          res.password = localMatch?.password || dbMember.password;
-        } else {
-          res.password = res.pin;
-        }
-        return res;
-      });
-
-      localSaved.forEach((loc) => {
-        if (!mergedStaff.some((m) => m.id === loc.id || m.username === loc.username)) {
-          mergedStaff.push(loc);
-        }
-      });
-
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(STORAGE_KEY_STAFF, JSON.stringify(mergedStaff));
-      }
-      return mergedStaff;
-    }
-
-    if (localSaved.length > 0) {
-      return localSaved;
-    }
-  } catch (err) {
-    console.warn('Error loading staff list:', err);
-  }
-
-  if (typeof window !== 'undefined') {
-    const { INITIAL_STAFF } = await import('@/data/mockData');
-    localStorage.setItem(STORAGE_KEY_STAFF, JSON.stringify(INITIAL_STAFF));
-    return INITIAL_STAFF;
-  }
-  const { INITIAL_STAFF } = await import('@/data/mockData');
-  return INITIAL_STAFF;
-}
-
-export function saveStaffListToLocalStorage(staffList: StaffMember[]) {
-  if (typeof window !== 'undefined') {
-    try {
-      localStorage.setItem(STORAGE_KEY_STAFF, JSON.stringify(staffList));
-    } catch (e) {
-      console.warn('Storage save error:', e);
-    }
-  }
+export function deleteStaffMemberFromDb(staffId: string): Promise<StaffMutationResult> {
+  return mutateStaff(`/api/staff/${encodeURIComponent(staffId)}`, 'DELETE');
 }
 
 export const DEFAULT_ROLE_PERMISSIONS: RolePermissionItem[] = [
@@ -522,16 +415,3 @@ export async function createAuditLogInDb(
   }
 }
 
-export async function sendPasswordResetEmail(email: string): Promise<{ success: boolean; error?: string }> {
-  try {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${typeof window !== 'undefined' ? window.location.origin : ''}/reset-password`,
-    });
-    if (error) throw error;
-    return { success: true };
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'No se pudo enviar el correo de recuperación.';
-    console.error('Error enviando correo de recuperación:', message);
-    return { success: false, error: message };
-  }
-}

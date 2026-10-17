@@ -370,11 +370,14 @@ export type Database = {
       }
       staff: {
         Row: {
+          auth_user_id: string | null
           avatar_url: string | null
           created_at: string | null
+          custom_permissions: Json | null
+          email: string | null
           id: string
+          must_change_password: boolean
           name: string
-          pin: string
           role: string
           role_title: string | null
           station: string | null
@@ -382,11 +385,14 @@ export type Database = {
           username: string
         }
         Insert: {
+          auth_user_id?: string | null
           avatar_url?: string | null
           created_at?: string | null
+          custom_permissions?: Json | null
+          email?: string | null
           id?: string
+          must_change_password?: boolean
           name: string
-          pin: string
           role: string
           role_title?: string | null
           station?: string | null
@@ -394,11 +400,14 @@ export type Database = {
           username: string
         }
         Update: {
+          auth_user_id?: string | null
           avatar_url?: string | null
           created_at?: string | null
+          custom_permissions?: Json | null
+          email?: string | null
           id?: string
+          must_change_password?: boolean
           name?: string
-          pin?: string
           role?: string
           role_title?: string | null
           station?: string | null
@@ -520,6 +529,22 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_set_staff_pin: {
+        Args: { p_staff_id: string; p_pin: string }
+        Returns: undefined
+      }
+      login_retry_after: {
+        Args: { p_identifier: string; p_ip: string }
+        Returns: number
+      }
+      record_login_attempt: {
+        Args: { p_identifier: string; p_ip: string; p_success: boolean }
+        Returns: undefined
+      }
+      verify_my_pin: {
+        Args: { p_pin: string }
+        Returns: Json
+      }
       place_order: {
         Args: {
           p_table_number: string

@@ -30,14 +30,13 @@ import {
   normalizeWaiterCallReason,
   parseWaiterCallRow
 } from '@/services/waiterCallService';
-import { loginStaffWithPin } from '@/services/authService';
+import { loadCurrentStaffUser, logoutStaff, verifyMyPin } from '@/services/authService';
 import {
   sanitizeText,
   sanitizeNotes,
   validateTableString,
   AuditLogger,
   AuditLogEntry,
-  clearAuthSessionCookie,
   readAuthSession,
   AUTH_SESSION_CHANGE_EVENT
 } from '../utils/security';
@@ -89,7 +88,8 @@ interface RestaurantContextType {
   createNewKdsTicket: (ticket: Ticket) => Promise<boolean>;
   logoutUser: () => void;
   lockTerminal: () => void;
-  unlockTerminalWithPin: (pin: string) => boolean;
+  /** El servidor valida el PIN (bcrypt) y lo bloquea tras 5 fallos. */
+  unlockTerminalWithPin: (pin: string) => Promise<boolean>;
   logSecurityEvent: (entry: Omit<AuditLogEntry, 'id' | 'timestamp' | 'isoDate'>) => AuditLogEntry;
   updateOrderStatus: (orderId: string, newStatus: OrderTicket['status']) => Promise<void>;
   addOrderNote: (orderId: string, note: string) => void;
@@ -395,13 +395,10 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
     [currentUser]
   );
 
-  const logoutUser = useCallback(() => {
+  const logoutUser = useCallback(async () => {
     setCurrentUser(null);
     setIsTerminalLocked(false);
-    clearAuthSessionCookie();
-    try {
-      localStorage.removeItem(STORAGE_KEY_AUTH);
-    } catch {}
+    await logoutStaff();
     if (typeof window !== 'undefined') {
       window.location.href = '/login';
     }
@@ -420,9 +417,16 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
   }, [currentUser]);
 
   const unlockTerminalWithPin = useCallback(
-    (pin: string): boolean => {
-      const targetPin = currentUser?.pin || '1234';
-      if (pin === targetPin) {
+    async (pin: string): Promise<boolean> => {
+      let check: Awaited<ReturnType<typeof verifyMyPin>>;
+      try {
+        check = await verifyMyPin(pin);
+      } catch {
+        setQuickUnlockError('No se pudo validar el PIN. Revisa la conexión.');
+        setQuickUnlockPin('');
+        return false;
+      }
+      if (check.ok) {
         setIsTerminalLocked(false);
         setQuickUnlockPin('');
         setQuickUnlockError('');
@@ -436,7 +440,13 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
         return true;
       } else {
         kitchenAudio.playAllergyWarning();
-        setQuickUnlockError('PIN incorrecto');
+        setQuickUnlockError(
+          check.reason === 'locked'
+            ? 'PIN bloqueado por 5 minutos. Cierra sesión y entra con tu contraseña.'
+            : check.reason === 'no_pin'
+            ? 'No tienes PIN configurado. Pide al administrador que te asigne uno.'
+            : `PIN incorrecto. Te quedan ${check.remaining ?? 0} intentos.`
+        );
         setQuickUnlockPin('');
         AuditLogger.log({
           eventType: 'LOGIN_FAILED',
@@ -673,12 +683,32 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
       const savedDiner = localStorage.getItem(STORAGE_KEY_DINER);
       if (savedDiner) setDinerActiveTicket(JSON.parse(savedDiner));
 
-      // Restaura la sesión activa desde localStorage (rememberMe habilitado) o, en su
-      // defecto, desde la cookie de sesión que ya validó el proxy de rutas.
+      // Perfil en caché para pintar sin parpadeo; abajo se confirma con Supabase Auth.
       setCurrentUser(readAuthSession());
     } catch (err) {
       console.warn('Error loading GastroPulse state from storage:', err);
     }
+  }, []);
+
+  // La sesión real es la de Supabase Auth: confirma (o descarta) el perfil en
+  // caché y reacciona si la sesión se cierra o vence en cualquier pestaña.
+  useEffect(() => {
+    let cancelled = false;
+    loadCurrentStaffUser()
+      .then((user) => {
+        if (!cancelled) setCurrentUser(user);
+      })
+      .catch(() => undefined);
+    const { data } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') {
+        setCurrentUser(null);
+        setIsTerminalLocked(false);
+      }
+    });
+    return () => {
+      cancelled = true;
+      data.subscription.unsubscribe();
+    };
   }, []);
 
   // Sincronización reactiva de la sesión: login, logout, cambio de usuario o

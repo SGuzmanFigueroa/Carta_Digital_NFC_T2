@@ -29,7 +29,6 @@ export interface AuditLogEntry {
 }
 
 const STORAGE_KEY_AUDIT = 'gastropulse_security_audit_v1';
-const AUTH_COOKIE_NAME = 'gastropulse_session';
 
 /**
  * Strips script tags, malicious HTML, and escapes dangerous characters
@@ -144,7 +143,7 @@ export class AuditLogger {
 export const OFFICIAL_ROLES = ['admin', 'kitchen', 'floor', 'bar', 'runner'] as const;
 export type OfficialRole = (typeof OFFICIAL_ROLES)[number];
 
-/** Clave de la sesión persistida (rememberMe) compartida con el contexto global. */
+/** Clave del caché de perfil del colaborador (solo presentación). */
 export const STORAGE_KEY_AUTH_USER = 'gastropulse_auth_user';
 
 /**
@@ -153,12 +152,6 @@ export const STORAGE_KEY_AUTH_USER = 'gastropulse_auth_user';
  * en vivo al rol activo sin depender de una recarga completa de la aplicación.
  */
 export const AUTH_SESSION_CHANGE_EVENT = 'gastropulse:auth-session-changed';
-
-/**
- * Subconjunto de la sesión persistido en la cookie. Nunca incluye el PIN,
- * que permanece únicamente en memoria durante la sesión activa.
- */
-export type AuthSessionPayload = Partial<Omit<AuthUser, 'pin' | 'email'>>;
 
 /** Alias legados o provenientes de base de datos que otorgan permisos de administración. */
 const ADMIN_ROLE_ALIASES: ReadonlySet<string> = new Set([
@@ -231,96 +224,46 @@ function emitAuthSessionChange(user: AuthUser | null): void {
 }
 
 /**
- * Fuente única de verdad para restaurar la sesión activa del terminal:
- * 1. Cookie de sesión: refleja el último inicio de sesión (la valida el proxy de
- *    rutas protegidas) y descarta cualquier recuerdo obsoleto de otro usuario.
- * 2. Sesión recordada en localStorage (opción "Recordarme"), siempre que pertenezca al
- *    mismo usuario que la cookie o que la cookie ya no exista.
+ * Perfil del colaborador para pintar la interfaz sin parpadeo al recargar.
+ * Es solo un caché de presentación: la autorización real la deciden el JWT de
+ * Supabase (proxy) y RLS. Nunca contiene PIN ni contraseña.
  */
 export function readAuthSession(): AuthUser | null {
   if (typeof window === 'undefined') return null;
-
-  // La cookie representa la sesión más reciente del terminal (se reescribe en cada
-  // inicio de sesión), por lo que se lee primero para poder detectar sesiones obsoletas.
-  const cookieSession = getAuthSessionCookie();
-  const cookieUser = cookieSession ? buildAuthUser(cookieSession) : null;
-
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY_AUTH_USER);
-    if (raw) {
-      const remembered = buildAuthUser(JSON.parse(raw) as Partial<AuthUser>);
-      // Se prefiere la sesión recordada sólo si pertenece al mismo usuario que la cookie.
-      // Así no se resucita el rol de un usuario anterior cuando el último inicio de
-      // sesión del terminal se realizó sin la opción "Recordarme".
-      if (remembered && (!cookieUser || remembered.id === cookieUser.id)) {
-        return remembered;
-      }
-    }
-  } catch {
-    // Sesión persistida corrupta o inaccesible: se continúa con la cookie
-  }
-
-  return cookieUser;
-}
-
-// ==========================================
-// Auth Cookie Persistence
-// ==========================================
-
-export function setAuthSessionCookie(user: AuthUser): void {
-  if (typeof document === 'undefined') return;
-  const session = buildAuthUser(user);
-  if (!session) return;
-
-  // El rol se canonicaliza antes de persistirse: el proxy de rutas y la interfaz
-  // comparan siempre el mismo valor normalizado ("Admin" => "admin").
-  const payload = encodeURIComponent(
-    JSON.stringify({
-      id: session.id,
-      name: session.name,
-      username: session.username,
-      role: session.role,
-      roleTitle: session.roleTitle,
-      assignment: session.assignment,
-      terminal: session.terminal,
-      loginTime: session.loginTime,
-    } as AuthSessionPayload)
-  );
-  // SameSite=Lax, Secure session cookie valid for 8 hours
-  const maxAge = 8 * 60 * 60;
-  document.cookie = `${AUTH_COOKIE_NAME}=${payload}; path=/; max-age=${maxAge}; SameSite=Lax`;
-
-  // Notifica en vivo a los consumidores de sesión (React) para que apliquen el nuevo
-  // rol inmediatamente, sin esperar a una recarga de página.
-  emitAuthSessionChange(session);
-}
-
-export function clearAuthSessionCookie(): void {
-  if (typeof document === 'undefined') return;
-  document.cookie = `${AUTH_COOKIE_NAME}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`;
-
-  try {
-    window.localStorage.removeItem(STORAGE_KEY_AUTH_USER);
-  } catch {
-    // localStorage inaccesible (modo privado / permisos): la cookie ya quedó limpia
-  }
-
-  // Propaga el cierre de sesión a la UI en vivo (Header / contexto global)
-  emitAuthSessionChange(null);
-}
-
-export function getAuthSessionCookie(): AuthSessionPayload | null {
-  if (typeof document === 'undefined') return null;
-  const match = document.cookie
-    .split('; ')
-    .find((row) => row.startsWith(`${AUTH_COOKIE_NAME}=`));
-  if (!match) return null;
-  
-  try {
-    // slice en lugar de split: preserva payloads URL-encoded que contienen "="
-    const value = match.slice(match.indexOf('=') + 1);
-    return JSON.parse(decodeURIComponent(value));
+    return raw ? buildAuthUser({ ...(JSON.parse(raw) as Partial<AuthUser>), pin: '' }) : null;
   } catch {
     return null;
   }
+}
+
+/** Cookie de sesión anterior (JSON sin firmar, editable por cualquiera). Ya no se usa. */
+const LEGACY_AUTH_COOKIE_NAME = 'gastropulse_session';
+
+function clearLegacyAuthCookie(): void {
+  if (typeof document === 'undefined') return;
+  document.cookie = `${LEGACY_AUTH_COOKIE_NAME}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`;
+}
+
+export function cacheAuthProfile(user: AuthUser): void {
+  const session = buildAuthUser({ ...user, pin: '' });
+  if (!session) return;
+  clearLegacyAuthCookie();
+  try {
+    window.localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(session));
+  } catch {
+    // localStorage inaccesible: la UI se reconstruye desde la sesión de Supabase
+  }
+  // Notifica en vivo a los consumidores (React) el colaborador activo.
+  emitAuthSessionChange(session);
+}
+
+export function clearAuthProfile(): void {
+  if (typeof window === 'undefined') return;
+  clearLegacyAuthCookie();
+  try {
+    window.localStorage.removeItem(STORAGE_KEY_AUTH_USER);
+  } catch {}
+  emitAuthSessionChange(null);
 }

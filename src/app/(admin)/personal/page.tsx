@@ -3,12 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import { StaffManagement } from '@/components/StaffManagement';
 import { Header } from '@/components/Header';
-import { INITIAL_STAFF } from '@/data/mockData';
 import { StaffMember } from '@/types';
 import { useRouter } from 'next/navigation';
 import {
   getPersistedStaffList,
-  saveStaffListToLocalStorage,
   createStaffMemberInDb,
   updateStaffMemberInDb,
   deleteStaffMemberFromDb,
@@ -17,7 +15,7 @@ import {
 
 export default function PersonalPage() {
   const router = useRouter();
-  const [staffList, setStaffList] = useState<StaffMember[]>(INITIAL_STAFF);
+  const [staffList, setStaffList] = useState<StaffMember[]>([]);
   const [toast, setToast] = useState<{ message: string; icon?: string } | null>(null);
 
   const showToast = (message: string, icon = 'info') => {
@@ -25,36 +23,40 @@ export default function PersonalPage() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  // Carga persistente inicial desde Supabase y localStorage
-  useEffect(() => {
+  // La lista viene de Supabase (RLS: solo personal con sesión). Tras cada cambio
+  // se vuelve a leer para mostrar lo que realmente quedó guardado.
+  const reloadStaff = () =>
     getPersistedStaffList()
-      .then((list) => {
-        if (list && list.length > 0) {
-          setStaffList(list);
-        }
-      })
+      .then(setStaffList)
       .catch(console.warn);
+
+  useEffect(() => {
+    reloadStaff();
   }, []);
 
   const handleAddStaff = async (newStaff: StaffMember) => {
-    const updated = [...staffList, newStaff];
-    setStaffList(updated);
-    saveStaffListToLocalStorage(updated);
-    await createStaffMemberInDb(newStaff);
+    const result = await createStaffMemberInDb(newStaff);
+    if (!result.ok) {
+      showToast(result.error || 'No se pudo registrar al colaborador', 'error');
+      return;
+    }
+    await reloadStaff();
     await createAuditLogInDb(
       'Nuevo Colaborador Registrado',
       newStaff.name,
       `Rol: ${newStaff.role}, Asignación: ${newStaff.assignment}`,
       'info'
     );
-    showToast(`Colaborador ${newStaff.name} guardado con éxito`, 'person_add');
+    showToast(`${newStaff.name} registrado. Su contraseña es temporal: deberá cambiarla al entrar.`, 'person_add');
   };
 
   const handleUpdateStaff = async (updatedStaff: StaffMember) => {
-    const updated = staffList.map((st) => (st.id === updatedStaff.id ? updatedStaff : st));
-    setStaffList(updated);
-    saveStaffListToLocalStorage(updated);
-    await updateStaffMemberInDb(updatedStaff);
+    const result = await updateStaffMemberInDb(updatedStaff);
+    if (!result.ok) {
+      showToast(result.error || 'No se pudo actualizar al colaborador', 'error');
+      return;
+    }
+    await reloadStaff();
     await createAuditLogInDb(
       'Actualización de Colaborador',
       updatedStaff.name,
@@ -66,10 +68,12 @@ export default function PersonalPage() {
 
   const handleDeleteStaff = async (staffId: string) => {
     const target = staffList.find((s) => s.id === staffId);
-    const updated = staffList.filter((st) => st.id !== staffId);
-    setStaffList(updated);
-    saveStaffListToLocalStorage(updated);
-    await deleteStaffMemberFromDb(staffId);
+    const result = await deleteStaffMemberFromDb(staffId);
+    if (!result.ok) {
+      showToast(result.error || 'No se pudo eliminar al colaborador', 'error');
+      return;
+    }
+    await reloadStaff();
     if (target) {
       await createAuditLogInDb(
         'Colaborador Dado de Baja',

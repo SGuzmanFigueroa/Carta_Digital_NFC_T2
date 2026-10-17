@@ -3,23 +3,12 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { LoginScreen } from '@/components/LoginScreen';
-import { INITIAL_STAFF } from '@/data/mockData';
-import { AuthUser, StaffMember } from '@/types';
-import { getPersistedStaffList } from '@/services/authService';
+import { AuthUser } from '@/types';
 
 function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [toast, setToast] = useState<{ message: string; icon?: string } | null>(null);
-  const [staffList, setStaffList] = useState<StaffMember[]>(INITIAL_STAFF);
-
-  useEffect(() => {
-    getPersistedStaffList().then((list) => {
-      if (list && list.length > 0) {
-        setStaffList(list);
-      }
-    }).catch(console.warn);
-  }, []);
 
   const showToast = (message: string, icon = 'info') => {
     setToast({ message, icon });
@@ -30,6 +19,8 @@ function LoginContent() {
     const reason = searchParams.get('reason');
     if (reason === 'unauthenticated') {
       showToast('Acceso restringido. Inicia sesión con tus credenciales de personal.', 'lock');
+    } else if (reason === 'change_password') {
+      showToast('Antes de continuar, elige una contraseña nueva.', 'key');
     } else if (reason === 'unauthorized' || searchParams.get('denied')) {
       showToast('Tu rol actual no tiene permisos para el panel ejecutivo.', 'security');
     }
@@ -51,7 +42,7 @@ function LoginContent() {
   return (
     <div className="relative min-h-screen bg-[#0e0e10]">
       <LoginScreen
-        staffList={staffList}
+        forcePasswordChange={searchParams.get('reason') === 'change_password'}
         onLoginSuccess={handleLoginSuccess}
         onExploreAsGuest={handleExploreAsGuest}
         onShowToast={showToast}

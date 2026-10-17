@@ -43,14 +43,23 @@ INSERT INTO public.restaurant_tables (id, number, capacity, pax, zone, status, w
 ON CONFLICT (id) DO UPDATE SET number = EXCLUDED.number;
 
 -- Personal y Roles
-INSERT INTO public.staff (name, username, role, role_title, pin, status, station) VALUES
-('Carlos Mendoza', 'admin', 'admin', 'Administrador General', '8080', 'Activo', 'Gerencia & Caja'),
-('Kenji Takahashi', 'chef_kenji', 'kitchen', 'Jefe Ejecutivo de Cocina', '1042', 'En Cocina KDS', 'Wok & Pase'),
-('Sofía Valdivia', 'garzon_sofia', 'floor', 'Capitana de Salón', '2045', 'En Turno Activo', 'Salón Central'),
-('Diego Salas', 'garzon_diego', 'floor', 'Mesero Senior', '2046', 'En Turno Activo', 'Terraza'),
-('Mateo Rivas', 'runner_mateo', 'runner', 'Runner Pase Central', '3012', 'Libre en Pase', 'Pase Despacho'),
-('Lucas Alarcón', 'bar_lucas', 'bar', 'Head Bartender', '4099', 'En Turno Activo', 'Barra Mixología')
-ON CONFLICT (username) DO UPDATE SET pin = EXCLUDED.pin, role = EXCLUDED.role;
+-- Sin contraseñas: las cuentas de Supabase Auth se crean con
+-- `node scripts/provision-staff-auth.mjs` (contraseña temporal por colaborador).
+INSERT INTO public.staff (name, username, role, role_title, status, station) VALUES
+('Carlos Mendoza', 'admin', 'admin', 'Administrador General', 'Activo', 'Gerencia & Caja'),
+('Kenji Takahashi', 'chef_kenji', 'kitchen', 'Jefe Ejecutivo de Cocina', 'En Cocina KDS', 'Wok & Pase'),
+('Sofía Valdivia', 'garzon_sofia', 'floor', 'Capitana de Salón', 'En Turno Activo', 'Salón Central'),
+('Diego Salas', 'garzon_diego', 'floor', 'Mesero Senior', 'En Turno Activo', 'Terraza'),
+('Mateo Rivas', 'runner_mateo', 'runner', 'Runner Pase Central', 'Libre en Pase', 'Pase Despacho'),
+('Lucas Alarcón', 'bar_lucas', 'bar', 'Head Bartender', 'En Turno Activo', 'Barra Mixología')
+ON CONFLICT (username) DO UPDATE SET role = EXCLUDED.role;
+
+-- PIN de desbloqueo de terminal (se guardan con bcrypt en private.staff_pins).
+SELECT public.admin_set_staff_pin(s.id, p.pin)
+FROM public.staff AS s
+JOIN (VALUES ('admin', '8080'), ('chef_kenji', '1042'), ('garzon_sofia', '2045'),
+             ('garzon_diego', '2046'), ('runner_mateo', '3012'), ('bar_lucas', '4099')) AS p(username, pin)
+  ON p.username = s.username;
 
 -- Configuración del sistema
 INSERT INTO public.system_config (id, branch_name, branch_ruc, manager_name, email, phone)

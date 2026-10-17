@@ -20,7 +20,6 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
   onShowToast,
 }) => {
   const [activeTab, setActiveTab] = useState<'all' | 'admin' | 'kitchen' | 'floor' | 'bar'>('all');
-  const [revealedPins, setRevealedPins] = useState<{ [id: string]: boolean }>({});
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [openMenuStaffId, setOpenMenuStaffId] = useState<string | null>(null);
 
@@ -86,14 +85,10 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
   const [newName, setNewName] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [newUsername, setNewUsername] = useState('');
-  const [newPassword, setNewPassword] = useState('pass123');
+  const [newPassword, setNewPassword] = useState('');
   const [newRole, setNewRole] = useState<StaffMember['role']>('floor');
   const [newAssignment, setNewAssignment] = useState('Salón Principal');
   const [newPin, setNewPin] = useState('');
-
-  const togglePinReveal = (id: string) => {
-    setRevealedPins((prev) => ({ ...prev, [id]: !prev[id] }));
-  };
 
   const filteredStaff = staffList.filter((st) => {
     if (activeTab === 'all') return true;
@@ -115,9 +110,23 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
   const handleCreateCollaborator = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName.trim()) return;
+    // PIN y contraseña los guarda hasheados el servidor; no hay valores por defecto.
+    if (!/^[0-9]{4,8}$/.test(newPin.trim())) {
+      onShowToast('El PIN debe tener entre 4 y 8 dígitos', 'warning');
+      return;
+    }
+    if (newPassword.trim().length < 8) {
+      onShowToast('La contraseña temporal debe tener al menos 8 caracteres', 'warning');
+      return;
+    }
 
-    const usernameGenerated = newUsername.trim() || newName.toLowerCase().replace(/\s+/g, '.');
-    const emailGenerated = newEmail.trim() || `${usernameGenerated}@aureabistro.pe`;
+    // Usuario de login: minúsculas sin tildes ni espacios (ej. "María Pérez" → "maria.perez").
+    const usernameGenerated = (newUsername.trim() || newName)
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/\s+/g, '.')
+      .replace(/[^a-z0-9._-]/g, '');
 
     const newMember: StaffMember = {
       id: `st-${Date.now()}`,
@@ -129,10 +138,10 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
       assignment: newAssignment || 'Salón Principal',
       permissions: 'Acceso Estándar TPV & Comandas',
       lastAccess: 'Justo ahora',
-      pin: newPin.trim() || '1234',
+      pin: newPin.trim(),
       username: usernameGenerated,
-      email: emailGenerated,
-      password: newPassword.trim() || newPin.trim() || '1234'
+      email: newEmail.trim() || undefined,
+      password: newPassword.trim()
     };
 
     onAddStaff(newMember);
@@ -141,7 +150,7 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
     setNewEmail('');
     setNewUsername('');
     setNewPin('');
-    setNewPassword('pass123');
+    setNewPassword('');
   };
 
   const handleSaveEditStaff = (e: React.FormEvent) => {
@@ -154,14 +163,22 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
   const handleSavePin = (e: React.FormEvent) => {
     e.preventDefault();
     if (!changingPinStaff || !onUpdateStaff) return;
-    if (newPinValue.length < 4) {
-      onShowToast('El PIN debe tener al menos 4 dígitos numéricos', 'warning');
+    if (newPinValue && !/^[0-9]{4,8}$/.test(newPinValue)) {
+      onShowToast('El PIN debe tener entre 4 y 8 dígitos', 'warning');
+      return;
+    }
+    if (newPasswordValue.trim() && newPasswordValue.trim().length < 8) {
+      onShowToast('La contraseña debe tener al menos 8 caracteres', 'warning');
+      return;
+    }
+    if (!newPinValue && !newPasswordValue.trim()) {
+      onShowToast('Escribe un PIN nuevo, una contraseña nueva o ambos', 'warning');
       return;
     }
     const updated: StaffMember = { 
       ...changingPinStaff, 
-      pin: newPinValue,
-      ...(newPasswordValue.trim() ? { password: newPasswordValue.trim() } : {})
+      pin: newPinValue || undefined,
+      password: newPasswordValue.trim() || undefined
     };
     onUpdateStaff(updated);
     setChangingPinStaff(null);
@@ -272,7 +289,6 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
       {/* Staff Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredStaff.map((staff) => {
-          const isRevealed = revealedPins[staff.id];
           const isMenuOpen = openMenuStaffId === staff.id;
 
           return (
@@ -331,18 +347,11 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
                 <div className="flex items-center gap-1.5">
                   <span className="text-[11px] text-[#c6c5cf] font-label-code">PIN TPV:</span>
                   <span className="font-label-code text-[13px] font-bold text-[#e5e1e4] tracking-widest">
-                    {isRevealed ? staff.pin : '••••'}
+                    ••••
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => togglePinReveal(staff.id)}
-                    className="p-1 rounded text-[#c6c5cf] hover:text-[#ff5708] transition-colors cursor-pointer"
-                    title={isRevealed ? 'Ocultar PIN' : 'Ver PIN'}
-                  >
-                    <span className="material-symbols-outlined text-[15px]">
-                      {isRevealed ? 'visibility_off' : 'visibility'}
-                    </span>
-                  </button>
+                  <span className="material-symbols-outlined text-[15px] text-[#c6c5cf]" title="El PIN se guarda cifrado: nadie puede verlo, solo cambiarlo">
+                    lock
+                  </span>
                 </div>
 
                 <div className="flex items-center gap-1.5">
@@ -382,7 +391,7 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
                         <button
                           type="button"
                           onClick={() => {
-                            setEditingStaff({ ...staff, password: staff.password || staff.pin || '' });
+                            setEditingStaff({ ...staff, pin: '', password: '' });
                             setOpenMenuStaffId(null);
                           }}
                           className="px-3 py-2 text-left hover:bg-[#27272a] text-[#e5e1e4] flex items-center gap-2 cursor-pointer"
@@ -395,8 +404,8 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
                           type="button"
                           onClick={() => {
                             setChangingPinStaff(staff);
-                            setNewPinValue(staff.pin || '');
-                            setNewPasswordValue(staff.password || staff.pin || '');
+                            setNewPinValue('');
+                            setNewPasswordValue('');
                             setOpenMenuStaffId(null);
                           }}
                           className="px-3 py-2 text-left hover:bg-[#27272a] text-[#e5e1e4] flex items-center gap-2 cursor-pointer"
@@ -508,10 +517,10 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-bold text-[#c6c5cf] uppercase mb-1">PIN TPV (4 dígitos) *</label>
+                  <label className="block text-[11px] font-bold text-[#c6c5cf] uppercase mb-1">PIN de desbloqueo (4-8 dígitos) *</label>
                   <input
                     type="password"
-                    maxLength={6}
+                    maxLength={8}
                     placeholder="1234"
                     required
                     value={newPin}
@@ -543,10 +552,12 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-[#c6c5cf] uppercase mb-1">Contraseña Login</label>
+                  <label className="block text-[11px] font-bold text-[#c6c5cf] uppercase mb-1">Contraseña temporal *</label>
                   <input
                     type="text"
-                    placeholder="Opcional (o usa el PIN)"
+                    required
+                    minLength={8}
+                    placeholder="Mín. 8 caracteres; la cambiará al entrar"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     className="w-full px-3 py-2 rounded-lg bg-[#141416] border border-[#2d2e38] text-white text-[12px] focus:border-[#ff5708] focus:outline-none"
@@ -654,20 +665,21 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-bold text-[#c6c5cf] uppercase mb-1">PIN TPV (4 dígitos)</label>
+                  <label className="block text-[11px] font-bold text-[#c6c5cf] uppercase mb-1">PIN nuevo (opcional)</label>
                   <input
-                    type="text"
-                    maxLength={6}
+                    type="password"
+                    maxLength={8}
+                    placeholder="Vacío = no cambiar"
                     value={editingStaff.pin || ''}
                     onChange={(e) => setEditingStaff({ ...editingStaff, pin: e.target.value.replace(/\D/g, '') })}
                     className="w-full px-3 py-2 rounded-lg bg-[#141416] border border-[#2d2e38] text-white font-mono text-center tracking-widest text-[14px] focus:border-[#ff5708] focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-[#c6c5cf] uppercase mb-1">Contraseña Login</label>
+                  <label className="block text-[11px] font-bold text-[#c6c5cf] uppercase mb-1">Contraseña temporal (opcional)</label>
                   <input
                     type="text"
-                    placeholder="Clave de acceso"
+                    placeholder="Vacío = no cambiar"
                     value={editingStaff.password || ''}
                     onChange={(e) => setEditingStaff({ ...editingStaff, password: e.target.value })}
                     className="w-full px-3 py-2 rounded-lg bg-[#141416] border border-[#2d2e38] text-white text-[12px] focus:border-[#ff5708] focus:outline-none"
@@ -724,12 +736,11 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
 
             <form onSubmit={handleSavePin} className="space-y-4 text-left">
               <div>
-                <label className="block text-[11px] font-bold text-[#c6c5cf] uppercase mb-1">Nuevo PIN TPV (4 dígitos)</label>
+                <label className="block text-[11px] font-bold text-[#c6c5cf] uppercase mb-1">Nuevo PIN (4-8 dígitos, opcional)</label>
                 <input
                   type="password"
-                  maxLength={6}
-                  required
-                  placeholder="Nuevo PIN"
+                  maxLength={8}
+                  placeholder="Vacío = no cambiar"
                   value={newPinValue}
                   onChange={(e) => setNewPinValue(e.target.value.replace(/\D/g, ''))}
                   className="w-full text-center py-2 px-3 rounded-xl bg-[#141416] border border-[#353437] text-white font-mono text-[18px] tracking-[0.3em] font-bold focus:border-[#ff5708] focus:outline-none"
@@ -738,10 +749,10 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-[#c6c5cf] uppercase mb-1">Nueva Contraseña Web (Opcional)</label>
+                <label className="block text-[11px] font-bold text-[#c6c5cf] uppercase mb-1">Contraseña temporal (opcional)</label>
                 <input
                   type="text"
-                  placeholder="Dejar vacío para usar el PIN"
+                  placeholder="Vacío = no cambiar; la cambiará al entrar"
                   value={newPasswordValue}
                   onChange={(e) => setNewPasswordValue(e.target.value)}
                   className="w-full py-2 px-3 rounded-xl bg-[#141416] border border-[#353437] text-white text-[13px] focus:border-[#ff5708] focus:outline-none"

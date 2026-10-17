@@ -48,3 +48,6 @@ CLAUDE.md
 
 # Raw design exports and temp dumps
 figma_exports/
+
+# Contraseñas temporales que genera scripts/provision-staff-auth.mjs
+*.local.txt
