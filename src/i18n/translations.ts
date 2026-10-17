@@ -352,6 +352,8 @@ export const es = {
   // ── Avisos (toasts) del comensal ────────────────────────────────────────────
   'toast.added': 'Agregado: {dish}',
   'toast.orderSent': '¡Comanda enviada a Cocina KDS desde {table}!',
+  'toast.orderRejected': 'No se pudo enviar el pedido: {reason}',
+  'toast.queuedOrderRejected': 'Un pedido guardado sin conexión no se pudo enviar: {reason}',
   'toast.tableSet': 'Mesa configurada: {table}',
   'toast.tableLinked': 'Mesa vinculada automáticamente por QR: {table}',
   'toast.promoApplied': 'Oferta aplicada: {dish} a {price} (-{percent}%)',
@@ -714,6 +716,8 @@ export const en: Record<TranslationKey, string> = {
   // ── Diner toasts ────────────────────────────────────────────────────────────
   'toast.added': 'Added: {dish}',
   'toast.orderSent': 'Order sent to the KDS kitchen from {table}!',
+  'toast.orderRejected': 'Your order could not be sent: {reason}',
+  'toast.queuedOrderRejected': 'An order saved while offline could not be sent: {reason}',
   'toast.tableSet': 'Table set: {table}',
   'toast.tableLinked': 'Table automatically linked via QR: {table}',
   'toast.promoApplied': 'Deal applied: {dish} at {price} (-{percent}%)',

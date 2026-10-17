@@ -1,6 +1,5 @@
-import { queuePendingOrder } from './offlineSyncService';
-﻿import { supabase } from '@/lib/supabase';
-import { OrderTicket, OrderItem, MenuItem } from '@/types';
+import { supabase } from '@/lib/supabase';
+import { OrderTicket, OrderItem, MenuItem, StationId } from '@/types';
 import { isTemporaryPairingItem } from '@/features/menu/pairing';
 import { updateTableStateInDb } from './tableService';
 import type { Database } from '@/types/database.types';
@@ -90,121 +89,122 @@ export async function fetchOrdersFromDb(options: { paymentStatus?: 'paid'; throw
   }
 }
 
-export async function createOrderInDb(
-  tableNumber: string,
-  cartItems: { item: MenuItem; quantity: number; notes?: string }[],
-  pax: number = 2,
-  customOrderId?: string,
-  skipQueue: boolean = false
-): Promise<OrderTicket | null> {
-  try {
-    const orderId = customOrderId || `cmd-${Math.floor(100 + Math.random() * 899)}`;
-    const subtotal = cartItems.reduce((acc, c) => acc + c.item.price * c.quantity, 0);
-    const total = subtotal;
+export type PlaceOrderItem = {
+  dishId?: string;
+  /** Maridaje sugerido que no existe en la carta; el servidor le pone su precio. */
+  pairingName?: string;
+  quantity: number;
+  notes?: string;
+  /** Solo enruta el plato en cocina; nunca afecta al precio. */
+  station?: StationId;
+};
 
-    // 1. Insert order
-    const { error: orderError } = await supabase
-      .from('orders')
-      .insert({
-        id: orderId,
-        table_number: tableNumber,
-        pax: pax,
-        origin: 'QR COMENSAL',
-        status: 'por-validar',
-        subtotal: subtotal,
-        total: total
-      });
+export type PlaceOrderInput = {
+  tableNumber: string;
+  items: PlaceOrderItem[];
+  /** Misma clave en cada reintento: el servidor no duplica la comanda. */
+  idempotencyKey: string;
+  pax?: number;
+  origin?: 'QR COMENSAL' | 'GARZÓN';
+  waiter?: string;
+};
 
-    if (orderError) {
-      console.warn('[OfflineSync] No se pudo guardar en Supabase (offline o red). Encolando localmente:', orderError.message);
-      if (!skipQueue) {
-        queuePendingOrder(tableNumber, cartItems, pax, orderId);
-      }
-      // Retornar ticket local para que la UI no se quede bloqueada
-      return {
-        id: orderId,
-        table: tableNumber,
-        pax: pax,
-        timeAgo: 'En cola offline',
-        createdTime: new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }),
-        origin: 'QR COMENSAL',
-        status: 'por-validar',
-        isCritical: false,
-        preparationPercent: 0,
-        items: cartItems.map((c, idx) => ({
-          id: `it-off-${Date.now()}-${idx}`,
-          name: c.item.name,
-          quantity: c.quantity,
-          price: c.item.price,
-          notes: c.notes,
-          station: 'wok_saute'
-        })),
-        subtotal: subtotal,
-        total: total
-      };
-    }
+export type PlacedOrder = {
+  id: string;
+  orderNumber: number;
+  table: string;
+  status: OrderTicket['status'];
+  subtotal: number;
+  total: number;
+  /** `price` es el precio unitario de la carta. */
+  items: (OrderItem & { dishId?: string })[];
+};
 
-    // 2. Insert order items
-    const itemsToInsert = cartItems.map((c) => ({
-      order_id: orderId,
-      dish_id:
-        c.item.id &&
-        !c.item.id.startsWith('cat-') &&
-        !isTemporaryPairingItem(c.item)
-          ? c.item.id
-          : null,
-      name: c.item.name,
-      quantity: c.quantity,
-      price: c.item.price,
-      notes: c.notes || null,
-      station: c.item.category === 'fondos' ? 'wok_saute' : c.item.category === 'entradas' ? 'frio_nikkei' : c.item.category === 'bebidas' ? 'barra_mixologia' : 'pasteleria',
-      item_status: 'pendiente' as const,
-      checked: false
-    }));
-
-    const { data: insertedItems, error: itemsError } = await supabase
-      .from('order_items')
-      .insert(itemsToInsert)
-      .select();
-
-    if (itemsError) {
-      console.error('Error inserting order items to Supabase:', itemsError);
-    }
-
-    // 3. Update table in DB
-    await updateTableStateInDb(tableNumber, {
-      status: 'qr',
-      amount: total,
-      pax: pax
-    });
-
-    const newTicket: OrderTicket = {
-      id: orderId,
-      table: tableNumber,
-      pax: pax,
-      timeAgo: 'Justo ahora',
-      createdTime: new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }),
-      origin: 'QR COMENSAL',
-      status: 'por-validar',
-      isCritical: false,
-      preparationPercent: 10,
-      items: (insertedItems || []).map((it) => ({
-        id: it.id,
-        name: it.name,
-        quantity: it.quantity,
-        price: Number(it.price),
-        notes: it.notes || undefined,
-        station: it.station || 'wok_saute'
-      })),
-      subtotal: subtotal,
-      total: total
-    };
-
-    return newTicket;
-  } catch (err) {
-    console.error('Error in createOrderInDb:', err);
-    return null;
+/** El servidor rechazó el pedido (plato retirado, límite, datos inválidos). Reintentar no sirve. */
+export class OrderRejectedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'OrderRejectedError';
   }
+}
+
+export function toPlaceOrderItems(
+  cartItems: { item: MenuItem; quantity: number; notes?: string }[]
+): PlaceOrderItem[] {
+  return cartItems.map(({ item, quantity, notes }) => ({
+    ...(isTemporaryPairingItem(item) ? { pairingName: item.name } : { dishId: item.id }),
+    quantity,
+    notes: notes?.trim() || undefined
+  }));
+}
+
+type PlaceOrderRow = {
+  id: string;
+  order_number: number;
+  table_number: string;
+  status: string;
+  subtotal: number | string;
+  total: number | string;
+  items: {
+    id: string;
+    dish_id: string | null;
+    name: string;
+    quantity: number;
+    price: number | string;
+    notes: string | null;
+    station: string | null;
+  }[];
+};
+
+/**
+ * Crea la comanda en una sola transacción (RPC `place_order`). El precio, el
+ * nombre y el número de comanda los decide la base de datos.
+ *
+ * Lanza `OrderRejectedError` si el servidor respondió que no (no reintentar) y
+ * un `Error` normal si no hubo respuesta (sin red): ese caso va a la cola offline.
+ */
+export async function placeOrderInDb(input: PlaceOrderInput): Promise<PlacedOrder> {
+  const { data, error } = await supabase.rpc('place_order', {
+    p_table_number: input.tableNumber,
+    p_items: input.items.map((item) => ({
+      dish_id: item.dishId,
+      pairing_name: item.pairingName,
+      quantity: item.quantity,
+      notes: item.notes,
+      station: item.station
+    })),
+    p_idempotency_key: input.idempotencyKey,
+    p_pax: input.pax ?? 2,
+    p_origin: input.origin ?? 'QR COMENSAL',
+    p_waiter: input.waiter
+  });
+
+  if (error) {
+    // Sin código = la petición no llegó (offline, DNS, timeout del navegador).
+    if (!error.code) throw new Error(error.message || 'Sin conexión con el servidor de pedidos.');
+    if (error.code === '22023') throw new OrderRejectedError(error.message);
+    console.error('[orders] place_order rechazado:', error.code, error.message);
+    throw new OrderRejectedError('No se pudo registrar el pedido. Avisa al personal del restaurante.');
+  }
+
+  const row = data as unknown as PlaceOrderRow;
+  return {
+    id: row.id,
+    orderNumber: Number(row.order_number),
+    table: row.table_number,
+    status: row.status as OrderTicket['status'],
+    subtotal: Number(row.subtotal),
+    total: Number(row.total),
+    items: row.items.map((item) => ({
+      id: item.id,
+      dishId: item.dish_id ?? undefined,
+      name: item.name,
+      quantity: item.quantity,
+      price: Number(item.price),
+      notes: item.notes ?? undefined,
+      station: item.station ?? undefined
+    }))
+  };
 }
 
 export async function updateOrderStatusInDb(orderId: string, status: OrderTicket['status']): Promise<boolean> {

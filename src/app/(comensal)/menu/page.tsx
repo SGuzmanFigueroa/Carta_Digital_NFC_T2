@@ -35,6 +35,7 @@ function MenuOfflineBanner() {
 export default function MenuPage() {
   const {
     sendOrderFromMenu,
+    reconcileQueuedOrder,
     recordTableOrderRound,
     dinerActiveTicket,
     orders,
@@ -75,12 +76,15 @@ export default function MenuPage() {
           showToast(translate(resolveInitialMenuLanguage(), 'toast.offlineMode'), 'wifi_off');
         }
       },
-      // 2. On orders synced
-      (count) => {
-        showToast(
-          translate(resolveInitialMenuLanguage(), 'toast.synced', { count }),
-          'cloud_done'
-        );
+      // 2. Pedidos de la cola confirmados (con número definitivo) o rechazados por el servidor
+      ({ synced, rejected }) => {
+        synced.forEach(({ localId, order }) => reconcileQueuedOrder(localId, order));
+        const language = resolveInitialMenuLanguage();
+        if (rejected.length > 0) {
+          showToast(translate(language, 'toast.queuedOrderRejected', { reason: rejected[0].message }), 'error');
+        } else {
+          showToast(translate(language, 'toast.synced', { count: synced.length }), 'cloud_done');
+        }
       }
     );
 
@@ -103,7 +107,7 @@ export default function MenuPage() {
     return () => {
       cleanupSync();
     };
-  }, [showToast]);
+  }, [showToast, reconcileQueuedOrder]);
 
   const handleAddNewOrder = (newTicket: OrderTicket) => {
     // Handled via sendOrderFromMenu inside QRMenuViewer

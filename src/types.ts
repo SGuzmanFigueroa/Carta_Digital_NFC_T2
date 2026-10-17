@@ -20,6 +20,8 @@ export type ActiveScreen =
 
 export interface TicketItem {
   id: string;
+  /** Id del plato en la carta (public.dishes); el servidor lo usa para fijar el precio. */
+  dishId?: string;
   name: string;
   quantity: number;
   station: StationId;

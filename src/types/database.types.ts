@@ -191,6 +191,7 @@ export type Database = {
           created_at: string | null
           id: string
           is_critical: boolean | null
+          idempotency_key: string | null
           order_number: number
           origin: string | null
           pax: number | null
@@ -209,6 +210,7 @@ export type Database = {
           created_at?: string | null
           id: string
           is_critical?: boolean | null
+          idempotency_key?: string | null
           order_number?: number
           origin?: string | null
           pax?: number | null
@@ -228,6 +230,7 @@ export type Database = {
           id?: string
           is_critical?: boolean | null
           order_number?: number
+          idempotency_key?: string | null
           origin?: string | null
           pax?: number | null
           payment_method?: string | null
@@ -472,7 +475,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      place_order: {
+        Args: {
+          p_table_number: string
+          p_items: Json
+          p_idempotency_key: string
+          p_pax?: number
+          p_origin?: string
+          p_waiter?: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never

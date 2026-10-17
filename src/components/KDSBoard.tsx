@@ -32,7 +32,8 @@ export const KDSBoard: React.FC<KDSBoardProps> = ({
     audioEnabled: contextAudioEnabled,
     toggleAudio: contextToggleAudio,
     waiterCalls: contextWaiterCalls,
-    attendWaiterCall: contextAttendWaiterCall
+    attendWaiterCall: contextAttendWaiterCall,
+    createNewKdsTicket: contextCreateNewKdsTicket
   } = useRestaurant();
 
   const [selectedStation, setSelectedStation] = useState<StationId>('all');
@@ -149,11 +150,8 @@ export const KDSBoard: React.FC<KDSBoardProps> = ({
     contextToggleKitchenPause();
   };
 
-  const handleCreateNewTicket = (newTicket: Ticket) => {
-    onUpdateTickets([newTicket, ...tickets]);
-    kitchenAudio.playDispatchSound();
-    showToast(`Nueva comanda #${newTicket.orderNumber} ingresada en KDS`, 'add_circle');
-  };
+  // El contexto la registra en Supabase (place_order) y la agrega al KDS con su número definitivo.
+  const handleCreateNewTicket = (newTicket: Ticket) => contextCreateNewKdsTicket(newTicket);
 
   const handleCallAllRunners = () => {
     contextCallAllRunners();

@@ -1,11 +1,16 @@
-import { MenuItem, OrderTicket } from '@/types';
-import { createOrderInDb } from './orderService';
+import { MenuItem } from '@/types';
+import {
+  OrderRejectedError,
+  placeOrderInDb,
+  toPlaceOrderItems,
+  type PlacedOrder,
+  type PlaceOrderInput
+} from './orderService';
 
 export interface PendingOrder {
+  /** Id provisional que ve el comensal mientras no hay conexión. */
   id: string;
-  tableNumber: string;
-  cartItems: { item: MenuItem; quantity: number; notes?: string }[];
-  pax: number;
+  input: PlaceOrderInput;
   createdAt: number;
 }
 
@@ -47,36 +52,49 @@ export function getCachedMenuItems(): MenuItem[] | null {
 }
 
 /**
- * Agrega un pedido a la cola de pedidos pendientes de sincronización
+ * Agrega un pedido a la cola de sincronización. `localId` es el id provisional
+ * que ve el comensal; `input.idempotencyKey` garantiza que, aunque el envío se
+ * reintente varias veces, el servidor cree una sola comanda.
  */
-export function queuePendingOrder(
-  tableNumber: string,
-  cartItems: { item: MenuItem; quantity: number; notes?: string }[],
-  pax: number = 2,
-  orderId?: string
-): PendingOrder {
-  const pendingId = orderId || `cmd-${Math.floor(100 + Math.random() * 899)}`;
-  const newPending: PendingOrder = {
-    id: pendingId,
-    tableNumber,
-    cartItems,
-    pax,
-    createdAt: Date.now()
-  };
+export function queuePendingOrder(localId: string, input: PlaceOrderInput): PendingOrder {
+  const newPending: PendingOrder = { id: localId, input, createdAt: Date.now() };
 
   if (typeof window !== 'undefined') {
     try {
-      const currentQueue = getPendingOrders();
-      const filtered = currentQueue.filter((o) => o.id !== pendingId);
-      const updatedQueue = [...filtered, newPending];
+      const updatedQueue = [...getPendingOrders().filter((o) => o.id !== localId), newPending];
       localStorage.setItem(STORAGE_KEY_PENDING_QUEUE, JSON.stringify(updatedQueue));
-      console.log(`[OfflineSync] Pedido ${pendingId} encolado para sincronización cuando haya conexión.`);
     } catch (e) {
       console.warn('[OfflineSync] Error al encolar pedido pendiente:', e);
     }
   }
 
   return newPending;
+}
+
+/** Entrada guardada por versiones anteriores (antes de place_order). */
+type LegacyPendingOrder = {
+  id: string;
+  tableNumber: string;
+  cartItems: { item: MenuItem; quantity: number; notes?: string }[];
+  pax: number;
+  createdAt: number;
+};
+
+function upgradePendingOrder(entry: PendingOrder | LegacyPendingOrder): PendingOrder | null {
+  if ('input' in entry && entry.input?.idempotencyKey) return entry;
+  if ('cartItems' in entry && Array.isArray(entry.cartItems)) {
+    return {
+      id: entry.id,
+      createdAt: entry.createdAt,
+      input: {
+        tableNumber: entry.tableNumber,
+        items: toPlaceOrderItems(entry.cartItems),
+        idempotencyKey: crypto.randomUUID(),
+        pax: entry.pax
+      }
+    };
+  }
+  return null;
 }
 
 /**
@@ -88,7 +106,13 @@ export function getPendingOrders(): PendingOrder[] {
     const raw = localStorage.getItem(STORAGE_KEY_PENDING_QUEUE);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    const upgraded = parsed.map(upgradePendingOrder).filter((o): o is PendingOrder => o !== null);
+    if (upgraded.some((o, i) => o !== parsed[i])) {
+      // Persistir la clave generada para que los reintentos sigan siendo idempotentes.
+      localStorage.setItem(STORAGE_KEY_PENDING_QUEUE, JSON.stringify(upgraded));
+    }
+    return upgraded;
   } catch {
     return [];
   }
@@ -108,44 +132,50 @@ export function removePendingOrder(orderId: string): void {
   }
 }
 
+export type SyncResult = {
+  synced: { localId: string; order: PlacedOrder }[];
+  /** El servidor rechazó estos pedidos (p. ej. un plato retirado): salen de la cola. */
+  rejected: { localId: string; message: string }[];
+  remainingCount: number;
+};
+
+let syncInFlight: Promise<SyncResult> | null = null;
+
 /**
- * Ejecuta la sincronización silenciosa de los pedidos en cola hacia Supabase
+ * Ejecuta la sincronización silenciosa de los pedidos en cola hacia Supabase.
+ * Nunca corre dos veces en paralelo (evento `online` + intervalo).
  */
-export async function syncPendingOrders(): Promise<{ syncedCount: number; remainingCount: number }> {
+export function syncPendingOrders(): Promise<SyncResult> {
+  syncInFlight ??= runSync().finally(() => {
+    syncInFlight = null;
+  });
+  return syncInFlight;
+}
+
+async function runSync(): Promise<SyncResult> {
+  const result: SyncResult = { synced: [], rejected: [], remainingCount: 0 };
   if (typeof window === 'undefined' || !navigator.onLine) {
-    return { syncedCount: 0, remainingCount: getPendingOrders().length };
+    result.remainingCount = getPendingOrders().length;
+    return result;
   }
 
-  const queue = getPendingOrders();
-  if (queue.length === 0) {
-    return { syncedCount: 0, remainingCount: 0 };
-  }
-
-  console.log(`[OfflineSync] Iniciando sincronización silenciosa de ${queue.length} comanda(s) pendiente(s)...`);
-  let synced = 0;
-
-  for (const pending of queue) {
+  for (const pending of getPendingOrders()) {
     try {
-      const result = await createOrderInDb(
-        pending.tableNumber,
-        pending.cartItems,
-        pending.pax,
-        pending.id,
-        true
-      );
-
-      if (result) {
-        removePendingOrder(pending.id);
-        synced++;
-        console.log(`[OfflineSync] Comanda ${pending.id} sincronizada con Supabase exitosamente.`);
-      }
+      const order = await placeOrderInDb(pending.input);
+      removePendingOrder(pending.id);
+      result.synced.push({ localId: pending.id, order });
     } catch (err) {
-      console.warn(`[OfflineSync] Falló intento de sincronizar comanda ${pending.id}:`, err);
+      if (err instanceof OrderRejectedError) {
+        removePendingOrder(pending.id);
+        result.rejected.push({ localId: pending.id, message: err.message });
+      } else {
+        console.warn(`[OfflineSync] Falló intento de sincronizar comanda ${pending.id}:`, err);
+      }
     }
   }
 
-  const remaining = getPendingOrders().length;
-  return { syncedCount: synced, remainingCount: remaining };
+  result.remainingCount = getPendingOrders().length;
+  return result;
 }
 
 /**
@@ -157,49 +187,41 @@ export function isDeviceOnline(): boolean {
 }
 
 /**
- * Configura los eventos de conexión/desconexión y reintento en segundo plano
+ * Configura los eventos de conexión/desconexión y reintento en segundo plano.
+ * `onSyncResult` recibe las comandas que el servidor confirmó (con su número
+ * definitivo) y las que rechazó, para que la interfaz las reconcilie.
  */
 export function setupOfflineSync(
   onConnectionChange?: (isOnline: boolean) => void,
-  onSyncSuccess?: (syncedCount: number) => void
+  onSyncResult?: (result: SyncResult) => void
 ): () => void {
   if (typeof window === 'undefined') return () => {};
 
-  const handleOnline = async () => {
-    console.log('[OfflineSync] 🌐 Conexión a Internet detectada. Sincronizando cola de pedidos...');
-    if (onConnectionChange) onConnectionChange(true);
-    const { syncedCount } = await syncPendingOrders();
-    if (syncedCount > 0 && onSyncSuccess) {
-      onSyncSuccess(syncedCount);
+  const runAndReport = async () => {
+    const result = await syncPendingOrders();
+    if (onSyncResult && (result.synced.length > 0 || result.rejected.length > 0)) {
+      onSyncResult(result);
     }
   };
 
+  const handleOnline = () => {
+    onConnectionChange?.(true);
+    void runAndReport();
+  };
+
   const handleOffline = () => {
-    console.log('[OfflineSync] ⚠️ El dispositivo perdió conexión a Internet. Activando modo local.');
-    if (onConnectionChange) onConnectionChange(false);
+    onConnectionChange?.(false);
   };
 
   window.addEventListener('online', handleOnline);
   window.addEventListener('offline', handleOffline);
 
   // Intentar sincronizar al arrancar por si quedaron pedidos de una sesión previa
-  if (navigator.onLine) {
-    syncPendingOrders().then(({ syncedCount }) => {
-      if (syncedCount > 0 && onSyncSuccess) {
-        onSyncSuccess(syncedCount);
-      }
-    });
-  }
+  if (navigator.onLine) void runAndReport();
 
   // Intervalo de reintento en segundo plano cada 30 segundos
   const intervalId = setInterval(() => {
-    if (navigator.onLine && getPendingOrders().length > 0) {
-      syncPendingOrders().then(({ syncedCount }) => {
-        if (syncedCount > 0 && onSyncSuccess) {
-          onSyncSuccess(syncedCount);
-        }
-      });
-    }
+    if (navigator.onLine && getPendingOrders().length > 0) void runAndReport();
   }, 30000);
 
   return () => {

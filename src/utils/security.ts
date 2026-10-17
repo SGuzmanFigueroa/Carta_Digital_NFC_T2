@@ -1,4 +1,4 @@
-import { MenuItem, AuthUser } from '../types';
+import { AuthUser } from '../types';
 
 // ==========================================
 // GastroPulse Security & Defense Utilities
@@ -86,38 +86,6 @@ export function validateTableString(tableStr: unknown): string {
 export function sanitizeNotes(notes?: unknown): string {
   if (!notes || typeof notes !== 'string') return '';
   return sanitizeText(notes, 120);
-}
-
-/**
- * Anti-Tampering: Verifies client-sent dish prices against the canonical menu catalog.
- * If the client manipulated the price, the canonical server price is enforced and logged.
- */
-export function verifyAndSanitizeDishPrice(
-  dishId: string,
-  clientPrice: number,
-  catalog: MenuItem[]
-): { price: number; wasTampered: boolean } {
-  const canonical = catalog.find((m) => m.id === dishId);
-  
-  if (!canonical) {
-    // If not found in catalog, ensure it's at least a valid positive number
-    const safePrice = Math.max(0, typeof clientPrice === 'number' && !isNaN(clientPrice) ? clientPrice : 15);
-    return { price: safePrice, wasTampered: false };
-  }
-  
-  // If price differs from canonical by more than 0.05 PEN
-  if (Math.abs(clientPrice - canonical.price) > 0.05) {
-    AuditLogger.log({
-      eventType: 'PRICE_TAMPERING_DETECTED',
-      severity: 'WARN',
-      details: `Intento de alteración de precio detectado para ${canonical.name}. Cliente envió: S/ ${clientPrice}, Precio oficial forzado: S/ ${canonical.price}`,
-      metadata: { dishId, clientPrice, canonicalPrice: canonical.price },
-    });
-    
-    return { price: canonical.price, wasTampered: true };
-  }
-  
-  return { price: canonical.price, wasTampered: false };
 }
 
 // ==========================================

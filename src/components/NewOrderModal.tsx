@@ -7,7 +7,8 @@ import { getPersistedStaffList } from '@/services/authService';
 
 interface NewOrderModalProps {
   onClose: () => void;
-  onCreateTicket: (ticket: Ticket) => void;
+  /** Si resuelve false (no se registró), el modal sigue abierto. */
+  onCreateTicket: (ticket: Ticket) => Promise<boolean> | void;
 }
 
 export const NewOrderModal: React.FC<NewOrderModalProps> = ({
@@ -29,6 +30,7 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
   const [allergyAlert, setAllergyAlert] = useState('');
   const [notes, setNotes] = useState('');
   const [selectedDishes, setSelectedDishes] = useState<{ [dishId: string]: number }>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Sync catalog, tables, and staff dynamically from Supabase
   useEffect(() => {
@@ -90,9 +92,9 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
     }, 0);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isCatalogLoading) return;
+    if (isCatalogLoading || isSubmitting) return;
 
     const selectedCatalogDishes = Object.entries(selectedDishes).reduce<Array<{
       dish: (typeof catalog)[number];
@@ -109,11 +111,11 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
     }
 
     const newTicketId = `ticket-${Date.now().toString().slice(-4)}`;
-    const randomOrderNum = Math.floor(Math.random() * 80) + 110;
 
     const items: TicketItem[] = selectedCatalogDishes.map(({ dish, quantity: qty }, idx) => {
       return {
         id: `item-${newTicketId}-${idx}`,
+        dishId: dish.id,
         name: `${qty}x ${dish.name}`,
         quantity: qty,
         station: dish.station,
@@ -141,7 +143,7 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
 
     const newTicket: Ticket = {
       id: newTicketId,
-      orderNumber: randomOrderNum,
+      orderNumber: 0, // Lo asigna el servidor (place_order).
       table,
       zone,
       serviceType,
@@ -158,8 +160,10 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
       items
     };
 
-    onCreateTicket(newTicket);
-    onClose();
+    setIsSubmitting(true);
+    const created = await onCreateTicket(newTicket);
+    setIsSubmitting(false);
+    if (created !== false) onClose();
   };
 
   return (
@@ -360,11 +364,11 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
             </button>
             <button
               onClick={handleSubmit}
-              disabled={isCatalogLoading || Object.keys(selectedDishes).length === 0}
+              disabled={isSubmitting || isCatalogLoading || Object.keys(selectedDishes).length === 0}
               className="px-6 py-2.5 rounded-lg bg-[#ff5708] hover:bg-orange-600 disabled:opacity-50 text-white font-bold text-[13px] flex items-center gap-2 shadow-lg shadow-[#ff5708]/30 transition-all active:scale-95"
             >
               <span className="material-symbols-outlined text-[18px]">send</span>
-              <span>Enviar a Cocina KDS</span>
+              <span>{isSubmitting ? 'Enviando…' : 'Enviar a Cocina KDS'}</span>
             </button>
           </div>
         </div>

@@ -10,13 +10,18 @@ import { supabase } from '@/lib/supabase';
 import { fetchTablesFromDb, settleTableInDb, updateTableStateInDb } from '@/services/tableService';
 import {
   fetchOrdersFromDb,
-  createOrderInDb,
+  placeOrderInDb,
+  toPlaceOrderItems,
+  OrderRejectedError,
+  type PlacedOrder,
+  type PlaceOrderInput,
   updateOrderStatusInDb,
   requestTableAccountInDb,
   callWaiterForTableInDb,
   settleOrdersForTableInDb,
   updateOrderItemCheckInDb
 } from '@/services/orderService';
+import { queuePendingOrder } from '@/services/offlineSyncService';
 // CD-28 · Llamados de mesa persistentes (KDS + Salón vía postgres_changes).
 import {
   fetchWaiterCallsFromDb,
@@ -30,7 +35,6 @@ import {
   sanitizeText,
   sanitizeNotes,
   validateTableString,
-  verifyAndSanitizeDishPrice,
   AuditLogger,
   AuditLogEntry,
   clearAuthSessionCookie,
@@ -58,7 +62,9 @@ interface RestaurantContextType {
   isTerminalLocked: boolean;
 
   // Actions
-  sendOrderFromMenu: (tableStr: string, cartItems: { item: MenuItem; quantity: number; notes?: string }[], pax?: number) => OrderTicket;
+  /** Rechaza con OrderRejectedError si el servidor no acepta el pedido. */
+  sendOrderFromMenu: (tableStr: string, cartItems: { item: MenuItem; quantity: number; notes?: string }[], pax?: number) => Promise<OrderTicket>;
+  reconcileQueuedOrder: (localId: string, placed: PlacedOrder) => void;
   recordTableOrderRound: (
     tableStr: string,
     cartItems: { item: MenuItem; quantity: number }[],
@@ -80,7 +86,7 @@ interface RestaurantContextType {
   showToast: (message: string, icon?: string) => void;
   resetAllDemoData: () => void;
   simulateNewOrder: () => void;
-  createNewKdsTicket: (ticket: Ticket) => void;
+  createNewKdsTicket: (ticket: Ticket) => Promise<boolean>;
   logoutUser: () => void;
   lockTerminal: () => void;
   unlockTerminalWithPin: (pin: string) => boolean;
@@ -206,6 +212,18 @@ function isStaffManagementRoute(path?: string | null): boolean {
     path.startsWith('/personal') ||
     path.startsWith('/configuracion')
   );
+}
+
+/** Estación de cocina por categoría (y por plato para la parrilla). Solo enruta; no afecta precios. */
+function routeKitchenStation(item: MenuItem): { station: StationId; badge: string; badgeColor: string } {
+  if (item.category === 'bebidas') return { station: 'barra_mixologia', badge: 'BARRA', badgeColor: 'bg-[#0494fc] text-white' };
+  if (item.category === 'entradas') return { station: 'frio_nikkei', badge: 'FRÍO & NIKKEI', badgeColor: 'bg-[#0494fc] text-white' };
+  if (item.category === 'postres') return { station: 'pasteleria', badge: 'PASTELERÍA', badgeColor: 'bg-[#c6c5cf] text-[#131315]' };
+  const name = item.name.toLowerCase();
+  if (name.includes('wagyu') || name.includes('pulpo') || name.includes('lomo')) {
+    return { station: 'fuego_grill', badge: 'FUEGO & GRILL', badgeColor: 'bg-[#ff5708] text-white' };
+  }
+  return { station: 'wok_saute', badge: 'WOK & SAUTÉ', badgeColor: 'bg-[#ff5708] text-white' };
 }
 
 function toKdsTicket(order: OrderTicket): Ticket | null {
@@ -827,121 +845,123 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
     []
   );
 
-  // 1. Send Order from Diner Carta Digital NFC (/menu) with Sanitization and Anti-Tampering
+  // Estado más reciente para callbacks asíncronos: tras un `await` el closure de
+  // useCallback puede tener tickets/orders/tables viejos (el realtime los cambia).
+  const latestStateRef = useRef({ tickets, orders, tables, dinerActiveTicket });
+  useEffect(() => {
+    latestStateRef.current = { tickets, orders, tables, dinerActiveTicket };
+  }, [tickets, orders, tables, dinerActiveTicket]);
+
+  // 1. Send Order from Diner Carta Digital NFC (/menu)
+  // El servidor (RPC place_order) decide precios, nombres y número de comanda.
+  // Sin conexión, el pedido queda en cola con un id provisional y se reconcilia
+  // al sincronizar (reconcileQueuedOrder). Si el servidor lo rechaza, lanza
+  // OrderRejectedError para que la carta muestre el motivo y conserve el carrito.
   const sendOrderFromMenu = useCallback(
-    (
+    async (
       tableStr: string,
       cartItems: { item: MenuItem; quantity: number; notes?: string }[],
       pax = 2
-    ): OrderTicket => {
-      // Input sanitization
+    ): Promise<OrderTicket> => {
       const safeTable = validateTableString(tableStr);
       const safePax = Math.max(1, Math.min(24, Math.floor(pax) || 2));
-      const orderNum = Math.floor(100 + Math.random() * 899);
-      const ticketId = `ticket-kds-${Date.now()}`;
-      const cmdId = `cmd-${orderNum}`;
-      const nowStr = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
+      const safeCart = cartItems.map((c) => ({
+        item: c.item,
+        quantity: Math.max(1, Math.min(99, Math.floor(c.quantity) || 1)),
+        notes: sanitizeNotes(c.notes)
+      }));
+      const routes = safeCart.map((c) => routeKitchenStation(c.item));
+      const input: PlaceOrderInput = {
+        tableNumber: safeTable,
+        items: toPlaceOrderItems(safeCart).map((item, idx) => ({ ...item, station: routes[idx].station })),
+        idempotencyKey: crypto.randomUUID(),
+        pax: safePax
+      };
 
-      let tamperedPricesFound = 0;
-      const stationTags: StationId[] = [];
+      let placed: PlacedOrder | null = null;
+      try {
+        placed = await placeOrderInDb(input);
+      } catch (err) {
+        if (err instanceof OrderRejectedError) throw err;
+        console.warn('[orders] Sin conexión: el pedido queda en cola offline.', err);
+      }
 
-      const kdsItems: TicketItem[] = cartItems.map((c, idx) => {
-        let station: StationId = 'wok_saute';
-        let badge = 'WOK & SAUTÉ';
-        let badgeColor = 'bg-[#ff5708] text-white';
+      const orderId = placed?.id ?? `cmd-pendiente-${input.idempotencyKey.slice(0, 8)}`;
+      if (!placed) queuePendingOrder(orderId, input);
 
-        if (c.item.category === 'bebidas') {
-          station = 'barra_mixologia';
-          badge = 'BARRA';
-          badgeColor = 'bg-[#0494fc] text-white';
-        } else if (c.item.category === 'entradas') {
-          station = 'frio_nikkei';
-          badge = 'FRÍO & NIKKEI';
-          badgeColor = 'bg-[#0494fc] text-white';
-        } else if (c.item.category === 'postres') {
-          station = 'pasteleria';
-          badge = 'PASTELERÍA';
-          badgeColor = 'bg-[#c6c5cf] text-[#131315]';
-        } else if (
-          c.item.name.toLowerCase().includes('wagyu') ||
-          c.item.name.toLowerCase().includes('pulpo') ||
-          c.item.name.toLowerCase().includes('lomo')
-        ) {
-          station = 'fuego_grill';
-          badge = 'FUEGO & GRILL';
-          badgeColor = 'bg-[#ff5708] text-white';
-        }
-
-        if (!stationTags.includes(station)) stationTags.push(station);
-
-        // Security: verify price against canonical catalog (Anti-Tampering)
-        const { price: canonicalUnitPrice, wasTampered } = verifyAndSanitizeDishPrice(
-          c.item.id,
-          c.item.price,
-          INITIAL_MENU_ITEMS
-        );
-        if (wasTampered) tamperedPricesFound++;
-
-        const safeQuantity = Math.max(1, Math.min(99, Math.floor(c.quantity) || 1));
-        const safeNotes = sanitizeNotes(c.notes);
-        const safeName = sanitizeText(c.item.name, 60);
-
+      // Con respuesta del servidor se usan sus precios; en cola, los de la carta local
+      // (provisionales: el servidor recalcula al sincronizar).
+      const lines = safeCart.map((c, idx) => {
+        const serverItem = placed?.items[idx];
+        const quantity = serverItem?.quantity ?? c.quantity;
         return {
-          id: `item-${Date.now()}-${idx}`,
-          name: `${safeQuantity}x ${safeName}`,
-          quantity: safeQuantity,
-          station,
-          stationBadge: badge,
-          stationBadgeColor: badgeColor,
+          name: sanitizeText(serverItem?.name ?? c.item.name, 60),
+          quantity,
+          lineTotal: (serverItem?.price ?? c.item.price) * quantity
+        };
+      });
+      const totalCart = placed?.total ?? lines.reduce((acc, line) => acc + line.lineTotal, 0);
+      const localTotal = safeCart.reduce((acc, c) => acc + c.item.price * c.quantity, 0);
+      const nowStr = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
+      const {
+        tickets: currentTickets,
+        orders: currentOrders,
+        tables: currentTables,
+        dinerActiveTicket: prevDiner
+      } = latestStateRef.current;
+
+      // El KDS solo recibe comandas confirmadas: las que están en cola llegan por
+      // realtime cuando el servidor las acepta.
+      let newKdsTicket: Ticket | null = null;
+      if (placed) {
+        const kdsItems: TicketItem[] = safeCart.map((c, idx) => ({
+          id: placed.items[idx]?.id ?? `item-${Date.now()}-${idx}`,
+          name: `${lines[idx].quantity}x ${lines[idx].name}`,
+          quantity: lines[idx].quantity,
+          station: routes[idx].station,
+          stationBadge: routes[idx].badge,
+          stationBadgeColor: routes[idx].badgeColor,
           status: 'pendiente',
-          cookingNotes: safeNotes ? [safeNotes] : ['Pase estándar'],
-          price: canonicalUnitPrice * safeQuantity,
+          cookingNotes: c.notes ? [c.notes] : ['Pase estándar'],
+          price: lines[idx].lineTotal,
           photoUrl: c.item.image,
           checked: false,
           prepTimeMinutes: parseInt(c.item.prepTime || '8') || 8
+        }));
+        const stationTags = Array.from(new Set(routes.map((r) => r.station)));
+        newKdsTicket = {
+          id: `ticket-kds-${Date.now()}`,
+          orderNumber: placed.orderNumber,
+          table: safeTable,
+          zone: safeTable.includes('Terraza') ? 'TERRAZA' : safeTable.includes('Barra') ? 'BARRA MIXOLOGÍA' : 'SALÓN PRINCIPAL',
+          serviceType: 'Carta Digital NFC',
+          elapsedSeconds: 0,
+          targetSeconds: 660,
+          serverOrRunner: 'AUTO-COMENSAL',
+          serverRole: 'PASE DIRECTO',
+          totalAmount: totalCart,
+          status: 'ingresada',
+          items: kdsItems,
+          timestamp: nowStr,
+          stationFilterTags: stationTags.length > 0 ? stationTags : ['wok_saute'],
+          isUrgent: false
         };
-      });
-
-      const totalCart = kdsItems.reduce((acc, i) => acc + i.price, 0);
-
-      if (tamperedPricesFound > 0) {
-        showToast('⚠️ Precios recalculados al valor canónico del menú', 'security');
       }
 
-      // Create KDS Ticket
-      const newKdsTicket: Ticket = {
-        id: ticketId,
-        orderNumber: orderNum,
-        table: safeTable,
-        zone: safeTable.includes('Terraza') ? 'TERRAZA' : safeTable.includes('Barra') ? 'BARRA MIXOLOGÍA' : 'SALÓN PRINCIPAL',
-        serviceType: 'Carta Digital NFC',
-        elapsedSeconds: 0,
-        targetSeconds: 660,
-        serverOrRunner: 'AUTO-COMENSAL',
-        serverRole: 'PASE DIRECTO',
-        totalAmount: totalCart,
-        status: 'ingresada',
-        items: kdsItems,
-        timestamp: nowStr,
-        stationFilterTags: stationTags.length > 0 ? stationTags : ['wok_saute'],
-        isUrgent: false
-      };
-
-      // Create Diner View OrderTicket
       const newDinerOrder: OrderTicket = {
-        id: cmdId,
+        id: orderId,
         table: safeTable,
         pax: safePax,
-        timeAgo: 'Justo ahora',
+        timeAgo: placed ? 'Justo ahora' : 'En cola offline',
         createdTime: nowStr,
         origin: 'QR COMENSAL',
         status: 'por-validar',
-        items: cartItems.map((c, idx) => ({
-          id: `it-${Date.now()}-${idx}`,
-          name: `${c.quantity}x ${sanitizeText(c.item.name, 60)}`,
-          quantity: c.quantity,
-          price: (kdsItems[idx]?.price || c.item.price * c.quantity),
-          notes: sanitizeNotes(c.notes),
+        items: safeCart.map((c, idx) => ({
+          id: placed?.items[idx]?.id ?? `it-${Date.now()}-${idx}`,
+          name: `${lines[idx].quantity}x ${lines[idx].name}`,
+          quantity: lines[idx].quantity,
+          price: lines[idx].lineTotal,
+          notes: c.notes,
           station: c.item.category === 'bebidas' ? 'Barra' : 'Cocina'
         })),
         subtotal: totalCart,
@@ -950,7 +970,7 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
 
       // Update Floor Table Status
       const cleanNum = safeTable.replace(/\D/g, '');
-      const updatedTables = tables.map((t) => {
+      const updatedTables = currentTables.map((t) => {
         if (t.number === cleanNum || safeTable.includes(t.number)) {
           return {
             ...t,
@@ -958,34 +978,29 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
             pax: safePax,
             amount: (t.amount || 0) + totalCart,
             timeActive: '0 min (QR)',
-            dishesCount: `${kdsItems.length} platos`
+            dishesCount: `${safeCart.length} platos`
           };
         }
         return t;
       });
 
-      const updatedTickets = [newKdsTicket, ...tickets];
-      const updatedOrders = [newDinerOrder, ...orders];
+      const updatedTickets = newKdsTicket ? [newKdsTicket, ...currentTickets] : currentTickets;
+      const updatedOrders = [newDinerOrder, ...currentOrders];
 
       // Consolidar comanda activa para el comensal si ya tiene pedidos previos en esta mesa (Ronda 2, 3...)
       let consolidatedDinerOrder = newDinerOrder;
-      const cleanNumSafe = safeTable.replace(/\D/g, '');
-      const prevDiner = dinerActiveTicket;
       const isSameTable = prevDiner && (
-        prevDiner.table.replace(/\D/g, '') === cleanNumSafe ||
+        prevDiner.table.replace(/\D/g, '') === cleanNum ||
         prevDiner.table.toLowerCase() === safeTable.toLowerCase() ||
         safeTable.toLowerCase().includes(prevDiner.table.toLowerCase())
       );
 
-      if (isSameTable) {
-        const combinedItems = [...prevDiner.items, ...newDinerOrder.items];
-        const combinedSubtotal = prevDiner.subtotal + newDinerOrder.subtotal;
-        const combinedTotal = prevDiner.total + newDinerOrder.total;
+      if (prevDiner && isSameTable) {
         consolidatedDinerOrder = {
           ...newDinerOrder,
-          items: combinedItems,
-          subtotal: combinedSubtotal,
-          total: combinedTotal
+          items: [...prevDiner.items, ...newDinerOrder.items],
+          subtotal: prevDiner.subtotal + newDinerOrder.subtotal,
+          total: prevDiner.total + newDinerOrder.total
         };
       }
 
@@ -996,23 +1011,49 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
 
       persistState(updatedTickets, updatedOrders, updatedTables, undefined, consolidatedDinerOrder);
 
-      // Persist order to Supabase in background
-      createOrderInDb(safeTable, cartItems, safePax, cmdId).catch((err) => {
-        console.warn('Failed to sync new order to Supabase:', err);
-      });
+      if (newKdsTicket) {
+        kitchenAudio.playDispatchSound();
+        broadcastSync('NEW_ORDER', {
+          ticket: newKdsTicket,
+          order: newDinerOrder,
+          tables: updatedTables
+        });
+      }
 
-      kitchenAudio.playDispatchSound();
-
-      broadcastSync('NEW_ORDER', {
-        ticket: newKdsTicket,
-        order: newDinerOrder,
-        tables: updatedTables
-      });
-
-      showToast(`¡Comanda #${orderNum} enviada a Cocina KDS desde ${safeTable}!`, 'soup_kitchen');
+      if (!placed) {
+        showToast('Sin conexión: tu pedido se enviará en cuanto vuelva la señal', 'cloud_off');
+      } else if (Math.abs(placed.total - localTotal) > 0.005) {
+        showToast(`Comanda #${placed.orderNumber} enviada con los precios vigentes de la carta`, 'sell');
+      } else {
+        showToast(`¡Comanda #${placed.orderNumber} enviada a Cocina KDS desde ${safeTable}!`, 'soup_kitchen');
+      }
       return newDinerOrder;
     },
-    [tickets, orders, tables, persistState, broadcastSync, showToast]
+    [persistState, broadcastSync, showToast]
+  );
+
+  // Una comanda que estaba en cola offline ya tiene número definitivo del servidor:
+  // reemplaza el id provisional en la vista del comensal y en sus rondas.
+  const reconcileQueuedOrder = useCallback(
+    (localId: string, placed: PlacedOrder) => {
+      const { orders: currentOrders, dinerActiveTicket: currentDiner } = latestStateRef.current;
+      const updatedOrders = currentOrders.map((order) =>
+        order.id === localId
+          ? { ...order, id: placed.id, timeAgo: 'Justo ahora', subtotal: placed.total, total: placed.total }
+          : order
+      );
+      setOrders(updatedOrders);
+      setTableOrderRounds((rounds) =>
+        rounds.map((round) => (round.orderId === localId ? { ...round, orderId: placed.id } : round))
+      );
+      let updatedDiner = currentDiner;
+      if (currentDiner?.id === localId) {
+        updatedDiner = { ...currentDiner, id: placed.id };
+        setDinerActiveTicket(updatedDiner);
+      }
+      persistState(undefined, updatedOrders, undefined, undefined, updatedDiner);
+    },
+    [persistState]
   );
 
   const recordTableOrderRound = useCallback(
@@ -1460,8 +1501,10 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
   const simulateNewOrder = useCallback(() => {
     const item = INITIAL_MENU_ITEMS[Math.floor(Math.random() * INITIAL_MENU_ITEMS.length)];
     const tableNum = Math.floor(Math.random() * 12) + 1;
-    sendOrderFromMenu(`MESA ${tableNum.toString().padStart(2, '0')}`, [{ item, quantity: 1 }], 2);
-  }, [sendOrderFromMenu]);
+    sendOrderFromMenu(`MESA ${tableNum.toString().padStart(2, '0')}`, [{ item, quantity: 1 }], 2).catch((err) => {
+      showToast(err instanceof Error ? err.message : 'No se pudo simular el pedido', 'error');
+    });
+  }, [sendOrderFromMenu, showToast]);
 
   // 16. Update Order Status from Central de Pedidos with Persistence
   const updateOrderStatus = useCallback(
@@ -1546,12 +1589,58 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
   );
 
   // 15. Create New Manual Ticket in KDS
+  // Se guarda primero en el servidor (place_order, origen GARZÓN) y solo si
+  // responde se muestra en el KDS, con el número y los precios definitivos.
+  // Devuelve false (y avisa) si no se pudo registrar, para que el modal no se cierre.
   const createNewKdsTicket = useCallback(
-    (ticket: Ticket) => {
-      const updated = [ticket, ...tickets];
+    async (ticket: Ticket): Promise<boolean> => {
+      const missingDish = ticket.items.find((i) => !i.dishId);
+      if (missingDish) {
+        showToast(`"${missingDish.name}" no está en la carta: no se puede cobrar`, 'error');
+        return false;
+      }
+
+      let placed: PlacedOrder;
+      try {
+        placed = await placeOrderInDb({
+          tableNumber: validateTableString(ticket.table),
+          items: ticket.items.map((i) => ({
+            dishId: i.dishId,
+            quantity: i.quantity,
+            notes: i.cookingNotes?.filter(Boolean).join(' | ') || undefined,
+            station: i.station === 'all' ? undefined : i.station
+          })),
+          idempotencyKey: crypto.randomUUID(),
+          pax: 2,
+          origin: 'GARZÓN',
+          waiter: ticket.serverOrRunner || undefined
+        });
+      } catch (err) {
+        console.error('[orders] No se pudo registrar la comanda manual:', err);
+        showToast(
+          err instanceof OrderRejectedError
+            ? err.message
+            : 'Sin conexión: la comanda no se registró. Vuelve a intentarlo.',
+          'error'
+        );
+        return false;
+      }
+
+      const confirmedItems: TicketItem[] = ticket.items.map((i, idx) => {
+        const serverItem = placed.items[idx];
+        return serverItem
+          ? { ...i, id: serverItem.id, quantity: serverItem.quantity, price: serverItem.price * serverItem.quantity }
+          : i;
+      });
+      const confirmedTicket: Ticket = {
+        ...ticket,
+        orderNumber: placed.orderNumber,
+        items: confirmedItems,
+        totalAmount: placed.total
+      };
       const newOrder: OrderTicket = {
-        id: `cmd-${ticket.orderNumber}`,
-        table: ticket.table,
+        id: placed.id,
+        table: placed.table,
         pax: 2,
         timeAgo: 'Justo ahora',
         createdTime: ticket.timestamp || new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }),
@@ -1560,7 +1649,7 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
         status: 'en-cocina',
         isCritical: Boolean(ticket.isUrgent),
         preparationPercent: 25,
-        items: ticket.items.map((i) => ({
+        items: confirmedItems.map((i) => ({
           id: i.id,
           name: i.name,
           quantity: i.quantity,
@@ -1569,56 +1658,26 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
           station: i.stationBadge || 'Cocina',
           allergen: ticket.allergyAlert || i.allergens?.join(', ')
         })),
-        subtotal: ticket.totalAmount,
-        total: ticket.totalAmount
+        subtotal: placed.subtotal,
+        total: placed.total
       };
-      const updatedOrders = [newOrder, ...orders];
+
+      const { tickets: currentTickets, orders: currentOrders } = latestStateRef.current;
+      const updated = [confirmedTicket, ...currentTickets];
+      const updatedOrders = [newOrder, ...currentOrders];
 
       setTickets(updated);
       setOrders(updatedOrders);
       persistState(updated, updatedOrders);
 
-      // Persist order and order items to Supabase in background
-      (async () => {
-        try {
-          await supabase.from('orders').insert({
-            id: newOrder.id,
-            table_number: newOrder.table,
-            pax: newOrder.pax,
-            origin: newOrder.origin,
-            status: newOrder.status,
-            subtotal: newOrder.subtotal,
-            total: newOrder.total,
-            waiter: newOrder.waiter,
-            is_critical: newOrder.isCritical
-          });
-
-          const itemsToInsert = ticket.items.map((i, idx) => ({
-            id: `item-${newOrder.id}-${idx}`,
-            order_id: newOrder.id,
-            name: i.name,
-            quantity: i.quantity,
-            price: i.price,
-            notes: i.cookingNotes?.join(' | ') || null,
-            station: i.stationBadge || 'Cocina',
-            item_status: 'pendiente' as const,
-            checked: false
-          }));
-
-          await supabase.from('order_items').insert(itemsToInsert);
-        } catch (err) {
-          console.warn('Error syncing KDS order to Supabase:', err);
-        }
-      })();
-
       kitchenAudio.playDispatchSound();
       broadcastSync('UPDATE_TICKETS', { tickets: updated });
       broadcastSync('UPDATE_ORDERS', { orders: updatedOrders, tickets: updated });
-      showToast(`Comanda #${ticket.orderNumber} creada en KDS y sincronizada con Pedidos`, 'add_circle');
+      showToast(`Comanda #${placed.orderNumber} creada en KDS y sincronizada con Pedidos`, 'add_circle');
+      return true;
     },
-    [tickets, orders, persistState, broadcastSync, showToast]
+    [persistState, broadcastSync, showToast]
   );
-
 
   // 18. Request Table Account from Mobile Diner Menu
   const requestTableAccount = useCallback(
@@ -1739,6 +1798,7 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
         currentUser,
         isTerminalLocked,
         sendOrderFromMenu,
+        reconcileQueuedOrder,
         recordTableOrderRound,
         updateTicketItem,
         startTicketPrep,

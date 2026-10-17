@@ -193,7 +193,7 @@ interface QRMenuViewerProps {
     table: string,
     items: Array<{ item: MenuItem; quantity: number; notes?: string }>,
     pax?: number
-  ) => OrderTicket;
+  ) => Promise<OrderTicket>;
   onRecordTableOrderRound?: (
     table: string,
     items: Array<{ item: MenuItem; quantity: number }>,
@@ -309,6 +309,8 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     message: '',
   });
   const [isVerifyingGeofence, setIsVerifyingGeofence] = useState(false);
+  // Evita una segunda comanda por doble toque mientras la primera espera al servidor.
+  const isSendingOrderRef = useRef(false);
 
   useEffect(() => {
     try {
@@ -1131,7 +1133,16 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   };
 
   const handleSendOrder = async () => {
-    if (cart.length === 0) return;
+    if (cart.length === 0 || isSendingOrderRef.current) return;
+    isSendingOrderRef.current = true;
+    try {
+      await sendCartOrder();
+    } finally {
+      isSendingOrderRef.current = false;
+    }
+  };
+
+  const sendCartOrder = async () => {
     const submittedAt = new Date();
 
     // CD-12 · Inicializar contexto de audio para campana KDS
@@ -1163,7 +1174,14 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
 
     let submittedOrder: OrderTicket;
     if (onSendOrderFromMenu) {
-      submittedOrder = onSendOrderFromMenu(selectedTable, cart, 2);
+      try {
+        submittedOrder = await onSendOrderFromMenu(selectedTable, cart, 2);
+      } catch (err) {
+        // El servidor rechazó el pedido (plato retirado, límite…): se conserva el carrito.
+        const reason = err instanceof Error ? err.message : String(err);
+        onShowToast(t('toast.orderRejected', { reason }), 'error');
+        return;
+      }
     } else {
       const newTicket: OrderTicket = {
         id: `cmd-${Math.floor(1000 + Math.random() * 9000)}`,
