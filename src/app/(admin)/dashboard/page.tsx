@@ -6,6 +6,7 @@ import { AdminFloorPanel } from '@/components/AdminFloorPanel';
 import { Header } from '@/components/Header';
 import { useRouter } from 'next/navigation';
 import { useRestaurant } from '@/context/RestaurantContext';
+import { useToast } from '@/context/ToastContext';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -18,9 +19,9 @@ export default function DashboardPage() {
     prioritizeTable,
     collectTableBill,
     openTable,
-    toast,
     showToast
   } = useRestaurant();
+  const { toast } = useToast();
 
   // Active tickets count
   const activeCount = tickets.filter(

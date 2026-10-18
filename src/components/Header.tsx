@@ -6,6 +6,7 @@ import { getTranslations } from '../i18n/adminTranslations';
 import { fetchSystemConfigFromDb } from '@/services/configService';
 import { isAdminRole, normalizeRole } from '../utils/security';
 import { DishImage } from './menu/DishImage';
+import { useStaffSession } from '@/context/StaffSessionContext';
 
 interface HeaderProps {
   currentTab: ScreenTab;
@@ -23,7 +24,8 @@ export const Header: React.FC<HeaderProps> = ({
   language
 }) => {
   const t = getTranslations(language);
-  const { currentUser, lockTerminal, logoutUser, tickets = [], orders = [] } = useRestaurant();
+  const { tickets = [], orders = [] } = useRestaurant();
+  const { currentUser, lockTerminal, logoutUser } = useStaffSession();
   const [bistroOpen, setBistroOpen] = useState(false);
   const [selectedBistro, setSelectedBistro] = useState('AUREA Bistro (Principal)');
   const [notificationsOpen, setNotificationsOpen] = useState(false);

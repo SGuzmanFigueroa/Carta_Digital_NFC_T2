@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { Header } from '@/components/Header';
 import { KDSBoard } from '@/components/KDSBoard';
 import { useRestaurant } from '@/context/RestaurantContext';
+import { useToast } from '@/context/ToastContext';
 
 export default function KDSRefinedPage() {
   const router = useRouter();
@@ -11,9 +12,9 @@ export default function KDSRefinedPage() {
     tickets,
     setTickets,
     runners,
-    setRunners,
-    toast
+    setRunners
   } = useRestaurant();
+  const { toast } = useToast();
 
   // Active tickets count
   const activeCount = tickets.filter(

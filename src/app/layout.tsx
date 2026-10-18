@@ -3,6 +3,8 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Space_Mono } from "next/font/google";
 import "./globals.css";
 import { RestaurantProvider } from "@/context/RestaurantContext";
+import { StaffSessionProvider } from "@/context/StaffSessionContext";
+import { ToastProvider } from "@/context/ToastContext";
 
 // Versión del service worker = commit del deploy (Netlify: COMMIT_REF). Cambia en
 // cada deploy y así el SW renueva la caché de modelos 3D e imágenes.
@@ -145,9 +147,14 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-screen flex flex-col bg-[#0b0c0e] text-[#e5e1e4] selection:bg-[#ff5708] selection:text-white">
-        <RestaurantProvider>
-          {children}
-        </RestaurantProvider>
+        {/* Avisos y sesión del personal en contextos propios: cambian sin re-renderizar la operación. */}
+        <ToastProvider>
+          <StaffSessionProvider>
+            <RestaurantProvider>
+              {children}
+            </RestaurantProvider>
+          </StaffSessionProvider>
+        </ToastProvider>
       </body>
     </html>
   );

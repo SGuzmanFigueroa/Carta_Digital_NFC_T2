@@ -15,6 +15,7 @@ import {
   setupOfflineSync,
   isDeviceOnline
 } from '@/services/offlineSyncService';
+import { useToast } from '@/context/ToastContext';
 
 /**
  * CD-31 · Aviso de conexión de la carta del comensal.
@@ -45,11 +46,11 @@ export function MenuClient({ initialMenuItems }: { initialMenuItems: MenuItem[] 
     orders,
     tableOrderRounds,
     tables,
-    toast,
     showToast,
     requestTableAccount,
     callWaiter
   } = useRestaurant();
+  const { toast } = useToast();
 
   const [menuItems, setMenuItems] = useState<MenuItem[]>(initialMenuItems);
   const [isOnline, setIsOnline] = useState<boolean>(true);

@@ -1,8 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
-import { usePathname } from 'next/navigation';
-import { Ticket, OrderTicket, OrderRound, OrderRoundItem, TableStatus, Runner, MenuItem, StationId, TicketItem, AuthUser, WaiterCall, PaymentClaim } from '../types';
+import { Ticket, OrderTicket, OrderRound, OrderRoundItem, TableStatus, Runner, MenuItem, TicketItem, WaiterCall, PaymentClaim } from '../types';
 import { INITIAL_MENU_ITEMS, INITIAL_RUNNERS } from '../data/mockData';
 import { kitchenAudio } from '../utils/audio';
 import { supabase } from '@/lib/supabase';
@@ -32,17 +31,29 @@ import {
   normalizeWaiterCallReason,
   parseWaiterCallRow
 } from '@/services/waiterCallService';
-import { loadCurrentStaffUser, logoutStaff, verifyMyPin } from '@/services/authService';
 import {
   sanitizeText,
   sanitizeNotes,
   validateTableString,
-  AuditLogger,
-  AuditLogEntry,
-  readAuthSession,
-  AUTH_SESSION_CHANGE_EVENT
+  AuditLogger
 } from '../utils/security';
-import { useDialog } from '@/hooks/useDialog';
+import { useToast } from './ToastContext';
+import { useStaffSession } from './StaffSessionContext';
+import {
+  ALLOWED_BROADCAST_ACTIONS,
+  describeRealtimeStatus,
+  getTableRoundKey,
+  instrumentRealtimeChannel,
+  nextRealtimeChannelSeq,
+  realtimeStamp,
+  STORAGE_KEY_DINER,
+  STORAGE_KEY_ORDERS,
+  STORAGE_KEY_REVENUE,
+  STORAGE_KEY_TABLES,
+  STORAGE_KEY_TICKETS,
+  toKdsTicket,
+  routeKitchenStation
+} from './restaurantHelpers';
 
 interface RestaurantContextType {
   // State
@@ -57,11 +68,8 @@ interface RestaurantContextType {
   setRunners: React.Dispatch<React.SetStateAction<Runner[]>>;
   totalShiftRevenue: number;
   kitchenPaused: boolean;
-  toast: { message: string; icon?: string } | null;
   dinerActiveTicket: OrderTicket | null;
   audioEnabled: boolean;
-  currentUser: AuthUser | null;
-  isTerminalLocked: boolean;
 
   // Actions
   /** Rechaza con OrderRejectedError si el servidor no acepta el pedido. */
@@ -89,11 +97,7 @@ interface RestaurantContextType {
   resetAllDemoData: () => void;
   simulateNewOrder: () => void;
   createNewKdsTicket: (ticket: Ticket) => Promise<boolean>;
-  logoutUser: () => void;
-  lockTerminal: () => void;
   /** El servidor valida el PIN (bcrypt) y lo bloquea tras 5 fallos. */
-  unlockTerminalWithPin: (pin: string) => Promise<boolean>;
-  logSecurityEvent: (entry: Omit<AuditLogEntry, 'id' | 'timestamp' | 'isoDate'>) => AuditLogEntry;
   updateOrderStatus: (orderId: string, newStatus: OrderTicket['status']) => Promise<void>;
   addOrderNote: (orderId: string, note: string) => void;
   /** CD-28 · `table` = mesa real del comensal (selector / QR); si se omite se usa la de su comanda. */
@@ -105,197 +109,8 @@ interface RestaurantContextType {
 
 const RestaurantContext = createContext<RestaurantContextType | undefined>(undefined);
 
-/**
- * CD-28 · REALTIME · Secuencia de instancias de canal (higiene defensiva).
- *
- * `RealtimeClient.channel(topic)` DEVUELVE la instancia existente si el topic ya
- * está en uso (documentado en realtime-js: "If a channel with the same topic already
- * exists it will be returned instead of creating a duplicate connection"). Si esa
- * instancia ya estaba suscrita, `channel.on()` LANZA:
- *   "cannot add `postgres_changes` callbacks for <topic> after `subscribe()`."
- * y el useEffect muere a mitad de camino → cero listeners → frontend "sordo" hasta un F5.
- * Con un topic único por montaje ese reuse es imposible.
- *
- * OJO: esto es necesario pero NO era la causa raíz del bug CD-28. La causa raíz real
- * está documentada antes del useEffect de realtime (una tabla SIN Realtime envenena
- * todas las suscripciones del canal).
- */
-let realtimeChannelSeq = 0;
-
-/** Sello de tiempo corto (HH:MM:SS.mmm) para los logs de diagnóstico de realtime. */
-function realtimeStamp(): string {
-  return new Date().toISOString().slice(11, 23);
-}
-
-/** Payload del evento `system` que emite el servidor de Realtime (no está tipado en el SDK). */
-type RealtimeSystemPayload = {
-  extension?: string;
-  message?: string;
-  status?: string;
-  channel?: string;
-};
-
-/** Canal de Supabase tal como lo expone el SDK, sin importar tipos internos del paquete. */
-type SupabaseRealtimeChannel = Parameters<typeof supabase.removeChannel>[0];
-
-/**
- * MONITOREO EXTREMO (CD-28) · El evento `system` del servidor de Realtime.
- *
- * Es el ÚNICO sitio donde el servidor comunica que ha rechazado el `postgres_changes`
- * de un canal (p. ej. "Unable to subscribe to changes with given parameters…" cuando
- * una tabla no tiene Realtime habilitado). El callback de `.subscribe()` recibe
- * 'SUBSCRIBED' igualmente, así que sin este listener el canal queda CIEGO SIN NINGÚN
- * ERROR VISIBLE: exactamente el fallo que motivó el ticket.
- */
-function instrumentRealtimeChannel(
-  channel: SupabaseRealtimeChannel,
-  scope: string,
-  topic: string
-): void {
-  interface ChannelWithSystemHook {
-    on: (
-      type: string,
-      filter: Record<string, unknown>,
-      callback: (payload: RealtimeSystemPayload) => void
-    ) => unknown;
-  }
-
-  (channel as unknown as ChannelWithSystemHook).on('system', {}, (payload) => {
-    if (!payload || payload.status === 'ok') return;
-    console.warn(
-      `[realtime:${scope}] ${realtimeStamp()} ERROR DEL SERVIDOR en ${topic}: ${payload.message ?? 'sin detalle'}`
-    );
-    console.warn(
-      `[realtime:${scope}] ${realtimeStamp()} Acción: habilita Realtime para la tabla citada → ` +
-      `ALTER PUBLICATION supabase_realtime ADD TABLE public.<tabla>;`
-    );
-  });
-}
-
-/** Traza cada transición de estado del canal: SUBSCRIBED / CHANNEL_ERROR / TIMED_OUT / CLOSED. */
-function describeRealtimeStatus(scope: string, topic: string, status: string, error?: Error): void {
-  const head = `[realtime:${scope}] ${realtimeStamp()} ${status} ${topic}`;
-  if (status === 'SUBSCRIBED') {
-    console.info(`${head} · canal operativo`);
-    return;
-  }
-  console.warn(`${head} · ${error?.message ?? 'el canal dejó de entregar eventos'}`);
-}
-
-const STORAGE_KEY_TICKETS = 'gastropulse_kds_tickets_v1';
-const STORAGE_KEY_ORDERS = 'gastropulse_orders_v1';
-const STORAGE_KEY_TABLES = 'gastropulse_tables_v1';
-const STORAGE_KEY_REVENUE = 'gastropulse_revenue_v1';
-const STORAGE_KEY_DINER = 'gastropulse_diner_ticket_v1';
-const STORAGE_KEY_AUTH = 'gastropulse_auth_user';
-
-function getTableRoundKey(table: string): string {
-  return table.replace(/\D/g, '') || table.trim().toUpperCase();
-}
-
-const ALLOWED_BROADCAST_ACTIONS = [
-  'NEW_ORDER',
-  'UPDATE_TICKETS',
-  'UPDATE_TABLES',
-  'UPDATE_RUNNERS',
-  'DINER_STATUS_UPDATE',
-  'PRIORITIZE_TABLE',
-  'RUNNER_ALERT',
-  'UPDATE_ORDERS'
-];
-
-// Lista blanca estricta: ÚNICAMENTE las rutas de gestión operativa del personal
-// admiten bloqueo por inactividad. La carta digital del comensal (/ y /menu) está 100% blindada.
-function isStaffManagementRoute(path?: string | null): boolean {
-  if (!path) return false;
-  return (
-    path.startsWith('/kds') ||
-    path.startsWith('/pedidos') ||
-    path.startsWith('/dashboard') ||
-    path.startsWith('/personal') ||
-    path.startsWith('/configuracion')
-  );
-}
-
-/** Estación de cocina por categoría (y por plato para la parrilla). Solo enruta; no afecta precios. */
-function routeKitchenStation(item: MenuItem): { station: StationId; badge: string; badgeColor: string } {
-  if (item.category === 'bebidas') return { station: 'barra_mixologia', badge: 'BARRA', badgeColor: 'bg-[#0494fc] text-white' };
-  if (item.category === 'entradas') return { station: 'frio_nikkei', badge: 'FRÍO & NIKKEI', badgeColor: 'bg-[#0494fc] text-white' };
-  if (item.category === 'postres') return { station: 'pasteleria', badge: 'PASTELERÍA', badgeColor: 'bg-[#c6c5cf] text-[#131315]' };
-  const name = item.name.toLowerCase();
-  if (name.includes('wagyu') || name.includes('pulpo') || name.includes('lomo')) {
-    return { station: 'fuego_grill', badge: 'FUEGO & GRILL', badgeColor: 'bg-[#ff5708] text-white' };
-  }
-  return { station: 'wok_saute', badge: 'WOK & SAUTÉ', badgeColor: 'bg-[#ff5708] text-white' };
-}
-
-function toKdsTicket(order: OrderTicket): Ticket | null {
-  const orderNumber = Number(order.id.replace(/^cmd-/, ''));
-  if (!order.id.startsWith('cmd-') || !Number.isFinite(orderNumber)) return null;
-
-  const mappedItems: TicketItem[] = order.items.map((item) => {
-    const stationName = item.station?.toLowerCase() || '';
-    let station: StationId = 'wok_saute';
-    let stationBadge = 'WOK & SAUTÉ';
-
-    if (stationName.includes('barra')) {
-      station = 'barra_mixologia';
-      stationBadge = 'BARRA';
-    } else if (stationName.includes('frío') || stationName.includes('frio') || stationName.includes('nikkei')) {
-      station = 'frio_nikkei';
-      stationBadge = 'FRÍO & NIKKEI';
-    } else if (stationName.includes('pastelería') || stationName.includes('pasteleria')) {
-      station = 'pasteleria';
-      stationBadge = 'PASTELERÍA';
-    } else if (stationName.includes('fuego') || stationName.includes('parrilla')) {
-      station = 'fuego_grill';
-      stationBadge = 'FUEGO & GRILL';
-    }
-
-    return {
-      id: item.id,
-      name: `${item.quantity}x ${item.name}`,
-      quantity: item.quantity,
-      station,
-      stationBadge,
-      status: order.status === 'pase-listo' ? 'listo' : 'pendiente',
-      cookingNotes: item.notes ? [item.notes] : ['Pase estándar'],
-      price: item.price,
-      photoUrl: '',
-      checked: order.status === 'pase-listo'
-    };
-  });
-
-  const stationFilterTags = Array.from(new Set(mappedItems.map((item) => item.station)));
-  const status: Ticket['status'] = order.status === 'en-cocina'
-    ? 'en_fuego'
-    : order.status === 'pase-listo'
-    ? 'lista_despachada'
-    : order.status === 'entregado'
-    ? 'archivada'
-    : 'ingresada';
-
-  return {
-    id: `ticket-${order.id}`,
-    orderNumber,
-    table: order.table,
-    zone: order.table.toLowerCase().includes('terraza') ? 'TERRAZA' : 'SALÓN PRINCIPAL',
-    serviceType: 'Carta Digital NFC',
-    elapsedSeconds: 0,
-    targetSeconds: 660,
-    serverOrRunner: order.waiter || 'AUTO-COMENSAL',
-    serverRole: order.origin === 'QR COMENSAL' ? 'PASE DIRECTO' : 'CAMARERO',
-    totalAmount: order.total,
-    status,
-    items: mappedItems,
-    timestamp: order.createdTime,
-    stationFilterTags: stationFilterTags.length > 0 ? stationFilterTags : ['wok_saute'],
-    isUrgent: Boolean(order.isCritical)
-  };
-}
 
 export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const pathname = usePathname();
   // Arrancan vacíos: los llena Supabase (antes eran datos de ejemplo que se
   // quedaban en pantalla si la base devolvía cero pedidos).
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -310,12 +125,9 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
   const [kitchenPaused, setKitchenPaused] = useState<boolean>(false);
   const [audioEnabled, setAudioEnabled] = useState<boolean>(true);
   const [lastDispatchedTicket, setLastDispatchedTicket] = useState<Ticket | null>(null);
-  const [toast, setToast] = useState<{ message: string; icon?: string } | null>(null);
+  const { showToast } = useToast();
+  const { currentUser } = useStaffSession();
   const [dinerActiveTicket, setDinerActiveTicket] = useState<OrderTicket | null>(null);
-  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
-  const [isTerminalLocked, setIsTerminalLocked] = useState<boolean>(false);
-  const [quickUnlockPin, setQuickUnlockPin] = useState<string>('');
-  const [quickUnlockError, setQuickUnlockError] = useState<string>('');
 
   const syncDinerTicketStatus = useCallback((freshOrders: OrderTicket[]) => {
     if (!dinerActiveTicket) return;
@@ -363,11 +175,6 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
     });
   }, []);
 
-  const showToast = useCallback((message: string, icon = 'check_circle') => {
-    setToast({ message, icon });
-    setTimeout(() => setToast(null), 3500);
-  }, []);
-
   // ===========================================================================
   // CD-28 · FIX N1 (realtime inestable) · Callbacks de realtime en un REF
   // ===========================================================================
@@ -395,84 +202,6 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
       return next;
     });
   }, [showToast]);
-
-  const logSecurityEvent = useCallback(
-    (entry: Omit<AuditLogEntry, 'id' | 'timestamp' | 'isoDate'>) => {
-      return AuditLogger.log({
-        user: entry.user || currentUser?.name,
-        role: entry.role || currentUser?.role,
-        ...entry
-      });
-    },
-    [currentUser]
-  );
-
-  const logoutUser = useCallback(async () => {
-    setCurrentUser(null);
-    setIsTerminalLocked(false);
-    await logoutStaff();
-    if (typeof window !== 'undefined') {
-      // Recarga completa a propósito: borra todo el estado en memoria del personal.
-      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-      window.location.href = '/login';
-    }
-  }, []);
-
-  const lockTerminal = useCallback(() => {
-    setIsTerminalLocked(true);
-    setQuickUnlockPin('');
-    setQuickUnlockError('');
-    AuditLogger.log({
-      eventType: 'SESSION_LOCKED',
-      severity: 'INFO',
-      user: currentUser?.name || 'TERMINAL',
-      details: 'Terminal bloqueada manualmente por el operador'
-    });
-  }, [currentUser]);
-
-  const unlockTerminalWithPin = useCallback(
-    async (pin: string): Promise<boolean> => {
-      let check: Awaited<ReturnType<typeof verifyMyPin>>;
-      try {
-        check = await verifyMyPin(pin);
-      } catch {
-        setQuickUnlockError('No se pudo validar el PIN. Revisa la conexión.');
-        setQuickUnlockPin('');
-        return false;
-      }
-      if (check.ok) {
-        setIsTerminalLocked(false);
-        setQuickUnlockPin('');
-        setQuickUnlockError('');
-        AuditLogger.log({
-          eventType: 'SESSION_UNLOCKED',
-          severity: 'INFO',
-          user: currentUser?.name || 'TERMINAL',
-          details: 'Terminal desbloqueada con PIN exitosamente'
-        });
-        showToast('Terminal desbloqueada', 'lock_open');
-        return true;
-      } else {
-        kitchenAudio.playAllergyWarning();
-        setQuickUnlockError(
-          check.reason === 'locked'
-            ? 'PIN bloqueado por 5 minutos. Cierra sesión y entra con tu contraseña.'
-            : check.reason === 'no_pin'
-            ? 'No tienes PIN configurado. Pide al administrador que te asigne uno.'
-            : `PIN incorrecto. Te quedan ${check.remaining ?? 0} intentos.`
-        );
-        setQuickUnlockPin('');
-        AuditLogger.log({
-          eventType: 'LOGIN_FAILED',
-          severity: 'WARN',
-          user: currentUser?.name || 'TERMINAL',
-          details: 'Intento fallido de desbloqueo rápido de terminal con PIN'
-        });
-        return false;
-      }
-    },
-    [currentUser, showToast]
-  );
 
   // Broadcast channel for instantaneous cross-tab synchronization
   const broadcastSync = useCallback((action: string, payload: unknown) => {
@@ -516,7 +245,7 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
   // irrepetible por montaje, guarda `disposed` y `removeChannel` en el cleanup.
   useEffect(() => {
     let disposed = false;
-    const mountId = ++realtimeChannelSeq;
+    const mountId = nextRealtimeChannelSeq();
     const stamp = Date.now();
     /** Topic irrepetible: imposibilita reutilizar una instancia zombie/moribunda. */
     const topicFor = (scope: string) => `gastropulse_realtime_${scope}_${stamp}_${mountId}`;
@@ -696,99 +425,10 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
       const savedDiner = localStorage.getItem(STORAGE_KEY_DINER);
       if (savedDiner) setDinerActiveTicket(JSON.parse(savedDiner));
 
-      // Perfil en caché para pintar sin parpadeo; abajo se confirma con Supabase Auth.
-      setCurrentUser(readAuthSession());
     } catch (err) {
       console.warn('Error loading GastroPulse state from storage:', err);
     }
   }, []);
-
-  // La sesión real es la de Supabase Auth: confirma (o descarta) el perfil en
-  // caché y reacciona si la sesión se cierra o vence en cualquier pestaña.
-  useEffect(() => {
-    let cancelled = false;
-    loadCurrentStaffUser()
-      .then((user) => {
-        if (!cancelled) setCurrentUser(user);
-      })
-      .catch(() => undefined);
-    const { data } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_OUT') {
-        setCurrentUser(null);
-        setIsTerminalLocked(false);
-      }
-    });
-    return () => {
-      cancelled = true;
-      data.subscription.unsubscribe();
-    };
-  }, []);
-
-  // Sincronización reactiva de la sesión: login, logout, cambio de usuario o
-  // modificaciones desde otro tab del mismo terminal actualizan el rol en vivo.
-  useEffect(() => {
-    const handleSessionChange = (event: Event) => {
-      const session = (event as CustomEvent<AuthUser | null>).detail ?? null;
-      setCurrentUser(session);
-      if (!session) {
-        setIsTerminalLocked(false);
-      }
-    };
-
-    const handleStorageSync = (event: StorageEvent) => {
-      // Sólo reacciona a cambios de la clave de sesión (o a un clear global)
-      if (event.key !== null && event.key !== STORAGE_KEY_AUTH) return;
-      setCurrentUser(readAuthSession());
-    };
-
-    window.addEventListener(AUTH_SESSION_CHANGE_EVENT, handleSessionChange);
-    window.addEventListener('storage', handleStorageSync);
-
-    return () => {
-      window.removeEventListener(AUTH_SESSION_CHANGE_EVENT, handleSessionChange);
-      window.removeEventListener('storage', handleStorageSync);
-    };
-  }, []);
-
-  // Blindaje absoluto: si el usuario está en la carta (/ o /menu), desbloquear de
-  // inmediato. Se ajusta durante el render, así la carta nunca pinta el candado.
-  const isOnStaffRoute = isStaffManagementRoute(pathname || (typeof window !== 'undefined' ? window.location.pathname : ''));
-  if (!isOnStaffRoute && (isTerminalLocked || quickUnlockPin || quickUnlockError)) {
-    setIsTerminalLocked(false);
-    setQuickUnlockPin('');
-    setQuickUnlockError('');
-  }
-
-  // Inactivity auto-lock monitor (EXCLUSIVO para terminales operativas del staff: /kds, /pedidos, etc.)
-  useEffect(() => {
-    if (!isOnStaffRoute) return;
-    if (!currentUser || isTerminalLocked) return;
-
-    let timeoutId: NodeJS.Timeout;
-    const INACTIVITY_LIMIT_MS = 5 * 60 * 1000; // 5 minutes
-
-    const resetTimer = () => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
-        setIsTerminalLocked(true);
-        AuditLogger.log({
-          eventType: 'SESSION_LOCKED',
-          severity: 'WARN',
-          user: currentUser.name,
-          details: 'Terminal bloqueada automáticamente por 5 min de inactividad'
-        });
-      }, INACTIVITY_LIMIT_MS);
-    };
-
-    const events = ['mousemove', 'keydown', 'touchstart', 'pointerdown'];
-    events.forEach((ev) => window.addEventListener(ev, resetTimer, { passive: true }));
-    resetTimer();
-
-    return () => {
-      clearTimeout(timeoutId);
-      events.forEach((ev) => window.removeEventListener(ev, resetTimer));
-    };
-  }, [currentUser, isTerminalLocked, isOnStaffRoute]);
 
   // Listen to BroadcastChannel events with strict schema and action validation
   useEffect(() => {
@@ -1885,8 +1525,6 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
     []
   );
 
-  const lockDialog = useDialog(Boolean(isTerminalLocked && currentUser && isOnStaffRoute));
-
   return (
     <RestaurantContext.Provider
       value={{
@@ -1901,11 +1539,8 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
         setRunners,
         totalShiftRevenue,
         kitchenPaused,
-        toast,
         dinerActiveTicket,
         audioEnabled,
-        currentUser,
-        isTerminalLocked,
         sendOrderFromMenu,
         reconcileQueuedOrder,
         recordTableOrderRound,
@@ -1925,10 +1560,6 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
         resetAllDemoData,
         simulateNewOrder,
         createNewKdsTicket,
-        logoutUser,
-        lockTerminal,
-        unlockTerminalWithPin,
-        logSecurityEvent,
         updateOrderStatus,
         addOrderNote,
         requestTableAccount,
@@ -1938,108 +1569,6 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
     >
       {children}
 
-      {/* Terminal Inactivity Quick Lock Screen Overlay (EXCLUSIVO para terminales del staff: /kds, /pedidos, etc.) */}
-      {isTerminalLocked && currentUser && isStaffManagementRoute(pathname || (typeof window !== 'undefined' ? window.location.pathname : '')) && (
-        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-xl flex items-center justify-center p-4 animate-fadeIn">
-          <div {...lockDialog} aria-label="Terminal bloqueada por inactividad" className="bg-[#161619] max-w-sm w-full rounded-2xl border border-[#ff5708]/50 p-6 space-y-5 text-center shadow-[0_0_50px_rgba(255,87,8,0.25)]">
-            <div className="w-14 h-14 mx-auto rounded-2xl bg-[#ff5708]/20 border border-[#ff5708]/40 flex items-center justify-center text-[#ff5708]">
-              <span className="material-symbols-outlined text-[32px]">lock</span>
-            </div>
-
-            <div>
-              <span className="font-label-code text-[11px] text-[#ffb59c] uppercase font-bold tracking-wider">
-                Terminal Bloqueada por Inactividad
-              </span>
-              <h3 className="text-[20px] font-bold text-white mt-1">{currentUser.name}</h3>
-              <p className="text-[12px] text-[#c6c5cf] mt-0.5 font-label-code">
-                {currentUser.roleTitle} • Ingresa tu PIN para continuar
-              </p>
-            </div>
-
-            {quickUnlockError && (
-              <div className="p-2 rounded-lg bg-[#93000a]/30 border border-[#ffb4ab]/40 text-[#ffb4ab] text-[12px]">
-                {quickUnlockError}
-              </div>
-            )}
-
-            {/* Bullets */}
-            <div className="flex justify-center items-center gap-3 py-1">
-              {[0, 1, 2, 3].map((index) => (
-                <div
-                  key={index}
-                  className={`w-3.5 h-3.5 rounded-full border-2 transition-all ${
-                    quickUnlockPin.length > index
-                      ? 'bg-[#ff5708] border-[#ff5708] shadow-[0_0_10px_#ff5708]'
-                      : 'bg-transparent border-[#353437]'
-                  }`}
-                />
-              ))}
-            </div>
-
-            {/* Numeric Keypad */}
-            <div className="grid grid-cols-3 gap-2 max-w-[220px] mx-auto">
-              {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
-                <button
-                  key={digit}
-                  type="button"
-                  onClick={() => {
-                    if (quickUnlockPin.length < 4) {
-                      const next = quickUnlockPin + digit;
-                      setQuickUnlockPin(next);
-                      if (next.length === 4) {
-                        unlockTerminalWithPin(next);
-                      }
-                    }
-                  }}
-                  className="h-11 rounded-xl bg-[#201f22] hover:bg-[#2a2a2c] active:bg-[#ff5708] text-white font-bold text-[18px] transition-colors cursor-pointer border border-[#353437]/40"
-                >
-                  {digit}
-                </button>
-              ))}
-              <button
-                type="button"
-                onClick={() => setQuickUnlockPin('')}
-                className="h-11 rounded-xl bg-[#201f22] hover:bg-[#2a2a2c] text-[#c6c5cf] font-medium text-[11px] flex items-center justify-center cursor-pointer border border-[#353437]/40"
-              >
-                Borrar
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (quickUnlockPin.length < 4) {
-                    const next = quickUnlockPin + '0';
-                    setQuickUnlockPin(next);
-                    if (next.length === 4) {
-                      unlockTerminalWithPin(next);
-                    }
-                  }
-                }}
-                className="h-11 rounded-xl bg-[#201f22] hover:bg-[#2a2a2c] active:bg-[#ff5708] text-white font-bold text-[18px] transition-colors cursor-pointer border border-[#353437]/40"
-              >
-                0
-              </button>
-              <button
-                type="button"
-                onClick={() => setQuickUnlockPin((prev) => prev.slice(0, -1))}
-                className="h-11 rounded-xl bg-[#201f22] hover:bg-[#2a2a2c] text-[#c6c5cf] flex items-center justify-center cursor-pointer border border-[#353437]/40"
-              >
-                <span className="material-symbols-outlined text-[18px]">backspace</span>
-              </button>
-            </div>
-
-            <div className="pt-2 border-t border-[#353437]/40 flex items-center justify-between text-[11px]">
-              <span className="text-[#c6c5cf]">¿No eres tú?</span>
-              <button
-                type="button"
-                onClick={logoutUser}
-                className="text-[#ff5708] hover:underline font-semibold cursor-pointer"
-              >
-                Cerrar Sesión
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </RestaurantContext.Provider>
   );
 };

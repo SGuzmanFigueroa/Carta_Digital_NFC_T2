@@ -9,10 +9,12 @@ import { useRouter } from 'next/navigation';
 import { usePaidOrderHistory } from '@/hooks/usePaidOrderHistory';
 import { mergePaymentOrders } from '@/features/orders/paymentFilter';
 import { reviewTablePaymentInDb } from '@/services/orderService';
+import { useToast } from '@/context/ToastContext';
 
 export default function PedidosPage() {
   const router = useRouter();
-  const { orders, updateOrderStatus, addOrderNote, toast, showToast } = useRestaurant();
+  const { orders, updateOrderStatus, addOrderNote, showToast } = useRestaurant();
+  const { toast } = useToast();
   const history = usePaidOrderHistory();
   const accountOrders = mergePaymentOrders(orders, history.paidOrders);
 
