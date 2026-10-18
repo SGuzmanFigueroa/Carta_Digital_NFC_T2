@@ -255,8 +255,9 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={lockTerminal}
             className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#1c1b1d] hover:bg-[#2a2a2c] text-[#bcbbc5] hover:text-[#ff5708] border border-[#353437] transition-all text-[11px] font-semibold"
             title="Bloquear Terminal Inmediatamente"
+            aria-label="Bloquear terminal"
           >
-            <span className="material-symbols-outlined text-[16px] text-amber-500">lock</span>
+            <span className="material-symbols-outlined text-[16px] text-amber-500" aria-hidden="true">lock</span>
             <span className="hidden md:inline">{t.lock}</span>
           </button>
 

@@ -12,7 +12,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     env:
       # Valores ficticios: el build solo necesita que existan. Nunca pongas
       # aquí claves reales; para eso están los secrets del repositorio.
@@ -41,3 +41,21 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      # Pruebas de punta a punta (Tarea 45) contra el build de producción. Sin
+      # Supabase real, las de login/panel se saltan solas; ninguna cambia datos.
+      - name: Instalar Chromium para Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Pruebas E2E
+        run: npm run test:e2e
+        env:
+          E2E_PORT: 3100
+
+      - name: Reporte E2E
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

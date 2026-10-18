@@ -51,3 +51,8 @@ figma_exports/
 
 # Contraseñas temporales que genera scripts/provision-staff-auth.mjs
 *.local.txt
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
