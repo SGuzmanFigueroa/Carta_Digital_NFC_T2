@@ -4,6 +4,7 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { LoginScreen } from '@/components/LoginScreen';
 import { AuthUser } from '@/types';
+import { getSafeLoginRedirect } from '@/services/authService';
 
 function LoginContent() {
   const router = useRouter();
@@ -34,9 +35,7 @@ function LoginContent() {
   };
 
   const redirectParam = searchParams.get('redirect');
-  const redirectTo = redirectParam?.startsWith('/') && !redirectParam.startsWith('//')
-    ? redirectParam
-    : undefined;
+  const redirectTo = redirectParam === null ? undefined : getSafeLoginRedirect(redirectParam);
 
   const handleExploreAsGuest = () => {
     router.push('/menu');

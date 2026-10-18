@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { AuditLogger, sanitizeText } from '../utils/security';
 import { kitchenAudio } from '../utils/audio';
 import { AuthUser } from '../types';
-import { changeOwnPassword, loadCurrentStaffUser, loginDemo, loginStaff } from '../services/authService';
+import { changeOwnPassword, loadCurrentStaffUser, loginDemo, loginStaff, getSafeLoginRedirect } from '../services/authService';
 import { useDialog } from '@/hooks/useDialog';
 
 interface LoginScreenProps {
@@ -131,14 +131,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
   const executeRoleRedirection = (user: AuthUser) => {
     const role = `${user.role} ${user.roleTitle}`.toLowerCase();
-    const destination = redirectTo || (
+    const destination = redirectTo !== undefined ? getSafeLoginRedirect(redirectTo) : (
       role.includes('admin') ? '/dashboard' :
       role.includes('kitchen') || role.includes('chef') || role.includes('cocina') ? '/kds' :
       role.includes('floor') || role.includes('waiter') || role.includes('mozo') || role.includes('mesero') || role.includes('sala') ? '/pedidos' :
       '/kds'
     );
 
-    router.replace(destination);
+    router.replace(getSafeLoginRedirect(destination));
   };
 
   const finishLogin = (user: AuthUser) => {

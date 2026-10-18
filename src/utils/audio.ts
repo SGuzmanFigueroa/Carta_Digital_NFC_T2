@@ -5,20 +5,32 @@ class KitchenAudioSystem {
   private ctx: AudioContext | null = null;
   public enabled: boolean = true;
 
-  private initCtx() {
-    if (!this.ctx && typeof window !== 'undefined') {
+  private initCtx(resume = true) {
+    if ((!this.ctx || this.ctx.state === 'closed') && typeof window !== 'undefined') {
       const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       if (AudioCtx) {
         this.ctx = new AudioCtx();
       }
     }
-    if (this.ctx && this.ctx.state === 'suspended') {
-      this.ctx.resume();
+    if (resume && this.ctx && this.ctx.state !== 'running' && this.ctx.state !== 'closed') {
+      void this.ctx.resume().catch(() => {});
     }
   }
 
-  public prepareForPlayback() {
-    this.initCtx();
+  public get isReady(): boolean {
+    return this.ctx?.state === 'running';
+  }
+
+  public async prepareForPlayback(): Promise<boolean> {
+    try {
+      // Called synchronously inside the gesture, before the first await.
+      this.initCtx(false);
+      if (!this.ctx) return false;
+      if (this.ctx.state !== 'running') await this.ctx.resume();
+      return this.isReady;
+    } catch {
+      return false;
+    }
   }
 
   public playCheckItemSound() {
@@ -193,3 +205,26 @@ class KitchenAudioSystem {
 }
 
 export const kitchenAudio = new KitchenAudioSystem();
+
+/** Capture the first real gesture without cancelling the kitchen's buttons. */
+export function bindKitchenAudioUnlock(
+  onReady: (ready: boolean) => void,
+  audio: Pick<KitchenAudioSystem, 'isReady' | 'prepareForPlayback'> = kitchenAudio,
+): () => void {
+  let disposed = false;
+  let pending = false;
+  const events = ['pointerup', 'click', 'keydown'] as const;
+  const remove = () => events.forEach(event => document.removeEventListener(event, activate, true));
+  const activate = (event: Event) => {
+    if (!event.isTrusted || pending || disposed) return;
+    pending = true;
+    void audio.prepareForPlayback().then(ready => {
+      if (disposed) return;
+      pending = false;
+      if (ready) { onReady(true); remove(); }
+    }).catch(() => { pending = false; });
+  };
+  onReady(audio.isReady);
+  if (!audio.isReady) events.forEach(event => document.addEventListener(event, activate, true));
+  return () => { disposed = true; remove(); };
+}

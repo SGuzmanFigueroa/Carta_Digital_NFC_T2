@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Ticket, StationId, Runner, TicketItem } from '../types';
-import { kitchenAudio } from '../utils/audio';
+import { kitchenAudio, bindKitchenAudioUnlock } from '../utils/audio';
+import { PassVelocityChart } from './PassVelocityChart';
 import { DishDetailModal } from './DishDetailModal';
 import { RunnersModal } from './RunnersModal';
 import { NewOrderModal } from './NewOrderModal';
@@ -36,6 +37,8 @@ export const KDSBoard: React.FC<KDSBoardProps> = ({
 
   const [selectedStation, setSelectedStation] = useState<StationId>('all');
   const [highContrast, setHighContrast] = useState(false);
+  const [audioUnlocked, setAudioUnlocked] = useState(false);
+  useEffect(() => bindKitchenAudioUnlock(setAudioUnlocked), []);
   const [currentTimeStr, setCurrentTimeStr] = useState('14:48:22');
   
   // Toast notification
@@ -180,6 +183,11 @@ export const KDSBoard: React.FC<KDSBoardProps> = ({
 
   return (
     <div className={`flex flex-col w-full text-[#e5e1e4] select-none pb-[calc(6.25rem+env(safe-area-inset-bottom))] sm:pb-28 ${highContrast ? 'contrast-125' : ''}`}>
+      {contextAudioEnabled && !audioUnlocked && (
+        <button type="button" className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 max-w-[calc(100%-2rem)] w-max rounded-full border border-[#ff5708]/40 bg-[#1c1b1d]/95 px-4 py-2 text-[12px] text-[#e5e1e4] shadow-lg cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5708]">
+          Toca la pantalla para activar las alertas sonoras de cocina
+        </button>
+      )}
       {/* Top Telemetry & Station Switcher Bar
           Sticky from tablet up. On phones it scrolls with the page so it doesn't eat half of the screen. */}
       <div className="relative md:sticky md:top-16 z-40 bg-[#0e0e10]/95 backdrop-blur-xl px-3 sm:px-4 lg:px-8 py-3 shadow-2xl flex flex-col gap-2.5 border-b border-[#353437]/40 w-full">
@@ -744,36 +752,7 @@ export const KDSBoard: React.FC<KDSBoardProps> = ({
             </span>
           </div>
 
-          {/* Inline SVG Visualizer for Ticket Latency */}
-          <div className="py-4">
-            <svg className="w-full h-16 text-[#ff5708] overflow-visible" preserveAspectRatio="none" viewBox="0 0 300 60">
-              <defs>
-                <linearGradient id="latencyGradient" x1="0" x2="0" y1="0" y2="1">
-                  <stop offset="0%" stopColor="#ff5708" stopOpacity="0.35" />
-                  <stop offset="100%" stopColor="#ff5708" stopOpacity="0.0" />
-                </linearGradient>
-              </defs>
-              <path
-                d="M 0,45 Q 40,20 80,35 T 160,15 T 240,40 T 300,10 L 300,60 L 0,60 Z"
-                fill="url(#latencyGradient)"
-              />
-              <path
-                d="M 0,45 Q 40,20 80,35 T 160,15 T 240,40 T 300,10"
-                fill="none"
-                stroke="currentColor"
-                strokeLinecap="round"
-                strokeWidth="3"
-              />
-              <circle className="animate-ping" cx="280" cy="15" r="5" fill="#ffb4ab" stroke="#93000a" strokeWidth="2" />
-              <circle cx="280" cy="15" r="4.5" fill="#ff5708" />
-            </svg>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 font-mono-code text-[11px] text-[#c6c5cf]">
-            <span>14:00 (18 Platos)</span>
-            <span>14:30 (34 Platos)</span>
-            <span className="text-[#ff5708] font-bold">14:48 (Pico Activo)</span>
-          </div>
+          <PassVelocityChart />
         </div>
 
         {/* Active Expediters & Runners Status */}

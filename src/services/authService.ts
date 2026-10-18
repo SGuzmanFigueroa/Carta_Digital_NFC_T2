@@ -3,6 +3,7 @@ import { AuthUser, StaffMember, RolePermissionItem, StaffAuditLogItem, Permissio
 import { cacheAuthProfile, clearAuthProfile } from '@/utils/security';
 import { clearSessionChoice, isBrowserSessionExpired, rememberSessionChoice } from '@/utils/sessionPersistence';
 import type { Database } from '@/types/database.types';
+export { getSafeLoginRedirect } from '@/utils/loginRedirect';
 
 // ==========================================
 // Sesión del personal (Supabase Auth)
@@ -421,3 +422,16 @@ export async function createAuditLogInDb(
   }
 }
 
+export async function sendPasswordResetEmail(email: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${typeof window !== 'undefined' ? window.location.origin : ''}/reset-password`,
+    });
+    if (error) throw error;
+    return { success: true };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'No se pudo enviar el correo de recuperación.';
+    console.error('Error enviando correo de recuperación:', message);
+    return { success: false, error: message };
+  }
+}
