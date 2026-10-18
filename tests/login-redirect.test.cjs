@@ -1,13 +1,16 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path'), ts = require('typescript'), vm = require('node:vm'), React = require('react');
+React.useRef = initial => ({ current: initial });
+React.useState = initial => [typeof initial === 'function' ? initial() : initial, () => {}];
+React.useEffect = () => {};
 const root = path.join(__dirname, '..');
 function load(file, dependencies = {}, globals = {}) {
   const module = { exports: {} };
   const code = ts.transpileModule(fs.readFileSync(path.join(root, file), 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.React, esModuleInterop: true },
   }).outputText;
-  vm.runInNewContext(code, { URL, URLSearchParams, module, exports: module.exports,
+  vm.runInNewContext(code, { URL, URLSearchParams, process: { env: { NODE_ENV: 'test' } }, module, exports: module.exports,
     require: id => dependencies[id] ?? (id === 'react' ? React : {}), ...globals });
   return module.exports;
 }
@@ -39,7 +42,7 @@ test('servicio y página: se valida el parámetro decodificado; ausencia conserv
   const service = load('src/services/authService.ts', { '@/utils/loginRedirect': validator });
   assert.equal(service.getSafeLoginRedirect('/\\evil.com'), '/dashboard');
   const LoginScreen = () => null;
-  const react = { ...React, useState: initial => [typeof initial === 'function' ? initial() : initial, () => {}], useEffect() {} };
+  const react = { ...React, useState: initial => [typeof initial === 'function' ? initial() : initial, () => {}], useEffect() {}, useRef: initial => ({ current: initial }) };
   for (const [query, expected] of [['redirect=%2F%5Cevil.com', '/dashboard'], ['redirect=%2F%2Fevil.com', '/dashboard'], ['redirect=/pedidos', '/pedidos'], ['redirect=', '/dashboard'], ['', undefined]]) {
     const page = load('src/app/(auth)/login/page.tsx', { react,
       'next/navigation': { useRouter: () => ({}), useSearchParams: () => new URLSearchParams(query) },
@@ -60,20 +63,29 @@ function findDemoButton(node, name) {
   return findDemoButton(node.props.children, name);
 }
 
-test('navegación real del componente: valida de nuevo un redirectTo recibido directamente', () => {
+test('navegación real del componente: valida de nuevo un redirectTo recibido directamente', async () => {
   const staff = [{ id: 'test-admin', name: 'Administrador de prueba', role: 'admin', roleTitle: 'Administrador', username: 'test-admin', pin: '1234' }];
   const react = { ...React, useState: initial => [typeof initial === 'function' ? initial() : initial, () => {}], useEffect() {} };
   for (const [redirectTo, expected] of [['/\\evil.com', '/dashboard'], ['//evil.com', '/dashboard'], ['https://evil.com', '/dashboard'], ['', '/dashboard'], ['/pedidos', '/pedidos'], [undefined, '/dashboard']]) {
     let destination;
-    const component = load('src/components/LoginScreen.tsx', { react,
+    const component = load('src/components/LoginScreen.tsx', { 'react': react,
       'next/navigation': { useRouter: () => ({ replace(value) { destination = value; } }) },
-      '../services/authService': { getSafeLoginRedirect: safe },
-      '../utils/security': { setAuthSessionCookie() {}, AuditLogger: { log() {} } },
+      '../services/authService': {
+        getSafeLoginRedirect: safe,
+        loginDemo: async () => ({ ok: true, user: staff[0], mustChangePassword: false }),
+        loginStaff: async () => ({ ok: true, user: staff[0], mustChangePassword: false }),
+        changeOwnPassword: async () => ({ ok: true }),
+        loadCurrentStaffUser: async () => staff[0],
+      },
+      '../utils/security': { setAuthSessionCookie() {}, AuditLogger: { log() {} }, sanitizeText: s => s },
+      '../utils/audio': { kitchenAudio: { prepareForPlayback() {}, playDispatchSound() {} } },
+      '@/hooks/useDialog': { useDialog: () => ({ dialogRef: { current: null }, isOpen: false, open: () => {}, close: () => {} }) },
       '../data/mockData': { INITIAL_STAFF: staff },
-    }, { localStorage: { setItem() {} } });
-    const tree = component.LoginScreen({ staffList: staff, onLoginSuccess() {}, onExploreAsGuest() {}, onShowToast() {}, redirectTo });
+    }, { localStorage: { setItem() {}, getItem() { return null; } } });
+    const tree = component.LoginScreen({ onLoginSuccess() {}, onExploreAsGuest() {}, onShowToast() {}, redirectTo });
     const button = findDemoButton(tree, 'Admin / Gerente');
-    assert.ok(button); button.props.onClick();
+    assert.ok(button); await button.props.onClick();
+    await new Promise(r => setTimeout(r, 20));
     assert.equal(destination, expected);
   }
 });
