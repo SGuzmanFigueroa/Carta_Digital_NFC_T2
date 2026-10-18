@@ -8,7 +8,7 @@ import { ToastProvider } from "@/context/ToastContext";
 
 // Versión del service worker = commit del deploy (Netlify: COMMIT_REF). Cambia en
 // cada deploy y así el SW renueva la caché de modelos 3D e imágenes.
-const SW_VERSION = encodeURIComponent((process.env.COMMIT_REF || process.env.GITHUB_SHA || "dev").slice(0, 12));
+const SW_VERSION = encodeURIComponent(process.env.APP_BUILD_VERSION || "dev");
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
