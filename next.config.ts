@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { buildContentSecurityPolicy } from "./src/lib/contentSecurityPolicy";
 
 const securityHeaders = [
   {
@@ -19,7 +20,17 @@ const securityHeaders = [
   },
   {
     key: "Permissions-Policy",
-    value: "camera=(self), microphone=(), geolocation=()",
+    // geolocation=(self): la geocerca antifraude pide la ubicación del comensal.
+    // Antes estaba en geolocation=() y el navegador la negaba sin preguntar.
+    value: "camera=(self), microphone=(), geolocation=(self)",
+  },
+  {
+    key: "Content-Security-Policy",
+    value: buildContentSecurityPolicy({
+      supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL || "https://zvtwnlfaizyhwtwypimv.supabase.co",
+      sentryDsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+      isDev: process.env.NODE_ENV === "development",
+    }),
   },
   {
     key: "X-XSS-Protection",
