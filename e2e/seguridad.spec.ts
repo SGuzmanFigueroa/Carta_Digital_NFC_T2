@@ -9,8 +9,9 @@ test('la carta envía la CSP y permite cámara y ubicación solo al propio sitio
   expect(csp).toContain("object-src 'none'");
   expect(csp).toContain("frame-ancestors 'self'");
   // Supabase (datos y realtime) tiene que poder conectarse.
-  expect(csp).toMatch(/connect-src [^;]*https:\/\/[a-z0-9]+\.supabase\.co/);
-  expect(csp).toMatch(/connect-src [^;]*wss:\/\/[a-z0-9]+\.supabase\.co/);
+  // [a-z0-9-]: en el CI el proyecto es ficticio (ci-placeholder).
+  expect(csp).toMatch(/connect-src [^;]*https:\/\/[a-z0-9-]+\.supabase\.co/);
+  expect(csp).toMatch(/connect-src [^;]*wss:\/\/[a-z0-9-]+\.supabase\.co/);
 
   // La geocerca antifraude necesita la ubicación del comensal.
   expect(res.headers()['permissions-policy']).toContain('geolocation=(self)');
