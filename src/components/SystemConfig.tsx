@@ -1,5 +1,7 @@
 'use client';
 
+import { DEFAULT_RESTAURANT_IDENTITY } from '@/config/restaurant';
+
 import React, { useState, useEffect } from 'react';
 import { SystemConfigState } from '../types';
 import { applyTheme, ACCENT_PALETTE } from '@/utils/theme';
@@ -236,7 +238,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
               {t.sys_title}
             </h1>
             <p className={`text-[13px] max-w-2xl ${descColor}`}>
-              {t.sys_subtitle} {formData.branchName || 'AUREA Bistro'}. {t.sys_subtitle_end}
+              {t.sys_subtitle} {formData.branchName || DEFAULT_RESTAURANT_IDENTITY.branchName}. {t.sys_subtitle_end}
             </p>
           </div>
           <div className="flex gap-2 sm:gap-4 w-full sm:w-auto">
@@ -458,12 +460,12 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                 }`}>
                   <UploadedImage 
                     src={formData.logoUrl || '/logo.png'} 
-                    alt={`Logo ${formData.branchName || 'AUREA Bistro'}`} 
+                    alt={`Logo ${formData.branchName || DEFAULT_RESTAURANT_IDENTITY.branchName}`}
                     className="w-full h-full object-cover"
                   />
                 </div>
 
-                <h3 className={`font-bold mb-1 text-[15px] text-center ${titleColor}`}>{formData.branchName || 'AUREA Bistro'}</h3>
+                <h3 className={`font-bold mb-1 text-[15px] text-center ${titleColor}`}>{formData.branchName || DEFAULT_RESTAURANT_IDENTITY.branchName}</h3>
                 <p className={`text-[10px] font-mono tracking-widest mb-5 ${descColor}`}>RUC: {formData.branchRuc || '20608941203'}</p>
                 <button 
                   type="button"
@@ -1062,7 +1064,7 @@ export const SystemConfig: React.FC<SystemConfigProps> = ({
                   
                   {/* Status header inside ticket */}
                   <div className="text-center border-b border-dashed border-gray-400 pb-2 mb-2">
-                    <p className="font-extrabold text-[11px]">=== {formData.branchName.toUpperCase() || 'AUREA BISTRO'} ===</p>
+                    <p className="font-extrabold text-[11px]">=== {formData.branchName.toUpperCase() || DEFAULT_RESTAURANT_IDENTITY.branchName.toUpperCase()} ===</p>
                     <p className="text-[8px] text-gray-500 font-mono tracking-wider">RUC: {formData.branchRuc || '20608941203'}</p>
                     <p className="font-bold mt-1 text-[#FF5A1F]">COMANDA: #4088 (MESA 12)</p>
                   </div>

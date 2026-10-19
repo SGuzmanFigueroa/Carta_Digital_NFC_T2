@@ -1,9 +1,10 @@
+import { RESTAURANT_ID, SYSTEM_CONFIG_STORAGE_KEY, SYSTEM_CONFIG_CHANGED_EVENT } from '@/config/restaurant';
 import { supabase } from '@/lib/supabase';
 import { SystemConfigState } from '@/types';
 import { INITIAL_CONFIG } from '@/data/mockData';
 import { createAuditLogInDb } from './authService';
 
-const STORAGE_KEY = 'gastropulse_system_config';
+const STORAGE_KEY = SYSTEM_CONFIG_STORAGE_KEY;
 
 const THEME_MODES: readonly SystemConfigState['themeMode'][] = ['obsidian', 'midnight', 'titanium', 'light', 'kds-high-contrast'];
 const DENSITIES: readonly SystemConfigState['density'][] = ['compact', 'touch'];
@@ -32,7 +33,7 @@ export async function fetchSystemConfigFromDb(): Promise<SystemConfigState> {
     const { data, error } = await supabase
       .from('system_config')
       .select('*')
-      .eq('id', 'primary')
+      .eq('id', RESTAURANT_ID)
       .maybeSingle();
 
     if (error || !data) {
@@ -85,12 +86,16 @@ export async function saveSystemConfigToDb(updated: SystemConfigState): Promise<
     }
   }
 
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(SYSTEM_CONFIG_CHANGED_EVENT, { detail: updated }));
+  }
+
   // 2. Persist to Supabase
   try {
     const { error } = await supabase
       .from('system_config')
       .upsert({
-        id: 'primary',
+        id: RESTAURANT_ID,
         branch_name: updated.branchName,
         branch_ruc: updated.branchRuc,
         logo_url: updated.logoUrl || "/logo.png",

@@ -1,3 +1,5 @@
+import { useRestaurantIdentity } from '@/context/RestaurantIdentityContext';
+import { escapeRestaurantHtml } from '@/config/restaurant';
 import React, { useState, useMemo } from 'react';
 import { TableStatus, Ticket, OrderTicket } from '../types';
 import { INITIAL_MENU_ITEMS } from '../data/mockData';
@@ -39,6 +41,7 @@ export const AdminFloorPanel: React.FC<AdminFloorPanelProps> = ({
   onCollectTableBill,
   onOpenTable
 }) => {
+  const { branchName, branchRuc } = useRestaurantIdentity();
   const [activeZone, setActiveZone] = useState<'all' | 'salon' | 'terraza' | 'barra'>('all');
   const [selectedTableDetail, setSelectedTableDetail] = useState<TableStatus | null>(null);
   // CD-28 · Llamados de mesa abiertos (indicador propio, NO cuenta en `criticalCount`).
@@ -241,8 +244,8 @@ export const AdminFloorPanel: React.FC<AdminFloorPanelProps> = ({
           </head>
           <body>
             <div class="header">
-              <h2 style="margin: 0;">AUREA BISTRO & WOK</h2>
-              <p style="margin: 4px 0; font-size: 12px;">RUC: 20608941203</p>
+              <h2 style="margin: 0;">${escapeRestaurantHtml(branchName)}</h2>
+              <p style="margin: 4px 0; font-size: 12px;">RUC: ${escapeRestaurantHtml(branchRuc)}</p>
               <h3 style="margin: 6px 0;">CORTE Z - CIERRE DE TURNO</h3>
               <p style="margin: 0; font-size: 11px;">Fecha: ${new Date().toLocaleDateString('es-PE')} ${new Date().toLocaleTimeString('es-PE')}</p>
             </div>
@@ -318,7 +321,7 @@ export const AdminFloorPanel: React.FC<AdminFloorPanelProps> = ({
               Panel Admin & Estado de Sala
             </h1>
             <span className="px-2 py-0.5 rounded-lg bg-[#1c1b1d] font-label-code text-[11px] text-[#ffb59c] border border-[#5c4037]/40 font-bold">
-              ZONA ACTIVA: AUREA MAIN
+              ZONA ACTIVA: {branchName}
             </span>
           </div>
         </div>

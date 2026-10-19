@@ -1,5 +1,6 @@
 'use client';
 
+import { useRestaurantIdentity } from '@/context/RestaurantIdentityContext';
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { AuditLogger, sanitizeText } from '../utils/security';
@@ -18,7 +19,7 @@ interface LoginScreenProps {
 }
 
 /**
- * ⚠️ Acceso rápido de la etapa de desarrollo: entra con un clic a las cuentas
+ * Acceso rápido de la etapa de desarrollo: entra con un clic a las cuentas
  * demo (demo_admin, demo_cocina…). Se apaga con NEXT_PUBLIC_DEMO_LOGIN_ENABLED=false
  * y hay que BORRARLO antes de tener clientes reales (ver /api/auth/demo-login).
  */
@@ -71,6 +72,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   redirectTo,
   forcePasswordChange = false
 }) => {
+  const { branchName, email } = useRestaurantIdentity();
   const router = useRouter();
   const passwordInputRef = useRef<HTMLInputElement>(null);
 
@@ -267,7 +269,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 OS
               </span>
             </div>
-            <span className="text-[11px] text-[#c6c5cf]">AUREA Bistro • Miraflores</span>
+            <span className="text-[11px] text-[#c6c5cf]">{branchName}</span>
           </div>
         </div>
 
@@ -551,7 +553,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         </div>
 
         <div>
-          <span>Sucursal Miraflores • Sistema de Facturación Electrónica SUNAT Conectado</span>
+          <span>{branchName} • {email}</span>
         </div>
       </footer>
     </div>

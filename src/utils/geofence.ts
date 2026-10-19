@@ -1,4 +1,5 @@
-﻿/**
+import { RESTAURANT_ID, DEFAULT_RESTAURANT_IDENTITY } from '@/config/restaurant';
+/**
  * Módulo de Utilidades de Geocerca GPS Antifraude
  * Proyecto: Carta Digital NFC
  * Arquitectura Segura, Aislamiento de Pedidos y Tolerancia a Entornos de Desarrollo
@@ -40,7 +41,7 @@ export const DEFAULT_GEOFENCE_CONFIG: GeofenceConfig = {
   longitude: -77.0298,
   radiusMeters: 150,
   bypassInDev: true,
-  branchName: 'AUREA Bistro Central'
+  branchName: DEFAULT_RESTAURANT_IDENTITY.branchName
 };
 
 /**
@@ -101,7 +102,7 @@ function writeGeofenceCache(config: GeofenceConfig): void {
  */
 export async function loadGeofenceConfig(): Promise<GeofenceConfig> {
   if (typeof window === 'undefined') return DEFAULT_GEOFENCE_CONFIG;
-  const { data, error } = await supabase.from('system_config').select('geofence_config').eq('id', 'primary').maybeSingle();
+  const { data, error } = await supabase.from('system_config').select('geofence_config').eq('id', RESTAURANT_ID).maybeSingle();
   const stored = (data?.geofence_config ?? {}) as Partial<GeofenceConfig>;
   if (error || Object.keys(stored).length === 0) return getStoredGeofenceConfig();
   try {
@@ -122,7 +123,7 @@ export function saveStoredGeofenceConfig(config: GeofenceConfig): void {
   void supabase
     .from('system_config')
     .update({ geofence_config: config as unknown as Json, updated_at: new Date().toISOString() })
-    .eq('id', 'primary')
+    .eq('id', RESTAURANT_ID)
     .select('id')
     .then(({ data, error }) => {
       if (error || !data?.length) {
@@ -296,7 +297,7 @@ export async function validateDinerGeofence(
 /** Migración única de la geocerca guardada solo en el navegador del admin (ver pagos). */
 export async function migrateLocalGeofenceConfigToDb(): Promise<void> {
   if (typeof window === 'undefined' || !localStorage.getItem(STORAGE_KEY_GEOFENCE)) return;
-  const { data, error } = await supabase.from('system_config').select('geofence_config').eq('id', 'primary').maybeSingle();
+  const { data, error } = await supabase.from('system_config').select('geofence_config').eq('id', RESTAURANT_ID).maybeSingle();
   if (error || !data) return;
   if (Object.keys((data.geofence_config ?? {}) as object).length === 0) saveStoredGeofenceConfig(getStoredGeofenceConfig());
 }

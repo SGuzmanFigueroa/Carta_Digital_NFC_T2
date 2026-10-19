@@ -1,3 +1,4 @@
+import { RestaurantIdentityProvider } from '@/context/RestaurantIdentityContext';
 import { MENU_THEME_BOOTSTRAP } from "@/utils/menuTheme";
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Space_Mono } from "next/font/google";
@@ -139,9 +140,11 @@ export default function RootLayout({
         {/* Avisos y sesión del personal en contextos propios: cambian sin re-renderizar la operación. */}
         <ToastProvider>
           <StaffSessionProvider>
-            <RestaurantProvider>
-              {children}
-            </RestaurantProvider>
+            <RestaurantIdentityProvider>
+              <RestaurantProvider>
+                {children}
+              </RestaurantProvider>
+            </RestaurantIdentityProvider>
           </StaffSessionProvider>
         </ToastProvider>
       </body>

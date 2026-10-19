@@ -1,3 +1,4 @@
+import { RESTAURANT_ID } from '@/config/restaurant';
 import type { Metadata } from 'next';
 import { INITIAL_MENU_ITEMS } from '@/data/mockData';
 import { createAnonServerClient } from '@/lib/supabaseServer';
@@ -18,7 +19,7 @@ async function loadMenu(): Promise<{ items: MenuItem[]; branchName: string | nul
     const db = createAnonServerClient();
     const [{ data: dishes, error }, { data: config }] = await Promise.all([
       db.from('dishes').select('*').eq('active', true).order('price', { ascending: true }),
-      db.from('system_config').select('branch_name').eq('id', 'primary').maybeSingle()
+      db.from('system_config').select('branch_name').eq('id', RESTAURANT_ID).maybeSingle()
     ]);
     if (error || !dishes?.length) throw error ?? new Error('Carta vacía');
     return { items: dishes.map(mapDishRow), branchName: config?.branch_name ?? null };

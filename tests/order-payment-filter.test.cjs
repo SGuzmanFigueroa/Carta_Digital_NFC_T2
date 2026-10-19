@@ -86,7 +86,7 @@ test('panel: pastillas accesibles y detalle restringido a la selección, sin acc
     } };
     const panel = load('src/components/OrdersCentral.tsx', {
       '@/components/OrderPaymentFilters': pills, '@/features/orders/paymentFilter': filters,
-      '@/hooks/useDialog': { useDialog: () => ({}) },
+      '@/context/RestaurantIdentityContext': { useRestaurantIdentity: () => ({ branchName: 'Local de prueba', email: 'ventas@example.test', branchRuc: '20123456789' }) }, '@/hooks/useDialog': { useDialog: () => ({}) },
     }, hookReact);
     const html = renderToStaticMarkup(panel.OrdersCentral({ orders: [order('pending', 'pending', 'en-cocina'), order('paid', 'paid')],
       onUpdateOrderStatus() {}, onShowToast() {} }));
@@ -99,7 +99,7 @@ test('panel: pastillas accesibles y detalle restringido a la selección, sin acc
     if (filter === 'pending') { assert.ok(html.includes('ID: #pending')); assert.ok(!html.includes('Ver comanda paid')); }
   }
   let stateIndex = 0;
-  const panel = load('src/components/OrdersCentral.tsx', { '@/components/OrderPaymentFilters': pills, '@/features/orders/paymentFilter': filters, '@/hooks/useDialog': { useDialog: () => ({}) } },
+  const panel = load('src/components/OrdersCentral.tsx', { '@/components/OrderPaymentFilters': pills, '@/features/orders/paymentFilter': filters, '@/context/RestaurantIdentityContext': { useRestaurantIdentity: () => ({ branchName: 'Local de prueba', email: 'ventas@example.test', branchRuc: '20123456789' }) }, '@/hooks/useDialog': { useDialog: () => ({}) } },
     { ...React, useState(initial) { return [stateIndex++ === 7 ? 'paid' : initial, () => {}]; } });
   const empty = renderToStaticMarkup(panel.OrdersCentral({ orders: [order('pending')], onUpdateOrderStatus() {}, onShowToast() {} }));
   assert.ok(empty.includes('No hay comandas que coincidan')); assert.ok(!empty.includes('Inspección de Ticket'));

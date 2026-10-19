@@ -1,3 +1,5 @@
+import { RESTAURANT_ID, restaurantIdentity } from '@/config/restaurant';
+import { createAnonServerClient } from '@/lib/supabaseServer';
 import type { MetadataRoute } from 'next';
 
 /**
@@ -10,10 +12,20 @@ import type { MetadataRoute } from 'next';
  * display e iconos de 192 y 512 px) Chrome en Android NUNCA dispara el evento
  * `beforeinstallprompt`, por lo que el banner no tendría nada que ofrecer.
  */
-export default function manifest(): MetadataRoute.Manifest {
+export const revalidate = 60;
+
+export default async function manifest(): Promise<MetadataRoute.Manifest> {
+  let identity = restaurantIdentity();
+  try {
+    const { data } = await createAnonServerClient().from('system_config')
+      .select('branch_name').eq('id', RESTAURANT_ID).maybeSingle();
+    if (data) identity = restaurantIdentity({ branchName: data.branch_name ?? undefined });
+  } catch {
+    // El manifiesto sigue disponible sin conexión, con el respaldo centralizado.
+  }
   return {
     id: '/menu',
-    name: 'Carta Digital · AUREA BISTRO',
+    name: `Carta Digital · ${identity.branchName}`,
     short_name: 'Carta Digital',
     description:
       'Carta digital interactiva con pedidos QR, visor 3D de platos, llamado a garzón y pago móvil.',

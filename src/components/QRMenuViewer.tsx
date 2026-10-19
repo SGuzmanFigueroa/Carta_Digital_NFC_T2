@@ -1,3 +1,4 @@
+import { useRestaurantIdentity } from '@/context/RestaurantIdentityContext';
 import React, { useState, useEffect, useRef } from 'react';
 import { MenuItem, OrderRound, OrderTicket, PaymentClaim, TableStatus, WaiterCallReason } from '../types';
 import { kitchenAudio } from '../utils/audio';
@@ -171,6 +172,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   onRequestTableAccount,
   onCallWaiter,
 }) => {
+   const { branchName } = useRestaurantIdentity();
    const [selectedCategory, setSelectedCategory] = useState<string>('todos');
    const [searchQuery, setSearchQuery] = useState('');
    const [selectedDietaryFilters, setSelectedDietaryFilters] = useState<DietaryPreference[]>([]);
@@ -844,7 +846,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
             <div className="flex flex-col min-w-0">
               <div className="flex items-center gap-1.5">
                 <span className="text-[13px] sm:text-[14px] font-bold text-[#0f172a] dark:text-white tracking-tight truncate font-sans">
-                  AUREA <span className="text-primary font-normal text-[11px]">BISTRO</span>
+                  {branchName}
                 </span>
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
               </div>
@@ -1017,7 +1019,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                   <span className="font-mono-code text-[10px] text-primary font-bold tracking-wider uppercase flex items-center gap-1">
                     <span>{t('welcome.kicker')}</span>
                     <span className="text-[8px] text-primary">•</span>
-                    <span>AUREA Bistro</span>
+                    <span>{branchName}</span>
                   </span>
                   <h4 className="text-[14px] sm:text-[15px] font-bold text-[#0f172a] dark:text-white tracking-tight leading-snug">
                     {t('welcome.title')}
@@ -1462,7 +1464,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
         <footer className="pt-10 pb-28 sm:pb-12 border-t border-[#e2e8f0] dark:border-[#24252e] space-y-4 text-center">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-[12px] text-[#64748b] dark:text-[#94a3b8]">
             <div className="flex items-center gap-2">
-              <span className="font-bold text-[#0f172a] dark:text-white">AUREA BISTRO</span>
+              <span className="font-bold text-[#0f172a] dark:text-white">{branchName}</span>
               <span>• RUC: 20608945231</span>
               <span className="hidden sm:inline">• {t('footer.cuisine')}</span>
             </div>
