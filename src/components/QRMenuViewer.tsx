@@ -393,6 +393,49 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       .map((item) => localizeMenuItem(item, language));
   }, [menuItems, selectedCategory, searchQuery, selectedDietaryFilters, searchIndexById, language]);
 
+  // CD-41 · Contador reactivo de resultados por categoría según búsqueda y alérgenos
+  const categoryCounts = React.useMemo(() => {
+    const counts: Record<string, number> = { todos: 0 };
+    const query = normalizeStr(searchQuery);
+    const tabs = getMenuCategoryTabs(language);
+
+    menuItems.forEach((item) => {
+      const indexedText = searchIndexById.get(item.id) ?? '';
+      const matchesSearch =
+        !query ||
+        normalizeStr(item.name).includes(query) ||
+        normalizeStr(item.description).includes(query) ||
+        (item.tag && normalizeStr(item.tag).includes(query)) ||
+        indexedText.includes(query) ||
+        normalizeStr(getMenuCategoryLabel(item.category, language)).includes(query) ||
+        (Array.isArray(item.ingredients) &&
+          item.ingredients.some((ingredient: string) => normalizeStr(ingredient).includes(query))) ||
+        (typeof item.ingredients === 'string' && normalizeStr(item.ingredients).includes(query));
+
+      const matchesDietary =
+        selectedDietaryFilters.length === 0 ||
+        selectedDietaryFilters.every((filter) => {
+          const preferences = getDietaryPreferences(item);
+          return preferences.includes(filter);
+        });
+
+      if (matchesSearch && matchesDietary) {
+        counts.todos = (counts.todos || 0) + 1;
+        const itemCat = normalizeStr(item.category || '');
+        tabs.forEach((tab) => {
+          if (tab.id !== 'todos') {
+            const selCat = normalizeStr(tab.id);
+            if (itemCat === selCat || itemCat.startsWith(selCat) || selCat.startsWith(itemCat)) {
+              counts[tab.id] = (counts[tab.id] || 0) + 1;
+            }
+          }
+        });
+      }
+    });
+
+    return counts;
+  }, [menuItems, searchQuery, selectedDietaryFilters, searchIndexById, language]);
+
   const cartTotal = cart.reduce((acc: number, curr: MenuCartItem) => acc + curr.item.price * curr.quantity, 0);
   const cartItemsCount = cart.reduce((acc: number, curr: MenuCartItem) => acc + curr.quantity, 0);
 
@@ -1098,53 +1141,73 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
             )}
           </div>
 
-          {/* Categories Pill Bar */}
-          <div className="relative">
-            {canScrollLeft && (
-              <button
-                type="button"
-                onClick={() => scrollCategories('left')}
-                aria-label={t('search.categoriesPrev')}
-                className="absolute left-0 top-0 bottom-1 z-10 w-11 flex items-center justify-start bg-gradient-to-r from-[#f4f5f7] via-[#f4f5f7]/90 to-transparent dark:from-[#0b0c0e] dark:via-[#0b0c0e]/90 cursor-pointer"
-              >
-                <span className="w-7 h-7 rounded-full bg-white dark:bg-[#1e1f28] border border-[#cbd5e1] dark:border-[#353642] flex items-center justify-center text-primary">
-                  <span className="material-symbols-outlined text-[18px]">chevron_left</span>
-                </span>
-              </button>
-            )}
-
-            <div
-              ref={catScrollRef}
-              onScroll={updateCatArrows}
-              className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar -mx-3.5 px-3.5 sm:mx-0 sm:px-0"
-            >
-              {getMenuCategoryTabs(language).map((cat) => (
+          {/* ========================================================================= */}
+          {/* ⚡ CD-41 · FILTRO POR CATEGORÍAS STICKY CON CONTADOR DE RESULTADOS       */}
+          {/* ========================================================================= */}
+          <div className="sticky top-[53px] sm:top-[57px] z-30 -mx-3.5 px-3.5 sm:-mx-6 sm:px-6 py-2 bg-[#f4f5f7]/95 dark:bg-[#0b0c0e]/95 backdrop-blur-xl border-b border-[#e2e8f0]/60 dark:border-[#24252c]/60 shadow-xs transition-colors">
+            <div className="relative">
+              {canScrollLeft && (
                 <button
-                  key={cat.id}
-                  onClick={() => setSelectedCategory(cat.id)}
-                  className={`px-3.5 py-2 min-h-[44px] rounded-full text-[12px] font-medium whitespace-nowrap transition-colors cursor-pointer ${
-                    selectedCategory === cat.id
-                      ? 'bg-primary text-on-primary font-bold shadow-[0_0_12px] shadow-primary/35'
-                      : 'bg-white text-[#475569] hover:text-[#0f172a] border border-[#cbd5e1] dark:bg-[#181920] dark:text-[#a1a1aa] dark:hover:text-white dark:border-[#2a2b35]'
-                  }`}
+                  type="button"
+                  onClick={() => scrollCategories('left')}
+                  aria-label={t('search.categoriesPrev')}
+                  className="absolute left-0 top-0 bottom-0 z-10 w-11 flex items-center justify-start bg-gradient-to-r from-[#f4f5f7] via-[#f4f5f7]/90 to-transparent dark:from-[#0b0c0e] dark:via-[#0b0c0e]/90 cursor-pointer"
                 >
-                  {cat.label}
+                  <span className="w-7 h-7 rounded-full bg-white dark:bg-[#1e1f28] border border-[#cbd5e1] dark:border-[#353642] flex items-center justify-center text-primary shadow-xs">
+                    <span className="material-symbols-outlined text-[18px]">chevron_left</span>
+                  </span>
                 </button>
-              ))}
-            </div>
+              )}
 
-            {canScrollRight && (
-              <button
-                type="button"
-                onClick={() => scrollCategories('right')}
-                aria-label={t('search.categoriesNext')}
-                className="absolute right-0 top-0 bottom-1 z-10 w-11 flex items-center justify-end bg-gradient-to-l from-[#f4f5f7] via-[#f4f5f7]/90 to-transparent dark:from-[#0b0c0e] dark:via-[#0b0c0e]/90 cursor-pointer"
+              <div
+                ref={catScrollRef}
+                onScroll={updateCatArrows}
+                className="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar -mx-3.5 px-3.5 sm:mx-0 sm:px-0"
               >
-                <span className="w-7 h-7 rounded-full bg-white dark:bg-[#1e1f28] border border-[#cbd5e1] dark:border-[#353642] flex items-center justify-center text-primary">
-                  <span className="material-symbols-outlined text-[18px]">chevron_right</span>
-                </span>
-              </button>
-            )}
+                {getMenuCategoryTabs(language).map((cat) => {
+                  const count = cat.id === 'todos'
+                    ? (categoryCounts.todos || 0)
+                    : (categoryCounts[cat.id] || 0);
+                  const isSelected = selectedCategory === cat.id;
+
+                  return (
+                    <button
+                      key={cat.id}
+                      onClick={() => setSelectedCategory(cat.id)}
+                      className={`px-3 py-1.5 min-h-[40px] rounded-full text-[12px] font-medium whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 active:scale-95 ${
+                        isSelected
+                          ? 'bg-primary text-on-primary font-bold shadow-[0_0_12px] shadow-primary/35'
+                          : 'bg-white text-[#475569] hover:text-[#0f172a] border border-[#cbd5e1] dark:bg-[#181920] dark:text-[#a1a1aa] dark:hover:text-white dark:border-[#2a2b35]'
+                      }`}
+                    >
+                      <span>{cat.label}</span>
+                      <span
+                        className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono-code font-bold tabular-nums transition-colors ${
+                          isSelected
+                            ? 'bg-black/20 text-on-primary'
+                            : 'bg-[#f1f5f9] text-[#64748b] dark:bg-[#282935] dark:text-[#a1a1aa]'
+                        }`}
+                      >
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {canScrollRight && (
+                <button
+                  type="button"
+                  onClick={() => scrollCategories('right')}
+                  aria-label={t('search.categoriesNext')}
+                  className="absolute right-0 top-0 bottom-0 z-10 w-11 flex items-center justify-end bg-gradient-to-l from-[#f4f5f7] via-[#f4f5f7]/90 to-transparent dark:from-[#0b0c0e] dark:via-[#0b0c0e]/90 cursor-pointer"
+                >
+                  <span className="w-7 h-7 rounded-full bg-white dark:bg-[#1e1f28] border border-[#cbd5e1] dark:border-[#353642] flex items-center justify-center text-primary shadow-xs">
+                    <span className="material-symbols-outlined text-[18px]">chevron_right</span>
+                  </span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
