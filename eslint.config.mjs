@@ -22,17 +22,6 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Exportaciones de Figma: referencia de diseño, no código de la app.
     "figma_exports/**",
-    // Componentes huérfanos (nadie los importa) que el equipo elimina en la
-    // Tarea 26. Cuando se borren, quitar estas líneas.
-    "src/components/CentralPedidos.tsx",
-    "src/components/Configuracion.tsx",
-    "src/components/GestionUsuarios.tsx",
-    "src/components/NativeARModelViewer.tsx",
-    "src/components/menu/ARBanner.tsx",
-    "src/components/menu/CategoryTabs.tsx",
-    "src/components/menu/MenuHeader.tsx",
-    "src/components/menu/ProductCard.tsx",
-    "src/components/menu/SearchBar.tsx",
   ]),
 ]);
 
