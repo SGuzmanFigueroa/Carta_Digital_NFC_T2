@@ -1,8 +1,11 @@
+'use client';
+import { useRestaurantIdentity } from '@/context/RestaurantIdentityContext';
 import React from "react";
 import { Bell, User } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 
 export function MenuHeader() {
+  const { branchName } = useRestaurantIdentity();
   return (
     <div className="flex flex-col gap-4 mb-6">
       {/* Top Bar */}
@@ -34,7 +37,7 @@ export function MenuHeader() {
             <span className="h-2 w-2 rounded-full bg-[var(--color-kinetic-amber)]" />
             MESA <span className="font-mono font-bold">04</span>
           </Badge>
-          <span className="text-sm font-semibold text-gray-300">AUREA Bistro</span>
+          <span className="text-sm font-semibold text-gray-300">{branchName}</span>
         </div>
         <div className="flex items-center gap-1 text-[11px] text-blue-300 bg-blue-900/20 px-2 py-1 rounded-full border border-blue-800/30 font-medium">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>

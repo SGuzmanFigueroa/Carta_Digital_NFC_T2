@@ -79,7 +79,7 @@ test('navegación real del componente: valida de nuevo un redirectTo recibido di
       },
       '../utils/security': { setAuthSessionCookie() {}, AuditLogger: { log() {} }, sanitizeText: s => s },
       '../utils/audio': { kitchenAudio: { prepareForPlayback() {}, playDispatchSound() {} } },
-      '@/hooks/useDialog': { useDialog: () => ({ dialogRef: { current: null }, isOpen: false, open: () => {}, close: () => {} }) },
+      '@/context/RestaurantIdentityContext': { useRestaurantIdentity: () => ({ branchName: 'Local de prueba', email: 'ventas@example.test' }) }, '@/hooks/useDialog': { useDialog: () => ({ dialogRef: { current: null }, isOpen: false, open: () => {}, close: () => {} }) },
       '../data/mockData': { INITIAL_STAFF: staff },
     }, { localStorage: { setItem() {}, getItem() { return null; } } });
     const tree = component.LoginScreen({ onLoginSuccess() {}, onExploreAsGuest() {}, onShowToast() {}, redirectTo });

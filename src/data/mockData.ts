@@ -1,3 +1,4 @@
+import { DEFAULT_RESTAURANT_IDENTITY } from '@/config/restaurant';
 import { MenuItem, TableStatus, SystemConfigState, Runner, StaffMember, StationLoad } from '../types';
 
 /**
@@ -330,10 +331,10 @@ export const INITIAL_TABLES: TableStatus[] = [
 ];
 
 export const INITIAL_CONFIG: SystemConfigState = {
-  branchName: 'AUREA Bistro - Miraflores',
-  branchRuc: '20608941203',
+  branchName: DEFAULT_RESTAURANT_IDENTITY.branchName,
+  branchRuc: DEFAULT_RESTAURANT_IDENTITY.branchRuc,
   managerName: 'Martín Valenzuela - Gerente General',
-  email: 'gerencia@aureabistro.pe',
+  email: DEFAULT_RESTAURANT_IDENTITY.email,
   phone: '+51 984 521 002',
   soundAlerts: true,
   delayAlerts: true,

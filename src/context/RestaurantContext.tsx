@@ -1,5 +1,6 @@
 'use client';
 
+import { SYSTEM_CONFIG_CHANGED_EVENT } from '@/config/restaurant';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { Ticket, OrderTicket, OrderRound, OrderRoundItem, TableStatus, Runner, MenuItem, TicketItem, WaiterCall, PaymentClaim } from '../types';
 import { INITIAL_MENU_ITEMS, INITIAL_RUNNERS } from '../data/mockData';
@@ -384,6 +385,7 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'system_config' }, () => {
         if (disposed) return;
+        window.dispatchEvent(new Event(SYSTEM_CONFIG_CHANGED_EVENT));
         realtimeCallbacksRef.current.showToast('Configuración del sistema actualizada', 'tune');
       });
     instrumentRealtimeChannel(adminChannel, 'avisos', adminTopic);

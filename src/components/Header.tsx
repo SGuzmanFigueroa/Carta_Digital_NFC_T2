@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { ScreenTab } from '../types';
 import { useRestaurant } from '../context/RestaurantContext';
 import { getTranslations } from '../i18n/adminTranslations';
-import { fetchSystemConfigFromDb } from '@/services/configService';
+import { useRestaurantIdentity } from '@/context/RestaurantIdentityContext';
 import { isAdminRole, normalizeRole } from '../utils/security';
 import { DishImage } from './menu/DishImage';
 import { useStaffSession } from '@/context/StaffSessionContext';
@@ -27,20 +27,12 @@ export const Header: React.FC<HeaderProps> = ({
   const { tickets = [], orders = [] } = useRestaurant();
   const { currentUser, lockTerminal, logoutUser } = useStaffSession();
   const [bistroOpen, setBistroOpen] = useState(false);
-  const [selectedBistro, setSelectedBistro] = useState('AUREA Bistro (Principal)');
+  const { branchName: selectedBistro } = useRestaurantIdentity();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const [readNotifications, setReadNotifications] = useState<boolean>(false);
 
-  // Load configured branch name dynamically from Supabase
-  React.useEffect(() => {
-    fetchSystemConfigFromDb().then((cfg) => {
-      if (cfg?.branchName) {
-        setSelectedBistro(cfg.branchName);
-      }
-    }).catch(console.warn);
-  }, []);
 
   // Compute live operational notifications from active tickets and orders
   const liveNotifications = React.useMemo(() => {
@@ -113,7 +105,7 @@ export const Header: React.FC<HeaderProps> = ({
     return list;
   }, [tickets, orders]);
 
-  const bistros = ['AUREA Bistro (Principal)', 'AUREA Rooftop Lounge', 'AUREA Privé Salón'];
+  const bistros = [selectedBistro];
 
   const roleNameMap: Record<string, string> = {
     admin: 'Gerente General',
@@ -203,7 +195,6 @@ export const Header: React.FC<HeaderProps> = ({
                   <button
                     key={b}
                     onClick={() => {
-                      setSelectedBistro(b);
                       setBistroOpen(false);
                     }}
                     className={`w-full text-left px-2.5 py-1.5 rounded text-[13px] flex items-center justify-between hover:bg-[#2a2a2c] transition-colors ${
@@ -456,7 +447,6 @@ export const Header: React.FC<HeaderProps> = ({
                   <button
                     key={b}
                     onClick={() => {
-                      setSelectedBistro(b);
                       setNavOpen(false);
                     }}
                     className={`w-full min-h-11 text-left px-3 rounded-lg text-[14px] flex items-center justify-between gap-2 hover:bg-[#2a2a2c] transition-colors ${

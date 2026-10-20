@@ -1,3 +1,4 @@
+import { RESTAURANT_ID } from '@/config/restaurant';
 import { supabase } from '@/lib/supabase';
 import type { Json } from '@/types/database.types';
 
@@ -58,7 +59,7 @@ export function getPaymentConfig(): PaymentGatewayConfig {
 
 /** Lee la configuración real desde Supabase y actualiza el caché. */
 export async function loadPaymentConfig(): Promise<PaymentGatewayConfig> {
-  const { data, error } = await supabase.from('system_config').select('payment_config').eq('id', 'primary').maybeSingle();
+  const { data, error } = await supabase.from('system_config').select('payment_config').eq('id', RESTAURANT_ID).maybeSingle();
   if (error || !data) return getPaymentConfig();
   const stored = (data.payment_config ?? {}) as Partial<PaymentGatewayConfig>;
   if (Object.keys(stored).length === 0) return getPaymentConfig();
@@ -78,7 +79,7 @@ export function savePaymentConfig(config: Partial<PaymentGatewayConfig>): Paymen
   void supabase
     .from('system_config')
     .update({ payment_config: updated as unknown as Json, updated_at: updated.updatedAt })
-    .eq('id', 'primary')
+    .eq('id', RESTAURANT_ID)
     .select('id')
     .then(({ data, error }) => {
       if (error || !data?.length) {
@@ -101,7 +102,7 @@ export function savePaymentConfig(config: Partial<PaymentGatewayConfig>): Paymen
  */
 export async function migrateLocalPaymentConfigToDb(): Promise<void> {
   if (typeof window === 'undefined' || !localStorage.getItem(STORAGE_KEY_PAYMENT_CONFIG)) return;
-  const { data, error } = await supabase.from('system_config').select('payment_config').eq('id', 'primary').maybeSingle();
+  const { data, error } = await supabase.from('system_config').select('payment_config').eq('id', RESTAURANT_ID).maybeSingle();
   if (error || !data) return;
   if (Object.keys((data.payment_config ?? {}) as object).length === 0) savePaymentConfig(getPaymentConfig());
 }

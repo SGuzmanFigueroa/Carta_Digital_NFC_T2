@@ -1,3 +1,4 @@
+import { useRestaurantIdentity } from '@/context/RestaurantIdentityContext';
 import React, { useState } from 'react';
 import { OrderTicket } from '../types';
 import { OrderPaymentFilters } from '@/components/OrderPaymentFilters';
@@ -25,6 +26,7 @@ export const OrdersCentral: React.FC<OrdersCentralProps> = ({
   paymentHistoryLoading = false,
   paymentHistoryError = false
 }) => {
+  const { branchName, branchRuc, email } = useRestaurantIdentity();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTicketId, setSelectedTicketId] = useState<string>('cmd-0482');
   const [isPrinting, setIsPrinting] = useState(false);
@@ -720,9 +722,9 @@ export const OrdersCentral: React.FC<OrdersCentralProps> = ({
               }`}
             >
               <div className="text-center font-bold pb-2 border-b border-dashed border-neutral-400">
-                <p className="text-[13px] tracking-tight">=== AUREA BISTRO ===</p>
-                <p className="text-[10px] text-neutral-600 font-normal">RUC: 20601239841</p>
-                <p className="text-[10px] text-neutral-600 font-normal">MIRAFLORES, LIMA - SALÓN 1</p>
+                <p className="text-[13px] tracking-tight">=== {branchName} ===</p>
+                <p className="text-[10px] text-neutral-600 font-normal">RUC: {branchRuc}</p>
+                <p className="text-[10px] text-neutral-600 font-normal">{email}</p>
               </div>
 
               <div className="py-1.5 flex justify-between text-[10px] text-neutral-600 border-b border-dashed border-neutral-400 font-medium">

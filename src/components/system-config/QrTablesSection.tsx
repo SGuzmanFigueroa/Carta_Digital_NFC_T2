@@ -1,5 +1,7 @@
 'use client';
 
+import { DEFAULT_RESTAURANT_IDENTITY } from '@/config/restaurant';
+
 import { useEffect, useState } from 'react';
 import type { SystemConfigState } from '@/types';
 import { useDialog } from '@/hooks/useDialog';
@@ -164,7 +166,7 @@ export function QrTablesSection({ styles, t, formData, onShowToast }: QrTablesSe
     const tableName = customTableName.trim() || ('MESA ' + selectedTableNumber);
     const targetMenuUrl = signedTableUrl(tableName, selectedZone);
     const qrCodeUrl = await qrDataUrl(targetMenuUrl, 500, qrColor);
-    const branchName = formData.branchName || 'AUREA Bistro';
+    const branchName = formData.branchName || DEFAULT_RESTAURANT_IDENTITY.branchName;
     const logoUrl = formData.logoUrl || '/logo.png';
     const instructions = t.scan_to_order || 'Escanea con la cámara de tu celular para ver la carta y hacer tu pedido';
     const nfcLabel = t.nfc_active || 'NTAG213 NFC Chip Linked';
@@ -389,7 +391,7 @@ export function QrTablesSection({ styles, t, formData, onShowToast }: QrTablesSe
 
   // Función para imprimir lote de mesas en cuadrícula A4 optimizada para corte
   const handlePrintAllTables = async (customList?: string[], customTitle?: string) => {
-    const branchName = formData.branchName || 'AUREA Bistro';
+    const branchName = formData.branchName || DEFAULT_RESTAURANT_IDENTITY.branchName;
     const logoUrl = formData.logoUrl || '/logo.png';
     
     let filteredForPrint: string[] = [];
@@ -869,7 +871,7 @@ export function QrTablesSection({ styles, t, formData, onShowToast }: QrTablesSe
               <div className="w-10 h-10 mx-auto rounded-lg overflow-hidden border border-gray-300 shadow-sm mb-1.5 flex items-center justify-center bg-black">
                 <UploadedImage src={formData.logoUrl || '/logo.png'} alt="Logo" className="w-full h-full object-cover" />
               </div>
-              <h4 className={`text-[13px] font-extrabold tracking-tight ${titleColor}`}>{formData.branchName || 'AUREA Bistro'}</h4>
+              <h4 className={`text-[13px] font-extrabold tracking-tight ${titleColor}`}>{formData.branchName || DEFAULT_RESTAURANT_IDENTITY.branchName}</h4>
               <span className="text-[10px] font-mono uppercase tracking-widest text-[#FF5A1F] font-bold">CARTA DIGITAL • AUTO-PEDIDO</span>
             </div>
 
@@ -1045,7 +1047,7 @@ export function QrTablesSection({ styles, t, formData, onShowToast }: QrTablesSe
                 }`}
               >
                 <div className="w-full text-[10px] font-mono text-[#FF5A1F] font-bold uppercase tracking-wider mb-1">
-                  {formData.branchName || 'AUREA Bistro'}
+                  {formData.branchName || DEFAULT_RESTAURANT_IDENTITY.branchName}
                 </div>
                 <div className={`text-[13px] font-bold mb-2 ${titleColor}`}>{tableLabel}</div>
                 <div className="p-2 bg-white rounded-lg shadow-sm border border-gray-200">
