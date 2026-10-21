@@ -1,3 +1,4 @@
+import { INVALID_CREDENTIALS_MESSAGE } from '@/utils/loginErrors';
 import {
   ServerConfigError,
   clientIp,
@@ -14,8 +15,6 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const INACTIVE_STATUSES = ['inactivo', 'inactive', 'disabled', 'desactivado', 'suspended'];
-// Mismo mensaje para usuario inexistente y contraseña errónea: no revela quién existe.
-const WRONG_CREDENTIALS = 'Usuario o contraseña incorrectos.';
 
 /**
  * Login del personal. Corre en el servidor para poder limitar intentos por
@@ -95,7 +94,7 @@ export async function POST(request: Request) {
           { 'Retry-After': String(lockedFor) }
         );
       }
-      return json({ error: WRONG_CREDENTIALS }, 401);
+      return json({ error: INVALID_CREDENTIALS_MESSAGE }, 401);
     }
 
     if (INACTIVE_STATUSES.includes((staff.status ?? '').trim().toLowerCase())) {

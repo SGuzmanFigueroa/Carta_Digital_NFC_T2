@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { INVALID_CREDENTIALS_MESSAGE } from '@/utils/loginErrors';
 import { AuthUser, StaffMember, RolePermissionItem, StaffAuditLogItem, PermissionState } from '@/types';
 import { cacheAuthProfile, clearAuthProfile } from '@/utils/security';
 import { clearSessionChoice, isBrowserSessionExpired, rememberSessionChoice } from '@/utils/sessionPersistence';
@@ -62,14 +63,14 @@ async function authHeaders(): Promise<Record<string, string>> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-async function postJson(url: string, body: unknown, method = 'POST'): Promise<{ ok: boolean; data: Record<string, unknown> }> {
+async function postJson(url: string, body: unknown, method = 'POST'): Promise<{ ok: boolean; status: number; data: Record<string, unknown> }> {
   const response = await fetch(url, {
     method,
     headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
     body: body === undefined ? undefined : JSON.stringify(body)
   });
   const data = (await response.json().catch(() => ({}))) as Record<string, unknown>;
-  return { ok: response.ok, data };
+  return { ok: response.ok, status: response.status, data };
 }
 
 /** Perfil del colaborador con sesión activa (o null si no hay sesión válida). */
@@ -101,14 +102,14 @@ export function loginStaff(identifier: string, password: string, remember = true
   return openStaffSession('/api/auth/login', { identifier, password }, remember);
 }
 
-/** ⚠️ Solo etapa de desarrollo: entra con la cuenta demo del rol (ver /api/auth/demo-login). */
+/** Solo etapa de desarrollo: entra con la cuenta demo del rol (ver /api/auth/demo-login). */
 export function loginDemo(role: 'admin' | 'kitchen' | 'floor' | 'bar'): Promise<LoginResult> {
   return openStaffSession('/api/auth/demo-login', { role }, true);
 }
 
 async function openStaffSession(url: string, body: unknown, remember: boolean): Promise<LoginResult> {
   purgeLegacyStaffCache();
-  let result: { ok: boolean; data: Record<string, unknown> };
+  let result: { ok: boolean; status: number; data: Record<string, unknown> };
   try {
     result = await postJson(url, body);
   } catch {
@@ -118,7 +119,9 @@ async function openStaffSession(url: string, body: unknown, remember: boolean): 
     const retryAfter = Number(result.data.retryAfter);
     return {
       ok: false,
-      error: (result.data.error as string) || 'No se pudo iniciar sesión.',
+      error: result.status === 401
+        ? INVALID_CREDENTIALS_MESSAGE
+        : (result.data.error as string) || 'No se pudo iniciar sesión.',
       retryAfterSeconds: Number.isFinite(retryAfter) && retryAfter > 0 ? Math.ceil(retryAfter) : undefined
     };
   }
