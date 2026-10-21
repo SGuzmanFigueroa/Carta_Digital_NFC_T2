@@ -32,10 +32,6 @@ const securityHeaders = [
       isDev: process.env.NODE_ENV === "development",
     }),
   },
-  {
-    key: "X-XSS-Protection",
-    value: "1; mode=block",
-  },
 ];
 
 const nextConfig: NextConfig = {
