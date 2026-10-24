@@ -15,6 +15,7 @@ function load(file, dependencies = {}) {
 }
 
 const { SplitBillModal } = load('src/components/menu/SplitBillModal.tsx', {
+  '@/hooks/useLanguage': { useLanguage: () => ({ language: 'es', t: (key, p) => p?.amount ? `Saldo pendiente: ${p.amount}` : (key === 'splitBill.continue' ? 'Continuar al pago' : key) }) },
   '@/hooks/useDialog': { useDialog: () => ({}) },
   'lucide-react': { Minus: () => null, Plus: () => null, X: () => null },
 });
