@@ -46,6 +46,7 @@ export function MenuClient({ initialMenuItems }: { initialMenuItems: MenuItem[] 
     orders,
     tableOrderRounds,
     tables,
+    collectTableBill,
     showToast,
     requestTableAccount,
     callWaiter
@@ -136,6 +137,7 @@ export function MenuClient({ initialMenuItems }: { initialMenuItems: MenuItem[] 
           orderHistory={orders}
           tableOrderRounds={tableOrderRounds}
           tables={tables}
+          onCollectTableBill={collectTableBill}
           onSendOrderFromMenu={sendOrderFromMenu}
           onRecordTableOrderRound={recordTableOrderRound}
           onRequestTableAccount={requestTableAccount}

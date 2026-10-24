@@ -87,7 +87,11 @@ interface RestaurantContextType {
   dispatchTicket: (ticketId: string) => void;
   recallLastDispatched: () => void;
   prioritizeTable: (tableNumber: string) => void;
-  collectTableBill: (tableNumber: string, amount?: number) => void;
+  collectTableBill: (
+    tableNumber: string,
+    amount?: number,
+    options?: { keepOpen?: boolean }
+  ) => Promise<boolean>;
   openTable: (tableNumber: string, pax?: number, waiter?: string) => void;
   notifyRunners: () => void;
   callAllRunners: () => void;
@@ -719,7 +723,7 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
       // Update Floor Table Status
       const cleanNum = safeTable.replace(/\D/g, '');
       const updatedTables = currentTables.map((t) => {
-        if (t.number === cleanNum || safeTable.includes(t.number)) {
+        if (getTableRoundKey(t.number) === cleanNum) {
           return {
             ...t,
             status: 'qr' as const,
@@ -1079,21 +1083,75 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
 
   // 7. Collect Table Bill and Free Table (Corte / Cobro)
   const collectTableBill = useCallback(
-    (tableNumber: string, amount?: number) => {
-      // Cobra en Supabase (mesa + pedidos) y luego recalcula la caja desde la base.
-      Promise.all([settleTableInDb(tableNumber), settleOrdersForTableInDb(tableNumber)])
-        .then(() => fetchShiftRevenueFromDb())
-        .then((revenue) => {
-          if (revenue !== null) setTotalShiftRevenue(revenue);
-        })
-        .catch(console.warn);
-      const cleanNum = tableNumber.replace(/\D/g, '');
+    async (
+      tableNumber: string,
+      amount?: number,
+      options?: { keepOpen?: boolean }
+    ): Promise<boolean> => {
+      const cleanNum = getTableRoundKey(tableNumber);
+      const currentTables = latestStateRef.current.tables;
       // Monto real de la mesa (antes, sin monto se sumaban S/ 165 inventados).
-      const tableAmount = tables.find((tbl) => tbl.number === cleanNum || tbl.number === tableNumber)?.amount;
-      const billAmount = amount ?? tableAmount ?? 0;
+      const currentTable = currentTables.find(
+        (tbl) => getTableRoundKey(tbl.number) === cleanNum
+      );
+      if (amount !== undefined && !currentTable) {
+        showToast(`No se encontró la Mesa ${tableNumber} para registrar el pago. Inténtalo nuevamente.`, 'error');
+        return false;
+      }
+      // FIX: Respaldo de seguridad por si el saldo de la mesa lee 0 por desincronización
+      const activeOrders = latestStateRef.current.orders.filter(
+        (o) => getTableRoundKey(o.table) === cleanNum && o.paymentStatus !== 'paid'
+      );
+      const fallbackOrderTotal = activeOrders.reduce((acc, o) => acc + (Number(o.total) || 0), 0);
 
-      const updatedTables = tables.map((tbl) => {
-        if (tbl.number === cleanNum || tbl.number === tableNumber) {
+      const tableAmount = (currentTable?.amount && currentTable.amount > 0) ? currentTable.amount : fallbackOrderTotal;
+      const billAmount = amount ?? tableAmount ?? 0;
+      if (amount !== undefined && (!Number.isFinite(amount) || amount <= 0)) return false;
+
+      // Usamos tableAmount corregido en lugar de (tableAmount ?? 0)
+      if (
+        amount !== undefined &&
+        (amount < tableAmount || options?.keepOpen)
+      ) {
+        const safeAmount = Number.isFinite(amount) && amount > 0 ? amount : 0;
+        if (safeAmount <= 0) return false;
+
+        const remainingAmount = Math.max(0, Math.round((tableAmount - safeAmount + Number.EPSILON) * 100) / 100);
+        const tableUpdated = await updateTableStateInDb(tableNumber, { amount: remainingAmount });
+        if (!tableUpdated) {
+          showToast(`No se pudo registrar el abono de Mesa ${tableNumber}. Inténtalo nuevamente.`, 'error');
+          return false;
+        }
+
+        const updatedTables = currentTables.map((tbl) => {
+          if (getTableRoundKey(tbl.number) === cleanNum) {
+            return { ...tbl, amount: remainingAmount };
+          }
+          return tbl;
+        });
+        const newRev = totalShiftRevenue + safeAmount;
+
+        setTables(updatedTables);
+        setTotalShiftRevenue(newRev);
+        persistState(undefined, undefined, updatedTables, newRev);
+        broadcastSync('UPDATE_TABLES', { tables: updatedTables });
+        showToast(`Abono parcial registrado para Mesa ${tableNumber}: S/ ${safeAmount.toFixed(2)}.`, 'point_of_sale');
+        return true;
+      }
+
+      // Cobra en Supabase (mesa + pedidos) y luego recalcula la caja desde la base.
+      const [tableSettled, ordersSettled] = await Promise.all([
+        settleTableInDb(tableNumber),
+        settleOrdersForTableInDb(tableNumber)
+      ]);
+      if (!tableSettled || !ordersSettled) {
+        showToast(`No se pudo liquidar la cuenta de Mesa ${tableNumber}. Inténtalo nuevamente.`, 'error');
+        return false;
+      }
+      const revenue = await fetchShiftRevenueFromDb();
+
+      const updatedTables = currentTables.map((tbl) => {
+        if (getTableRoundKey(tbl.number) === cleanNum) {
           return {
             ...tbl,
             status: 'disponible' as const,
@@ -1107,21 +1165,24 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
       });
 
       const updatedTickets = tickets.map((t) => {
-        const ticketNum = t.table.replace(/\D/g, '');
-        if (ticketNum === cleanNum || t.table.includes(tableNumber)) {
+        const ticketNum = getTableRoundKey(t.table);
+        if (ticketNum === cleanNum) {
           return { ...t, status: 'archivada' as const };
         }
         return t;
       });
 
-      if (dinerActiveTicket && (dinerActiveTicket.table === tableNumber || tableNumber.includes(dinerActiveTicket.table))) {
+      if (
+        dinerActiveTicket
+        && getTableRoundKey(dinerActiveTicket.table) === cleanNum
+      ) {
         setDinerActiveTicket(null);
         persistState(updatedTickets, undefined, updatedTables, totalShiftRevenue + billAmount, null);
       } else {
         persistState(updatedTickets, undefined, updatedTables, totalShiftRevenue + billAmount);
       }
 
-      const newRev = totalShiftRevenue + billAmount;
+      const newRev = revenue ?? totalShiftRevenue + billAmount;
       setTables(updatedTables);
       setTickets(updatedTickets);
       setTotalShiftRevenue(newRev);
@@ -1138,8 +1199,9 @@ export const RestaurantProvider: React.FC<{ children: ReactNode }> = ({ children
       broadcastSync('UPDATE_TABLES', { tables: updatedTables });
       broadcastSync('UPDATE_TICKETS', { tickets: updatedTickets });
       showToast(`Cobro liquidado para Mesa ${tableNumber}: S/ ${billAmount.toFixed(2)}. Mesa liberada.`, 'point_of_sale');
+      return true;
     },
-    [tables, tickets, dinerActiveTicket, totalShiftRevenue, currentUser, persistState, broadcastSync, showToast]
+    [tickets, dinerActiveTicket, totalShiftRevenue, currentUser, persistState, broadcastSync, showToast]
   );
 
   // 8. Open Table in Floor Plan
