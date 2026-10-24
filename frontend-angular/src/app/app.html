@@ -1,0 +1,19 @@
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="logo">CD</span>
+      <div>
+        <strong>Carta Digital</strong>
+        <small>Tablas maestras</small>
+      </div>
+    </div>
+    <nav>
+      @for (link of links; track link.path) {
+        <a [routerLink]="link.path" routerLinkActive="active">{{ link.label }}</a>
+      }
+    </nav>
+  </aside>
+  <main class="content">
+    <router-outlet />
+  </main>
+</div>

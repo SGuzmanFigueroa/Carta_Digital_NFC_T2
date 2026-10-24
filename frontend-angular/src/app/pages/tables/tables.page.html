@@ -1,0 +1,65 @@
+<header class="page-head">
+  <div>
+    <h1>Mesas</h1>
+    <p class="muted">Mesas del local, su capacidad y zona</p>
+  </div>
+  <button class="btn primary" (click)="openNew()">+ Nueva mesa</button>
+</header>
+
+@if (notice()) { <div class="alert ok">{{ notice() }}</div> }
+@if (error()) { <div class="alert err">{{ error() }}</div> }
+
+@if (showForm()) {
+  <form class="card form" [formGroup]="form" (ngSubmit)="save()">
+    <h2>{{ editingId() === null ? 'Nueva mesa' : 'Editar mesa' }}</h2>
+    <div class="grid">
+      <label>Número
+        <input formControlName="number" maxlength="10" placeholder="Ej. M05" />
+        @if (fieldError('number'); as e) { <small class="field-err">{{ e }}</small> }
+      </label>
+      <label>Capacidad (personas)
+        <input type="number" formControlName="capacity" min="1" max="30" />
+        @if (fieldError('capacity'); as e) { <small class="field-err">{{ e }}</small> }
+      </label>
+      <label>Zona
+        <select formControlName="zone">
+          @for (z of zones; track z) { <option [value]="z">{{ z }}</option> }
+        </select>
+      </label>
+      <label>Estado
+        <select formControlName="status">
+          @for (s of statuses; track s) { <option [value]="s">{{ s }}</option> }
+        </select>
+      </label>
+    </div>
+    <div class="actions">
+      <button type="button" class="btn" (click)="cancel()">Cancelar</button>
+      <button type="submit" class="btn primary" [disabled]="saving()">{{ saving() ? 'Guardando…' : 'Guardar' }}</button>
+    </div>
+  </form>
+}
+
+<div class="card table-wrap">
+  <table>
+    <thead>
+      <tr><th>#</th><th>Número</th><th>Capacidad</th><th>Zona</th><th>Estado</th><th class="right">Acciones</th></tr>
+    </thead>
+    <tbody>
+      @for (t of items(); track t.id) {
+        <tr>
+          <td class="muted">{{ t.id }}</td>
+          <td><strong>{{ t.number }}</strong></td>
+          <td>{{ t.capacity }}</td>
+          <td class="cap">{{ t.zone }}</td>
+          <td><span class="badge" [class.on]="t.status === 'disponible'">{{ t.status }}</span></td>
+          <td class="right">
+            <button class="btn small" (click)="edit(t)">Editar</button>
+            <button class="btn small danger" (click)="remove(t)">Eliminar</button>
+          </td>
+        </tr>
+      } @empty {
+        <tr><td colspan="6" class="empty">{{ loading() ? 'Cargando…' : 'No hay mesas registradas' }}</td></tr>
+      }
+    </tbody>
+  </table>
+</div>

@@ -1,0 +1,73 @@
+<header class="page-head">
+  <div>
+    <h1>Personal</h1>
+    <p class="muted">Trabajadores del restaurante y su rol</p>
+  </div>
+  <button class="btn primary" (click)="openNew()">+ Nuevo trabajador</button>
+</header>
+
+@if (notice()) { <div class="alert ok">{{ notice() }}</div> }
+@if (error()) { <div class="alert err">{{ error() }}</div> }
+
+@if (showForm()) {
+  <form class="card form" [formGroup]="form" (ngSubmit)="save()">
+    <h2>{{ editingId() === null ? 'Nuevo trabajador' : 'Editar trabajador' }}</h2>
+    <div class="grid">
+      <label>Nombre completo
+        <input formControlName="name" maxlength="100" />
+        @if (fieldError('name'); as e) { <small class="field-err">{{ e }}</small> }
+      </label>
+      <label>Usuario
+        <input formControlName="username" maxlength="40" placeholder="ej. juan.perez" />
+        @if (fieldError('username'); as e) { <small class="field-err">{{ e === 'Formato inválido' ? 'Minúsculas, números, punto o guion bajo (3 a 40)' : e }}</small> }
+      </label>
+      <label>Rol
+        <select formControlName="role">
+          @for (r of roles; track r.value) { <option [value]="r.value">{{ r.label }}</option> }
+        </select>
+      </label>
+      <label>Cargo
+        <input formControlName="roleTitle" maxlength="60" placeholder="Ej. Chef principal" />
+      </label>
+      <label>Estación
+        <input formControlName="station" maxlength="60" placeholder="Ej. Cocina caliente" />
+      </label>
+      <label>Estado
+        <select formControlName="status">
+          <option value="Activo">Activo</option>
+          <option value="Inactivo">Inactivo</option>
+        </select>
+      </label>
+    </div>
+    <div class="actions">
+      <button type="button" class="btn" (click)="cancel()">Cancelar</button>
+      <button type="submit" class="btn primary" [disabled]="saving()">{{ saving() ? 'Guardando…' : 'Guardar' }}</button>
+    </div>
+  </form>
+}
+
+<div class="card table-wrap">
+  <table>
+    <thead>
+      <tr><th>#</th><th>Nombre</th><th>Usuario</th><th>Rol</th><th>Cargo</th><th>Estado</th><th class="right">Acciones</th></tr>
+    </thead>
+    <tbody>
+      @for (s of items(); track s.id) {
+        <tr>
+          <td class="muted">{{ s.id }}</td>
+          <td><strong>{{ s.name }}</strong>@if (s.station) {<br /><small class="muted">{{ s.station }}</small>}</td>
+          <td><code>{{ s.username }}</code></td>
+          <td>{{ roleLabel(s.role) }}</td>
+          <td>{{ s.roleTitle || '—' }}</td>
+          <td><span class="badge" [class.on]="s.status === 'Activo'">{{ s.status }}</span></td>
+          <td class="right">
+            <button class="btn small" (click)="edit(s)">Editar</button>
+            <button class="btn small danger" (click)="remove(s)">Eliminar</button>
+          </td>
+        </tr>
+      } @empty {
+        <tr><td colspan="7" class="empty">{{ loading() ? 'Cargando…' : 'No hay personal registrado' }}</td></tr>
+      }
+    </tbody>
+  </table>
+</div>

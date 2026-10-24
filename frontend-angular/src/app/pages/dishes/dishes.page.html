@@ -1,0 +1,82 @@
+<header class="page-head">
+  <div>
+    <h1>Platos</h1>
+    <p class="muted">Productos de la carta con su precio y categoría</p>
+  </div>
+  <div class="head-tools">
+    <select (change)="filterBy($any($event.target).value)" aria-label="Filtrar por categoría">
+      <option value="">Todas las categorías</option>
+      @for (c of categories(); track c.id) { <option [value]="c.id">{{ c.name }}</option> }
+    </select>
+    <button class="btn primary" (click)="openNew()" [disabled]="categories().length === 0">+ Nuevo plato</button>
+  </div>
+</header>
+
+@if (notice()) { <div class="alert ok">{{ notice() }}</div> }
+@if (error()) { <div class="alert err">{{ error() }}</div> }
+
+@if (showForm()) {
+  <form class="card form" [formGroup]="form" (ngSubmit)="save()">
+    <h2>{{ editingId() === null ? 'Nuevo plato' : 'Editar plato' }}</h2>
+    <div class="grid">
+      <label>Nombre
+        <input formControlName="name" maxlength="120" placeholder="Ej. Lomo saltado" />
+        @if (fieldError('name'); as e) { <small class="field-err">{{ e }}</small> }
+      </label>
+      <label>Categoría
+        <select formControlName="categoryId">
+          @for (c of categories(); track c.id) { <option [ngValue]="c.id">{{ c.name }}</option> }
+        </select>
+        @if (fieldError('categoryId'); as e) { <small class="field-err">{{ e }}</small> }
+      </label>
+      <label>Precio (S/)
+        <input type="number" formControlName="price" min="0" step="0.10" />
+        @if (fieldError('price'); as e) { <small class="field-err">{{ e }}</small> }
+      </label>
+      <label>Tiempo de preparación
+        <input formControlName="prepTime" maxlength="30" placeholder="Ej. 15 min" />
+      </label>
+      <label class="span-2">Descripción
+        <textarea formControlName="description" rows="2" maxlength="500"></textarea>
+        @if (fieldError('description'); as e) { <small class="field-err">{{ e }}</small> }
+      </label>
+      <label>Dieta
+        <input formControlName="dietary" maxlength="60" placeholder="Ej. Vegetariano" />
+      </label>
+      <label>URL de imagen
+        <input formControlName="image" maxlength="300" placeholder="https://…" />
+      </label>
+      <label class="check"><input type="checkbox" formControlName="active" /> Disponible en la carta</label>
+    </div>
+    <div class="actions">
+      <button type="button" class="btn" (click)="cancel()">Cancelar</button>
+      <button type="submit" class="btn primary" [disabled]="saving()">{{ saving() ? 'Guardando…' : 'Guardar' }}</button>
+    </div>
+  </form>
+}
+
+<div class="card table-wrap">
+  <table>
+    <thead>
+      <tr><th>#</th><th>Plato</th><th>Categoría</th><th class="right">Precio</th><th>Prep.</th><th>Estado</th><th class="right">Acciones</th></tr>
+    </thead>
+    <tbody>
+      @for (d of items(); track d.id) {
+        <tr>
+          <td class="muted">{{ d.id }}</td>
+          <td><strong>{{ d.name }}</strong>@if (d.description) {<br /><small class="muted">{{ d.description }}</small>}</td>
+          <td>{{ d.category.name }}</td>
+          <td class="right">{{ d.price | currency: 'PEN' : 'S/ ' }}</td>
+          <td>{{ d.prepTime || '—' }}</td>
+          <td><span class="badge" [class.on]="d.active">{{ d.active ? 'Disponible' : 'Oculto' }}</span></td>
+          <td class="right">
+            <button class="btn small" (click)="edit(d)">Editar</button>
+            <button class="btn small danger" (click)="remove(d)">Eliminar</button>
+          </td>
+        </tr>
+      } @empty {
+        <tr><td colspan="7" class="empty">{{ loading() ? 'Cargando…' : 'No hay platos registrados' }}</td></tr>
+      }
+    </tbody>
+  </table>
+</div>
