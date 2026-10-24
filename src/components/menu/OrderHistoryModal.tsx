@@ -6,6 +6,9 @@ import { Clock3, History, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { OrderRound } from '@/types';
 import { useDialog } from '@/hooks/useDialog';
+import { useLanguage } from '@/hooks/useLanguage';
+import { KITCHEN_STATUS_LABEL_KEYS } from '@/i18n/orderStatus';
+import { localizeTableLabel } from '@/i18n/tableLabel';
 
 interface OrderHistoryModalProps {
   isOpen: boolean;
@@ -26,6 +29,7 @@ const calculateRoundSubtotal = (round: OrderRound): number =>
 
 export function OrderHistoryModal({ isOpen, onClose, tableNumber, rounds }: OrderHistoryModalProps) {
   const dialog = useDialog<HTMLElement>(isOpen, onClose);
+  const { language, t } = useLanguage();
 
   useEffect(() => {
     if (!isOpen) return;
@@ -68,10 +72,10 @@ export function OrderHistoryModal({ isOpen, onClose, tableNumber, rounds }: Orde
                 </span>
                 <div className="min-w-0">
                   <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-500 dark:text-white/45">
-                    Consumo de mesa
+                    {t('history.kicker')}
                   </p>
                   <h2 id="order-history-title" className="truncate text-lg font-bold sm:text-xl">
-                    Historial · {tableNumber}
+                    {t('history.title', { table: localizeTableLabel(tableNumber, language) })}
                   </h2>
                 </div>
               </div>
@@ -79,7 +83,7 @@ export function OrderHistoryModal({ isOpen, onClose, tableNumber, rounds }: Orde
                 
                 type="button"
                 onClick={onClose}
-                aria-label="Cerrar historial de pedidos"
+                aria-label={t('history.close')}
                 className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-gray-200 bg-white/70 text-gray-600 transition hover:bg-gray-100 dark:border-white/10 dark:bg-white/5 dark:text-white/70 dark:hover:bg-white/10"
               >
                 <X size={20} aria-hidden="true" />
@@ -103,7 +107,7 @@ export function OrderHistoryModal({ isOpen, onClose, tableNumber, rounds }: Orde
                         </span>
                         <div>
                           <h3 id={`order-round-${round.id}`} className="text-sm font-bold">
-                            Ronda {index + 1}
+                            {t('history.round', { number: index + 1 })}
                           </h3>
                           <p className="mt-0.5 flex items-center gap-1 text-[11px] text-gray-500 dark:text-white/50">
                             <Clock3 size={12} aria-hidden="true" />
@@ -126,7 +130,7 @@ export function OrderHistoryModal({ isOpen, onClose, tableNumber, rounds }: Orde
                                 {item.quantity} × S/ {item.price.toFixed(2)}
                               </span>
                               <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${statusStyles[item.status]}`}>
-                                {item.status}
+                                {t(KITCHEN_STATUS_LABEL_KEYS[item.status])}
                               </span>
                             </div>
                           </div>
@@ -145,10 +149,13 @@ export function OrderHistoryModal({ isOpen, onClose, tableNumber, rounds }: Orde
               <div className="flex items-end justify-between gap-4">
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-gray-500 dark:text-white/45">
-                    Total acumulado
+                    {t('history.totalAccumulated')}
                   </p>
                   <p className="mt-1 text-xs text-gray-500 dark:text-white/50">
-                    {rounds.length} {rounds.length === 1 ? 'ronda' : 'rondas'}
+                    {t(
+                      rounds.length === 1 ? 'history.roundCountOne' : 'history.roundCountOther',
+                      { count: rounds.length }
+                    )}
                   </p>
                 </div>
                 <p className="font-mono-code text-2xl font-bold text-[#c2410c] dark:text-[#ff8a55]">

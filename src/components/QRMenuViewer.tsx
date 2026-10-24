@@ -1023,10 +1023,10 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                   type="button"
                   onClick={() => setIsOrderHistoryOpen(true)}
                   className="px-2.5 py-1 min-h-[36px] rounded-lg border border-[#cbd5e1] bg-white/70 font-bold text-[11px] text-[#334155] transition-colors hover:bg-white dark:border-[#3a3b46] dark:bg-[#24252e] dark:text-white dark:hover:bg-[#2d2e3a]"
-                  title="Consultar el historial de consumo de la mesa"
+                  title={t('history.openTitle')}
                 >
                   <span className="material-symbols-outlined mr-1 align-middle text-[15px]">receipt_long</span>
-                  <span>Consumo de Mesa</span>
+                  <span>{t('history.kicker')}</span>
                 </button>
                 <span className="text-[#0f172a] dark:text-white font-bold">{t('tracker.total', { amount: `S/ ${consumptionTotal.toFixed(2)}` })}</span>
                 <button
@@ -1406,7 +1406,17 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
               <h4 className="text-[#0f172a] dark:text-white font-bold text-[16px]">{t('grid.emptyTitle')}</h4>
               <p className="text-[#475569] dark:text-[#a1a1aa] text-[13px] max-w-sm mx-auto">
                 {selectedDietaryFilters.length > 0 ? (
-                  `No encontramos ningún resultado para "${selectedDietaryFilters.map((selectedFilter) => DIETARY_FILTERS.find((filter) => filter.value === selectedFilter)?.label).join(', ')}". Prueba con otro ingrediente o limpia los filtros.`
+                  t('dietary.emptyBody', {
+                    filters: selectedDietaryFilters
+                      .map((selectedFilter) => {
+                        const filter = DIETARY_FILTERS.find(
+                          (option) => option.value === selectedFilter
+                        );
+                        return filter ? t(filter.labelKey) : '';
+                      })
+                      .filter(Boolean)
+                      .join(', ')
+                  })
                 ) : (
                   t('grid.emptyBody', { query: searchQuery })
                 )}
@@ -1466,11 +1476,11 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
                         ).map((filter) => (
                           <span
                             key={filter.value}
-                            title={filter.label}
+                            title={t(filter.labelKey)}
                             className="inline-flex items-center gap-1 rounded-full border border-[#e2e8f0] bg-[#f8fafc]/90 px-2 py-0.5 text-[10px] font-medium text-[#475569] backdrop-blur-md dark:border-white/10 dark:bg-white/[0.06] dark:text-[#c4c4ce]"
                           >
                             <span aria-hidden="true"><span className="material-symbols-outlined text-[13px]">{filter.materialIcon}</span></span>
-                            {filter.label}
+                            {t(filter.labelKey)}
                           </span>
                         ))}
                       </div>
