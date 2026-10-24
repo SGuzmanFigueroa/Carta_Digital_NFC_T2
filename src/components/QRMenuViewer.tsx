@@ -19,7 +19,7 @@ import { AnimatedSoles } from './menu/AnimatedSoles';
 // panel "Total" del carrito ocupa el carril inferior para que flote por encima.
 import { setDinerCartBarVisible } from '@/hooks/useDinerCartBar';
 import { PaymentModal } from './menu/PaymentModal';
-import { SplitBillModal } from './menu/SplitBillModal';
+import { SplitBillModal, type SplitBillItem } from './menu/SplitBillModal';
 import { ComplaintBookModal } from './menu/ComplaintBookModal';
 import { DishDetailModal } from './menu/DishDetailModal';
 import { PairingSuggestion } from './menu/PairingSuggestion';
@@ -129,10 +129,8 @@ const normalizeStr = (str: string) =>
   str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
 
 const normalizeTable = (table: string) => normalizeStr(table).replace(/\s+/g, '-');
-
-
-
-
+/** Redondeo monetario único para que saldo, abonos y totales no arrastren céntimos. */
+const roundMoney = (amount: number) => Math.round((amount + Number.EPSILON) * 100) / 100;
 
 interface QRMenuViewerProps {
   menuItems: MenuItem[];
@@ -141,7 +139,13 @@ interface QRMenuViewerProps {
   activeTicket?: OrderTicket | null;
   orderHistory?: OrderTicket[];
   tableOrderRounds?: OrderRound[];
+  /** Mesas del salón: `amount` es el saldo pendiente real tras los abonos. */
   tables?: TableStatus[];
+  onCollectTableBill: (
+    table: string,
+    amount: number,
+    options?: { keepOpen?: boolean }
+  ) => Promise<boolean>;
   onSendOrderFromMenu?: (
     table: string,
     items: Array<{ item: MenuItem; quantity: number; notes?: string }>,
@@ -167,6 +171,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   orderHistory = [],
   tableOrderRounds = [],
   tables,
+  onCollectTableBill,
   onSendOrderFromMenu,
   onRecordTableOrderRound,
   onRequestTableAccount,
@@ -291,18 +296,6 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       return { ...previous, [selectedTableKey]: nextCart };
     });
   };
-
-  /**
-   * CD-26 · Publica si el panel flotante del carrito ocupa el carril inferior.
-   * El banner de instalación PWA lo lee para flotar justo encima del "Total" sin
-   * taparlo ni quedar debajo. Se limpia al desmontar la carta para no dejar el
-   * carril marcado como ocupado en otras vistas.
-   */
-  const isCartBarVisible = cart.length > 0;
-  useEffect(() => {
-    setDinerCartBarVisible(isCartBarVisible);
-    return () => setDinerCartBarVisible(false);
-  }, [isCartBarVisible]);
 
   // Sincronizar automáticamente la mesa desde el QR escaneado (?mesa=4, ?table=04, ?m=2)
   useEffect(() => {
@@ -470,6 +463,95 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
     (total, round) => total + round.items.reduce((roundTotal, item) => roundTotal + item.price * item.quantity, 0),
     0
   );
+  const selectedTableTicket = activeTicket && normalizeTable(activeTicket.table) === selectedTableKey
+    ? activeTicket
+    : null;
+  const selectedTableDigits = selectedTable.replace(/\D/g, '');
+  const currentTable = (tables || []).find((table) => {
+    const tableDigits = table.number.replace(/\D/g, '');
+    return normalizeTable(table.number) === selectedTableKey
+      || (selectedTableDigits.length > 0 && tableDigits === selectedTableDigits);
+  });
+  const rawTableBalance = Number(currentTable?.amount);
+  const tableBalance = Number.isFinite(rawTableBalance) && rawTableBalance > 0
+    ? roundMoney(rawTableBalance)
+    : 0;
+  const activeOrderTicket = activeTableTicket || selectedTableTicket;
+  const hasSentOrderItems = orderRounds.some((round) => round.items.length > 0)
+    || Boolean(selectedTableTicket?.items.length);
+  const hasActiveUnpaidOrder = Boolean(
+    currentTable
+    && currentTable.status !== 'disponible'
+    && hasSentOrderItems
+    && activeOrderTicket?.paymentStatus !== 'paid'
+  );
+  const sentOrderTotal = hasActiveUnpaidOrder
+    ? orderRounds.length > 0
+      ? consumptionTotal
+      : Number(selectedTableTicket?.total || 0)
+    : 0;
+  /**
+   * Total original de los platos, ANTES de los abonos.
+   * - `tableBalance` es el saldo pendiente real de la mesa (`tables[].amount`).
+   * - Si el consumo original es mayor, la diferencia son los abonos previos.
+   * - Si la mesa aún no tiene saldo (o el contexto no cargó), se usa el pedido
+   *   actual para no bloquear el cobro.
+   */
+  const dishesTotal = roundMoney(cart.length > 0 ? cartTotal : sentOrderTotal);
+  const hasLocalCart = cart.length > 0;
+  const activeTableBalance = hasActiveUnpaidOrder ? tableBalance : 0;
+  const orderTotal = hasLocalCart
+    ? roundMoney(cartTotal)
+    : roundMoney(Math.max(dishesTotal, activeTableBalance));
+  /**
+   * FUENTE ÚNICA del monto a cobrar en toda la carta: el SALDO PENDIENTE de la
+   * mesa. Tras un abono parcial ya viene descontado, por eso el segundo
+   * comensal ve solo lo que falta. Los modales nunca recalculan desde los platos.
+   */
+  const amountDue = activeTableBalance > 0
+    ? activeTableBalance
+    : hasSentOrderItems
+      ? sentOrderTotal
+      : hasLocalCart
+        ? roundMoney(cartTotal)
+        : dishesTotal;
+  const hasPendingTableBalance = !hasLocalCart && activeTableBalance > 0;
+
+  /**
+   * CD-26 · Publica si el panel flotante del carrito ocupa el carril inferior.
+   * El banner de instalación PWA lo lee para flotar justo encima del panel.
+   */
+  const isCartBarVisible = hasLocalCart || hasPendingTableBalance;
+  useEffect(() => {
+    setDinerCartBarVisible(isCartBarVisible);
+    return () => setDinerCartBarVisible(false);
+  }, [isCartBarVisible]);
+
+  /** Detalle de platos del consumo original; NO impone el monto a cobrar. */
+  const billItems: SplitBillItem[] = cart.length > 0
+    ? cart.map(({ item, quantity }, index) => ({
+        id: `${cartLineKey(item)}-${index}`,
+        name: item.name,
+        quantity,
+        price: item.price * quantity
+      }))
+    : orderRounds.length > 0
+      ? orderRounds.flatMap((round) =>
+          round.items.map((item) => ({
+            id: `${round.id}-${item.id}`,
+            name: item.name,
+            quantity: item.quantity,
+            price: item.price * item.quantity
+          }))
+        )
+      : (selectedTableTicket?.items || [])
+          .map((item, index) => ({
+            id: `${item.id}-${index}`,
+            name: item.name,
+            quantity: item.quantity,
+            price: Number(item.price)
+          }))
+          .filter((item) => Number.isFinite(item.price) && item.price > 0);
 
   const activeTicketId = activeTableTicket?.id;
   const activeTicketStatus = activeTableTicket?.status;
@@ -491,10 +573,12 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   }, [activeTicketId, activeTicketStatus]);
 
   /** CD-31 · Etiqueta accesible del carrito, traducida (con singular/plural). */
-  const cartAriaLabel = t('cart.aria', {
-    count: cartItemsCount,
-    dishes: t(cartItemsCount === 1 ? 'unit.dishOne' : 'unit.dishOther')
-  });
+  const cartAriaLabel = hasPendingTableBalance
+    ? t('cart.pendingBalanceAria', { amount: amountDue.toFixed(2) })
+    : t('cart.aria', {
+        count: cartItemsCount,
+        dishes: t(cartItemsCount === 1 ? 'unit.dishOne' : 'unit.dishOther')
+      });
 
   const handleAddToCart = (item: MenuItem) => {
     // CD-27 · Feedback háptico inmediato: micro-vibración de 15 ms que confirma
@@ -804,13 +888,46 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
   const handleOpenSplitBill = () => {
     setIsPaymentModalOpen(false);
     setPaymentAmount(null);
+    setIsCartOpen(false);
     setIsSplitBillModalOpen(true);
   };
 
   const handleConfirmSplitBill = (amount: number) => {
+    const requestedAmount = Number.isFinite(amount) && amount > 0 ? amount : 0;
+    // El cobro nunca puede superar el SALDO PENDIENTE de la mesa.
+    const safeAmount = roundMoney(Math.min(requestedAmount, amountDue));
+    if (safeAmount <= 0) return;
     setIsSplitBillModalOpen(false);
-    setPaymentAmount(amount);
+    setPaymentAmount(safeAmount);
     setIsPaymentModalOpen(true);
+  };
+
+  const handlePaymentSuccess = async (
+    paidAmount: number,
+    options?: { keepOpen?: boolean }
+  ): Promise<boolean> => {
+    const settledAmount = Number.isFinite(paidAmount) && paidAmount > 0
+      ? roundMoney(Math.min(paidAmount, amountDue))
+      : 0;
+    if (settledAmount <= 0) return false;
+
+    // FIX 1: Si hay platos en el carrito sin enviar, PRIMERO los enviamos a la base de datos
+    // para generar la deuda real de la mesa antes de aplicarle el abono.
+    if (cart.length > 0) {
+      await sendCartOrder();
+    }
+
+    // FIX 2: Ahora siempre ejecutamos el cobro contra el RestaurantContext para que
+    // reste matemáticamente el abono del total de la mesa.
+    const collected = await onCollectTableBill(selectedTable, settledAmount, options);
+    if (!collected) return false;
+
+    // FIX 3: Eliminamos setPaymentAmount(settledAmount) para no "congelar" el saldo visual.
+    // Al limpiar el carrito, la carta leerá automáticamente el nuevo saldo real desde el contexto.
+    setCart([]);
+    setActiveNoteItemId({});
+    setIsCartOpen(false);
+    return true;
   };
 
   const handleTriggerCallWaiter = () => {
@@ -915,16 +1032,14 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
               onClick={() => setIsCartOpen(true)}
               aria-label={cartAriaLabel}
               title={t('header.openCart')}
-              className="relative px-3 py-1.5 min-h-[44px] rounded-xl bg-primary hover:brightness-110 text-on-primary font-bold text-[12px] flex items-center gap-1.5 shadow-[0_0_15px] shadow-primary/35 active:scale-95 transition-all cursor-pointer"
+              className="relative px-2 sm:px-3 py-1.5 min-h-[44px] rounded-xl bg-primary hover:brightness-110 text-on-primary font-bold text-[12px] flex items-center gap-1 sm:gap-1.5 shadow-[0_0_15px] shadow-primary/35 active:scale-95 transition-all cursor-pointer"
             >
               <span className="material-symbols-outlined text-[17px]">shopping_bag</span>
               {/* CD-27 · Globo del contador con rebote elástico (badge pop). */}
-              <CartBadge count={cartItemsCount} hideWhenEmpty={false} />
-              {cartTotal > 0 && (
-                <span className="hidden sm:inline-block font-mono-code text-[11px] border-l border-[#511500]/30 pl-1.5">
-                  <AnimatedSoles value={cartTotal} />
-                </span>
-              )}
+              <CartBadge count={cartItemsCount} />
+              <span className="inline-block font-mono-code text-[10px] sm:text-[11px] border-l border-[#511500]/30 pl-1 sm:pl-1.5">
+                <AnimatedSoles value={amountDue} />
+              </span>
             </button>
           </div>
         </div>
@@ -1563,46 +1678,70 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       {/* ========================================================================= */}
       {/*  PERSISTENT FLOATING BOTTOM ORDER BAR */}
       {/* ========================================================================= */}
-      {cart.length > 0 && (
+      {isCartBarVisible && (
         <div className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] sm:bottom-3 left-3 right-3 max-w-md mx-auto z-40">
           <div className="bg-white/95 dark:bg-[#15161c]/95 backdrop-blur-xl border border-primary/50 p-2.5 sm:p-3 rounded-2xl shadow-[0_4px_25px_rgba(15,23,42,0.18)] dark:shadow-[0_4px_25px_rgba(0,0,0,0.8)] flex items-center justify-between gap-2.5">
-            <div
-              className="flex items-center gap-2.5 cursor-pointer min-w-0"
+            <button
+              type="button"
               onClick={() => setIsCartOpen(true)}
+              aria-label={hasPendingTableBalance ? cartAriaLabel : undefined}
+              className="flex items-center gap-2.5 cursor-pointer min-w-0 text-left"
             >
               {/* CD-27 · Globo del carrito: rebote elástico al agregar un plato. */}
-              <CartBadge
-                count={cartItemsCount}
-                className="w-9 h-9 rounded-xl bg-[#ff5708] text-[#2b0b00] flex items-center justify-center font-bold font-mono-code text-[15px] shrink-0 shadow-md"
-              />
+              {cartItemsCount > 0 && (
+                <CartBadge
+                  count={cartItemsCount}
+                  className="w-9 h-9 rounded-xl bg-[#ff5708] text-[#2b0b00] flex items-center justify-center font-bold font-mono-code text-[15px] shrink-0 shadow-md"
+                />
+              )}
               <div className="flex flex-col min-w-0">
-                <span className="text-[11px] text-[#475569] dark:text-[#a1a1aa] truncate">{t('cart.totalWithCount', { count: cartItemsCount, dishes: t(cartItemsCount === 1 ? 'unit.dishOne' : 'unit.dishOther') })}</span>
+                <span className="text-[11px] text-[#475569] dark:text-[#a1a1aa] truncate">
+                  {hasPendingTableBalance
+                    ? t('cart.pendingBalance')
+                    : t('cart.totalWithCount', {
+                        count: cartItemsCount,
+                        dishes: t(cartItemsCount === 1 ? 'unit.dishOne' : 'unit.dishOther')
+                      })}
+                </span>
                 <span className="font-mono-code text-[15px] sm:text-[16px] font-bold text-[#c2410c] dark:text-[#ff5708]">
                   {/* CD-27 · El importe cuenta a 60 FPS en lugar de saltar. */}
-                  <AnimatedSoles value={cartTotal} />
+                  <AnimatedSoles value={amountDue} />
                 </span>
               </div>
-            </div>
+            </button>
 
             <div className="flex items-center gap-1.5 shrink-0">
-              <button
-                type="button"
-                onClick={() => setIsCartOpen(true)}
-                title="Ver y editar los platos pendientes del pedido"
-                className="px-2.5 sm:px-3 py-2 min-h-[44px] rounded-xl bg-[#f1f5f9] hover:bg-[#e2e8f0] text-[#0f172a] border border-[#cbd5e1] dark:bg-[#24252e] dark:hover:bg-[#2d2e3a] dark:text-white dark:border-transparent text-[11px] sm:text-[12px] font-medium transition-colors cursor-pointer"
-              >
-                {t('cart.viewOrder')}
-              </button>
-              <button
-                type="button"
-                onClick={handleSendOrder}
-                disabled={isVerifyingGeofence}
-                aria-busy={isVerifyingGeofence}
-                className="disabled:opacity-60 disabled:cursor-wait px-3 sm:px-4 py-2 min-h-[44px] rounded-xl bg-primary text-on-primary font-bold text-[12px] sm:text-[13px] flex items-center gap-1 hover:brightness-110 active:scale-95 transition-all shadow-[0_0_15px] shadow-primary/35 cursor-pointer"
-              >
-                <span>{t('cart.send')}</span>
-                <span className="material-symbols-outlined text-[16px]">send</span>
-              </button>
+              {hasPendingTableBalance ? (
+                <button
+                  type="button"
+                  onClick={() => setIsCartOpen(true)}
+                  className="px-3 sm:px-4 py-2 min-h-[44px] rounded-xl bg-primary text-on-primary font-bold text-[11px] sm:text-[12px] flex items-center gap-1 hover:brightness-110 active:scale-95 transition-all shadow-[0_0_15px] shadow-primary/35 cursor-pointer"
+                >
+                  <span>{t('cart.payPendingBalance')}</span>
+                  <span className="material-symbols-outlined text-[16px]">payments</span>
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setIsCartOpen(true)}
+                    title="Ver y editar los platos pendientes del pedido"
+                    className="px-2.5 sm:px-3 py-2 min-h-[44px] rounded-xl bg-[#f1f5f9] hover:bg-[#e2e8f0] text-[#0f172a] border border-[#cbd5e1] dark:bg-[#24252e] dark:hover:bg-[#2d2e3a] dark:text-white dark:border-transparent text-[11px] sm:text-[12px] font-medium transition-colors cursor-pointer"
+                  >
+                    {t('cart.viewOrder')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSendOrder}
+                    disabled={isVerifyingGeofence}
+                    aria-busy={isVerifyingGeofence}
+                    className="disabled:opacity-60 disabled:cursor-wait px-3 sm:px-4 py-2 min-h-[44px] rounded-xl bg-primary text-on-primary font-bold text-[12px] sm:text-[13px] flex items-center gap-1 hover:brightness-110 active:scale-95 transition-all shadow-[0_0_15px] shadow-primary/35 cursor-pointer"
+                  >
+                    <span>{t('cart.send')}</span>
+                    <span className="material-symbols-outlined text-[16px]">send</span>
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -1612,7 +1751,6 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       {/*  TABLE SELECTOR MODAL */}
       {/* ========================================================================= */}
 
-
       {/* ========================================================================= */}
       {/* ️ CART DRAWER / REVIEW MODAL */}
       {/* ========================================================================= */}
@@ -1621,7 +1759,8 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
         onClose={() => setIsCartOpen(false)}
         selectedTable={selectedTable}
         cart={cart}
-        cartTotal={cartTotal}
+        amountDue={amountDue}
+        orderTotal={orderTotal}
         isVerifyingGeofence={isVerifyingGeofence}
         activeNoteItemId={activeNoteItemId}
         setActiveNoteItemId={setActiveNoteItemId}
@@ -1663,55 +1802,32 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
       {/* ========================================================================= */}
       {/*  CD-10 · MODAL PASARELA DE PAGO DIGITAL QR Y RESEÑAS POST-PAGO          */}
       {/* ========================================================================= */}
-      {(() => {
-        const cleanTblNum = selectedTable.replace(/\D/g, '');
-        const currentTbl = (tables || []).find((t) => t.number === cleanTblNum || selectedTable.includes(t.number));
-        const tblAmount = Number(currentTbl?.amount || 0);
-        const consolidatedTotalAmount: number =
-          orderRounds.length > 0
-            ? consumptionTotal
-            : tblAmount > 0
-            ? tblAmount
-            : Number(activeTicket?.total || (cartTotal > 0 ? cartTotal : 86.00));
-        const splitBillItems = (activeTicket?.items || [])
-          .map((item, index) => ({
-            id: `${item.id}-${index}`,
-            name: item.name,
-            quantity: item.quantity,
-            price: Number(item.price)
-          }))
-          .filter((item) => Number.isFinite(item.price) && item.price > 0);
-        const splitBillTotal = splitBillItems.length > 0
-          ? splitBillItems.reduce((total, item) => total + item.price, 0)
-          : consolidatedTotalAmount;
-
-        return (
-          <>
-            {isSplitBillModalOpen && (
-              <SplitBillModal
-                isOpen
-                totalAmount={splitBillTotal}
-                items={splitBillItems}
-                onClose={() => setIsSplitBillModalOpen(false)}
-                onConfirm={handleConfirmSplitBill}
-              />
-            )}
-            <PaymentModal
-              isOpen={isPaymentModalOpen}
-              onClose={() => {
-                setIsPaymentModalOpen(false);
-                setPaymentAmount(null);
-              }}
-              tableNumber={activeTicket?.table || selectedTable}
-              totalAmount={paymentAmount ?? consolidatedTotalAmount}
-              orderId={activeTicket?.id}
-              orderKey={activeTicket?.dinerKey}
-              onRequestTableAccount={onRequestTableAccount}
-              onShowToast={onShowToast}
-            />
-          </>
-        );
-      })()}
+      {isSplitBillModalOpen && (
+        <SplitBillModal
+          isOpen
+          amountDue={amountDue}
+          items={billItems}
+          onClose={() => setIsSplitBillModalOpen(false)}
+          onConfirm={handleConfirmSplitBill}
+        />
+      )}
+      {/* Se monta solo al abrirse: cada cobro arranca en el paso 'payment'. */}
+      {isPaymentModalOpen && (
+        <PaymentModal
+          isOpen
+          onClose={() => {
+            setIsPaymentModalOpen(false);
+            setPaymentAmount(null);
+          }}
+          tableNumber={activeTicket?.table || selectedTable}
+          amountDue={paymentAmount ?? amountDue}
+          orderId={activeTicket?.id}
+          orderKey={activeTicket?.dinerKey}
+          onRequestTableAccount={onRequestTableAccount}
+          onPaymentSuccess={handlePaymentSuccess}
+          onShowToast={onShowToast}
+        />
+      )}
 
       {/*  LIBRO DE RECLAMACIONES VIRTUAL (INDECOPI) */}
       <ComplaintBookModal
@@ -1736,7 +1852,7 @@ export const QRMenuViewer: React.FC<QRMenuViewerProps> = ({
         onClose={() => setIsWaiterCallModalOpen(false)}
         onSelect={handleSubmitWaiterCall}
         /* CD-28 · Se muestra EXACTAMENTE la mesa que se va a registrar (WYSIWYG):
-           `selectedTable` es la fuente única (QR `?mesa=` + modal selector). */
+            `selectedTable` es la fuente única (QR `?mesa=` + modal selector). */
         tableNumber={selectedTable}
       />
 
