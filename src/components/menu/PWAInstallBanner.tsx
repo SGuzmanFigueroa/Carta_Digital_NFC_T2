@@ -5,6 +5,7 @@ import { Download, LoaderCircle, Share, Smartphone, SquarePlus, X } from 'lucide
 import { cn } from '@/lib/utils';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
 import { useDinerCartBarVisible } from '@/hooks/useDinerCartBar';
+import { useLanguage } from '@/hooks/useLanguage';
 
 interface PWAInstallBannerProps {
   className?: string;
@@ -15,10 +16,11 @@ interface PWAInstallBannerProps {
  * Banner flotante de instalación PWA de la carta digital del comensal.
  *
  * Contenido según la plataforma (renderizado condicional limpio):
- *  · Android/Chrome y Chromium de escritorio → un único botón con el acento del local "Instalar"
- *    que dispara el diálogo nativo capturado por `usePWAInstall`. Nunca pasos
- *    manuales: CD-26 exige instalar con un clic.
- *  · iOS/Safari → guía de 2 pasos ("Compartir › Añadir a pantalla de inicio"),
+ *  · Android/Chrome y Chromium de escritorio → un único botón con el acento del local
+ *    cuyo rótulo sale del diccionario ES/EN (clave `pwa.install`) y que dispara el
+ *    diálogo nativo capturado por `usePWAInstall`. Nunca pasos manuales: CD-26 exige
+ *    instalar con un clic.
+ *  · iOS/Safari → guía de 2 pasos (claves `pwa.iosShare` › `pwa.iosAddToHome`),
  *    porque iOS no expone ninguna API de instalación programática.
  * Diseño: tarjeta de cristal (glassmorphism) con contorno del acento al 50 % y
  * elevación real. El contorno replica exactamente el del panel "Total (N platos)"
@@ -69,17 +71,19 @@ const GUIDE_CHIP =
  * ninguna API de instalación (la única vía es el menú Compartir de Safari).
  */
 function IosInstallGuide() {
+  // CD-101 · Guía de iOS en el idioma activo de la carta (ES/EN).
+  const { t } = useLanguage();
   return (
     <p className="mt-2.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11.5px] leading-snug text-[#475569] dark:text-[#a1a1aa]">
-      <span>Toca</span>
+      <span>{t('pwa.iosTap')}</span>
       <span className={GUIDE_CHIP}>
         <Share size={12} aria-hidden="true" className="text-primary" />
-        Compartir
+        {t('pwa.iosShare')}
       </span>
-      <span>y luego</span>
+      <span>{t('pwa.iosThen')}</span>
       <span className={GUIDE_CHIP}>
         <SquarePlus size={12} aria-hidden="true" className="text-primary" />
-        Añadir a pantalla de inicio
+        {t('pwa.iosAddToHome')}
       </span>
     </p>
   );
@@ -99,6 +103,8 @@ interface InstallButtonProps {
  * abre el diálogo nativo de instalación. Ni una sola instrucción manual.
  */
 function InstallButton({ canPrompt, isPrompting, onInstall }: InstallButtonProps) {
+  // CD-101 · Rótulos y tooltip del botón en el idioma activo de la carta.
+  const { t } = useLanguage();
   return (
     <button
       type="button"
@@ -106,9 +112,7 @@ function InstallButton({ canPrompt, isPrompting, onInstall }: InstallButtonProps
       disabled={isPrompting}
       aria-busy={isPrompting}
       title={
-        canPrompt
-          ? 'Abre el instalador de tu navegador'
-          : 'El instalador se habilita en cuanto el navegador lo ofrece'
+        canPrompt ? t('pwa.installTitleReady') : t('pwa.installTitlePending')
       }
       className={cn(
         'mt-2.5 inline-flex min-h-[44px] w-full cursor-pointer items-center justify-center gap-2 rounded-xl px-4',
@@ -123,7 +127,7 @@ function InstallButton({ canPrompt, isPrompting, onInstall }: InstallButtonProps
       ) : (
         <Download size={16} aria-hidden="true" />
       )}
-      <span>{isPrompting ? 'Abriendo…' : 'Instalar'}</span>
+      <span>{isPrompting ? t('pwa.installing') : t('pwa.install')}</span>
     </button>
   );
 }
@@ -131,6 +135,8 @@ function InstallButton({ canPrompt, isPrompting, onInstall }: InstallButtonProps
 export function PWAInstallBanner({ className }: PWAInstallBannerProps) {
   const { mode, platform, canPrompt, isPrompting, install, dismiss } = usePWAInstall();
   const isCartBarVisible = useDinerCartBarVisible();
+  // CD-101 · Idioma de la carta (se invoca antes de la salida temprana).
+  const { t } = useLanguage();
   const titleId = useId();
   const descriptionId = useId();
   const hintId = useId();
@@ -167,8 +173,8 @@ export function PWAInstallBanner({ className }: PWAInstallBannerProps) {
 
   const isIOS = platform === 'ios';
   const isMobile = isIOS || platform === 'android';
-  const title = isMobile ? 'Instala la carta en tu móvil' : 'Instala la carta en tu equipo';
-  const description = 'Acceso directo, pantalla completa y funciona sin conexión.';
+  const title = isMobile ? t('pwa.titleMobile') : t('pwa.titleDevice');
+  const description = t('pwa.description');
 
   return (
     <aside
@@ -256,7 +262,7 @@ export function PWAInstallBanner({ className }: PWAInstallBannerProps) {
                 id={hintId}
                 className="mt-1.5 text-[11px] leading-snug text-[#b45309] dark:text-[#fbbf24]"
               >
-                Tu navegador no ofrece la instalación en este momento.
+                {t('pwa.unavailable')}
               </p>
             ) : null}
           </div>
@@ -264,8 +270,8 @@ export function PWAInstallBanner({ className }: PWAInstallBannerProps) {
           <button
             type="button"
             onClick={handleDismiss}
-            aria-label="Cerrar la sugerencia de instalación y no volver a mostrarla en 7 días"
-            title="No volver a mostrar en 7 días"
+            aria-label={t('pwa.dismissAria')}
+            title={t('pwa.dismissTitle')}
             className={cn(
               'flex h-11 w-11 min-h-[44px] min-w-[44px] shrink-0 cursor-pointer items-center justify-center',
               'rounded-full text-[#64748b] transition-all duration-200',

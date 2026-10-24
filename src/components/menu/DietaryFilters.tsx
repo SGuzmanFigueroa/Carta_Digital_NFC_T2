@@ -1,17 +1,27 @@
 'use client';
 
 import type { DietaryPreference, MenuItem } from '@/types';
+import type { TranslationKey } from '@/i18n/translations';
+import { useLanguage } from '@/hooks/useLanguage';
 
+/**
+ * CD-31 · Definición de los filtros dietéticos de la carta.
+ *
+ * `labelKey` es la clave del diccionario ES/EN: el componente y sus consumidores
+ * (chips de la grilla, estado vacío) resuelven el rótulo con `t()`.
+ * `keywords` se mantiene en ambos idiomas porque clasifica el texto legacy de la
+ * base de datos, no la interfaz.
+ */
 export const DIETARY_FILTERS: {
   value: DietaryPreference;
-  label: string;
+  labelKey: TranslationKey;
   materialIcon: string;
   keywords: string[];
 }[] = [
-  { value: 'vegetarian', label: 'Vegetariano', materialIcon: 'eco', keywords: ['vegetariano', 'vegetariana', 'vegetarian'] },
-  { value: 'gluten-free', label: 'Sin Gluten', materialIcon: 'grain', keywords: ['sin gluten', 'gluten free', 'libre de gluten'] },
-  { value: 'dairy-free', label: 'Sin Lactosa', materialIcon: 'water_drop', keywords: ['sin lactosa', 'lactose free', 'sin lacteos', 'dairy free'] },
-  { value: 'spicy', label: 'Picante', materialIcon: 'local_fire_department', keywords: ['picante', 'spicy'] }
+  { value: 'vegetarian', labelKey: 'dietary.vegetarian', materialIcon: 'eco', keywords: ['vegetariano', 'vegetariana', 'vegetarian'] },
+  { value: 'gluten-free', labelKey: 'dietary.glutenFree', materialIcon: 'grain', keywords: ['sin gluten', 'gluten free', 'libre de gluten'] },
+  { value: 'dairy-free', labelKey: 'dietary.dairyFree', materialIcon: 'water_drop', keywords: ['sin lactosa', 'lactose free', 'sin lacteos', 'dairy free'] },
+  { value: 'spicy', labelKey: 'dietary.spicy', materialIcon: 'local_fire_department', keywords: ['picante', 'spicy'] }
 ];
 
 export function getDietaryPreferences(item: Pick<MenuItem, 'dietary' | 'dietaryPreferences'>): DietaryPreference[] {
@@ -36,14 +46,18 @@ interface DietaryFiltersProps {
 }
 
 export function DietaryFilters({ selectedFilters, onToggle }: DietaryFiltersProps) {
+  // CD-31 · Rótulos reactivos al idioma de la carta.
+  const { t } = useLanguage();
+
   return (
     <div
       role="group"
-      aria-label="Filtros de preferencias dietéticas"
+      aria-label={t('dietary.groupAria')}
       className="flex gap-2 overflow-x-auto -mx-3.5 px-3.5 pb-1 no-scrollbar sm:mx-0 sm:px-0"
     >
       {DIETARY_FILTERS.map((filter) => {
         const isSelected = selectedFilters.includes(filter.value);
+        const label = t(filter.labelKey);
 
         return (
           <button
@@ -58,7 +72,7 @@ export function DietaryFilters({ selectedFilters, onToggle }: DietaryFiltersProp
             }`}
           >
             <span aria-hidden="true"><span className="material-symbols-outlined text-[15px]">{filter.materialIcon}</span></span>
-            <span>{filter.label}</span>
+            <span>{label}</span>
           </button>
         );
       })}

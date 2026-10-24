@@ -162,10 +162,12 @@ export function MenuClient({ initialMenuItems }: { initialMenuItems: MenuItem[] 
               });
             }}
           />
-        </LanguageProvider>
 
-        {/* CD-26 · Invitación flotante a instalar la carta como aplicación */}
-        <PWAInstallBanner />
+          {/* CD-26 · Invitación flotante a instalar la carta como aplicación.
+              CD-101 · Vive DENTRO de `LanguageProvider` para que su copy respete
+              el idioma activo (ES/EN) sin recargar la página. */}
+          <PWAInstallBanner />
+        </LanguageProvider>
 
         {/* Floating Toast Alert */}
         {toast && (
