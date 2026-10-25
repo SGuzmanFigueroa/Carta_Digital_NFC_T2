@@ -1,7 +1,7 @@
 package com.cartadigital.backend.service;
 
-import com.cartadigital.backend.entity.Category;
-import com.cartadigital.backend.entity.Dish;
+import com.cartadigital.backend.model.Category;
+import com.cartadigital.backend.model.Dish;
 import com.cartadigital.backend.exception.ConflictException;
 import com.cartadigital.backend.exception.ResourceNotFoundException;
 import com.cartadigital.backend.repository.DishRepository;

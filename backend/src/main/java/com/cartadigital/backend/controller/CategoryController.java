@@ -1,6 +1,6 @@
 package com.cartadigital.backend.controller;
 
-import com.cartadigital.backend.entity.Category;
+import com.cartadigital.backend.model.Category;
 import com.cartadigital.backend.service.CategoryService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;

@@ -1,9 +1,9 @@
 package com.cartadigital.backend.config;
 
-import com.cartadigital.backend.entity.Category;
-import com.cartadigital.backend.entity.Dish;
-import com.cartadigital.backend.entity.RestaurantTable;
-import com.cartadigital.backend.entity.Staff;
+import com.cartadigital.backend.model.Category;
+import com.cartadigital.backend.model.Dish;
+import com.cartadigital.backend.model.RestaurantTable;
+import com.cartadigital.backend.model.Staff;
 import com.cartadigital.backend.repository.CategoryRepository;
 import com.cartadigital.backend.repository.DishRepository;
 import com.cartadigital.backend.repository.RestaurantTableRepository;

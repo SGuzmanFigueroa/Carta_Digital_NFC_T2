@@ -1,6 +1,6 @@
 package com.cartadigital.backend.repository;
 
-import com.cartadigital.backend.entity.Staff;
+import com.cartadigital.backend.model.Staff;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;

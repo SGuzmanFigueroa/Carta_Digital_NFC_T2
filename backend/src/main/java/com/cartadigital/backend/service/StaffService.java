@@ -1,6 +1,6 @@
 package com.cartadigital.backend.service;
 
-import com.cartadigital.backend.entity.Staff;
+import com.cartadigital.backend.model.Staff;
 import com.cartadigital.backend.exception.ConflictException;
 import com.cartadigital.backend.exception.ResourceNotFoundException;
 import com.cartadigital.backend.repository.StaffRepository;

@@ -1,4 +1,4 @@
-package com.cartadigital.backend.entity;
+package com.cartadigital.backend.model;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;

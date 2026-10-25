@@ -1,6 +1,6 @@
 package com.cartadigital.backend.controller;
 
-import com.cartadigital.backend.entity.RestaurantTable;
+import com.cartadigital.backend.model.RestaurantTable;
 import com.cartadigital.backend.service.RestaurantTableService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;

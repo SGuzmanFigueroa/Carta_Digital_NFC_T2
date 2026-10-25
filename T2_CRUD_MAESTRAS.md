@@ -15,7 +15,7 @@ Las tablas transaccionales (`orders`, `order_items`, `complaint_book`, `waiter_c
 
 ```
 backend/            Spring Boot 4.1 · Java 25 · JPA · MySQL
-  entity/           Category, Dish, RestaurantTable, Staff (con validaciones)
+  model/            Category, Dish, RestaurantTable, Staff (con validaciones)
   repository/       JpaRepository por entidad
   service/          Reglas de negocio (duplicados, FK, 404)
   controller/       REST: GET, GET/{id}, POST, PUT/{id}, DELETE/{id}

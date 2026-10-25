@@ -1,6 +1,6 @@
 package com.cartadigital.backend.controller;
 
-import com.cartadigital.backend.entity.Dish;
+import com.cartadigital.backend.model.Dish;
 import com.cartadigital.backend.service.DishService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;

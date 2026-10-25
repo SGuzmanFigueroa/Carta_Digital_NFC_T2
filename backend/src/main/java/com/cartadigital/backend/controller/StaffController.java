@@ -1,6 +1,6 @@
 package com.cartadigital.backend.controller;
 
-import com.cartadigital.backend.entity.Staff;
+import com.cartadigital.backend.model.Staff;
 import com.cartadigital.backend.service.StaffService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
