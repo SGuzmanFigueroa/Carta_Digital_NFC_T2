@@ -28,21 +28,20 @@ frontend-angular/   Angular 21 · standalone · signals · formularios reactivos
 
 ## Cómo ejecutarlo
 
-1. **MySQL** (guía detallada en [MYSQL_SETUP.md](MYSQL_SETUP.md)): debe estar corriendo en `localhost:3306`. La base `carta_digital_t2` y las tablas se crean solas.
-   Usuario/clave por defecto `root`/`root`; si tu clave es otra, cámbiala en
-   `backend/src/main/resources/application.properties` o usa variables de entorno:
+1. **MySQL** (guía detallada en [MYSQL_SETUP.md](MYSQL_SETUP.md)): debe estar corriendo en `localhost:3306`.
+   Ejecuta en MySQL Workbench el script [backend/carta_digital_t2.sql](backend/carta_digital_t2.sql):
+   crea la base `carta_digital_t2`, las 4 tablas y los datos de ejemplo.
+   Ojo: empieza con `DROP DATABASE IF EXISTS`, así que reinicia la base cada vez que se corre.
+   Si no corres el script, el backend igual crea la base y las tablas al arrancar.
 
-   ```bash
-   set DB_USERNAME=root
-   set DB_PASSWORD=tu_clave
+2. **Backend** (puerto 8080). Usuario/clave por defecto `root`/`root`; si tu clave es otra,
+   pásala por variable de entorno (PowerShell, dentro de `backend`):
+
+   ```powershell
+   $env:DB_PASSWORD="tu_clave"; .\mvnw spring-boot:run
    ```
 
-2. **Backend** (puerto 8080):
-
-   ```bash
-   cd backend
-   mvnw spring-boot:run
-   ```
+   O cámbiala en `backend/src/main/resources/application.properties` (sin hacer commit de tu clave).
 
 3. **Frontend** (puerto 4200):
 
@@ -61,7 +60,7 @@ frontend-angular/   Angular 21 · standalone · signals · formularios reactivos
 - Nombre de categoría, número de mesa y usuario del personal son únicos (409 si se repiten).
 - No se puede eliminar una categoría que tiene platos (409).
 - Validaciones en backend (Bean Validation) y en frontend (Validators), con el mensaje de cada campo.
-- Al primer arranque se cargan datos de ejemplo si las tablas están vacías.
+- Al primer arranque se cargan datos de ejemplo si las tablas están vacías (si ya corriste el script, no se duplican).
 
 ## Pruebas
 
