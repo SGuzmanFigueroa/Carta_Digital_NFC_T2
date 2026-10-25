@@ -1,5 +1,5 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
-import { CurrencyPipe } from '@angular/common';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { DecimalPipe } from '@angular/common';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CrudPage } from '../../core/crud-page';
 import { Category, Dish } from '../../core/models';
@@ -7,12 +7,14 @@ import { CategoryService, DishService } from '../../core/services';
 
 @Component({
   selector: 'app-dishes-page',
-  imports: [ReactiveFormsModule, CurrencyPipe],
+  imports: [ReactiveFormsModule, DecimalPipe],
   templateUrl: './dishes.page.html',
+  styleUrl: './dishes.page.css',
 })
 export class DishesPage extends CrudPage<Dish> implements OnInit {
   protected readonly service = inject(DishService);
   private readonly categoryService = inject(CategoryService);
+  protected readonly resource = 'dishes' as const;
   protected readonly entityLabel = 'plato';
 
   protected readonly categories = signal<Category[]>([]);
@@ -29,19 +31,27 @@ export class DishesPage extends CrudPage<Dish> implements OnInit {
     active: [true],
   });
 
+  /** Nombre de la categoría que la ficha muestra mientras se edita. */
+  protected readonly draftCategory = computed(() =>
+    this.categories().find((c) => c.id === Number(this.draft().categoryId))?.name ?? 'Sin categoría');
+
   override ngOnInit(): void {
     super.ngOnInit();
     this.categoryService.list().subscribe((c) => this.categories.set(c));
   }
 
-  protected filterBy(value: string): void {
-    this.filterCategoryId.set(value ? Number(value) : null);
+  protected filterBy(id: number | null): void {
+    this.filterCategoryId.set(id);
     this.load();
   }
 
   protected override listParams() {
     const id = this.filterCategoryId();
     return id === null ? undefined : { categoryId: id };
+  }
+
+  protected countIn(categoryId: number): number | null {
+    return this.filterCategoryId() === null ? this.items().filter((d) => d.category.id === categoryId).length : null;
   }
 
   protected defaults() {

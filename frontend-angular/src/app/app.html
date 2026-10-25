@@ -1,19 +1,32 @@
-<div class="shell">
-  <aside class="sidebar">
-    <div class="brand">
-      <span class="logo">CD</span>
-      <div>
-        <strong>Carta Digital</strong>
-        <small>Tablas maestras</small>
-      </div>
-    </div>
-    <nav>
-      @for (link of links; track link.path) {
-        <a [routerLink]="link.path" routerLinkActive="active">{{ link.label }}</a>
-      }
-    </nav>
-  </aside>
-  <main class="content">
-    <router-outlet />
-  </main>
-</div>
+<header class="top">
+  <a class="brand" routerLink="/platos" aria-label="GastroPulse, tablas maestras">
+    <span class="brand-mark"><span class="icon">restaurant</span></span>
+    <span class="brand-text">
+      <strong>GastroPulse</strong>
+      <span class="muted">Tablas maestras de la carta</span>
+    </span>
+  </a>
+
+  <div class="api" [class]="'api ' + store.api()" role="status">
+    <span class="icon">{{ store.api() === 'offline' ? 'cloud_off' : 'database' }}</span>
+    @switch (store.api()) {
+      @case ('online') { <span>MySQL conectado</span><span class="label api-port">API :8080</span> }
+      @case ('offline') { <span>Sin conexión con la API</span><span class="label api-port">:8080</span> }
+      @default { <span>Conectando…</span> }
+    }
+  </div>
+</header>
+
+<nav class="rail" aria-label="Tablas maestras">
+  @for (link of links; track link.path) {
+    <a class="pill" [routerLink]="link.path" routerLinkActive="on" #rla="routerLinkActive" [attr.aria-current]="rla.isActive ? 'page' : null">
+      <span class="icon">{{ link.icon }}</span>
+      {{ link.label }}
+      <span class="count num">{{ store.counts()[link.resource] ?? '–' }}</span>
+    </a>
+  }
+</nav>
+
+<main class="stage">
+  <router-outlet />
+</main>

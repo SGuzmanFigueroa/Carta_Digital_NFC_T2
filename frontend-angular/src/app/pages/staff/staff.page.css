@@ -1,0 +1,72 @@
+.grp-icon { font-size: 15px; vertical-align: -3px; margin-right: 6px; color: var(--gold); }
+
+.person { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.avatar {
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: var(--surface-3);
+  color: var(--text);
+  font: 700 13px var(--mono);
+  letter-spacing: 0.04em;
+}
+.row.on .avatar { background: var(--gold); color: var(--gold-ink); }
+
+.badge-band {
+  position: relative;
+  padding: 70px 30px 28px;
+  background:
+    repeating-linear-gradient(-45deg, rgb(234 179 8 / 0.05) 0 12px, transparent 12px 24px),
+    linear-gradient(160deg, #1d1a0e, #121216 70%);
+  border-bottom: 1px solid var(--line-soft);
+}
+.badge-band .preview-tag { left: 16px; right: auto; }
+
+.credential {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 20px 22px;
+  border-radius: 18px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  box-shadow: 0 20px 40px -20px rgb(0 0 0 / 0.8);
+  max-width: 560px;
+}
+.credential::before {
+  content: '';
+  position: absolute;
+  top: -9px;
+  left: 50%;
+  width: 54px;
+  height: 10px;
+  margin-left: -27px;
+  border-radius: 6px;
+  background: var(--obsidian);
+  border: 1px solid var(--line);
+}
+.avatar.big { width: 76px; height: 76px; border-radius: 20px; font-size: 24px; background: var(--gold); color: var(--gold-ink); }
+.cred-text { display: grid; gap: 4px; min-width: 0; }
+.cred-name { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; color: #fff; line-height: 1.1; }
+.cred-user { color: var(--text-2); }
+.role-chip {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--gold-wash);
+  color: var(--gold);
+  font-weight: 600;
+  font-size: 13px;
+}
+.role-chip .icon { font-size: 16px; }
+.cred-stamp { position: absolute; right: 18px; top: 16px; }
+
+.placeholder { position: static; animation: none; }

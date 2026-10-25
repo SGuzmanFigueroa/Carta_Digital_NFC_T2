@@ -1,65 +1,95 @@
-<header class="page-head">
-  <div>
-    <h1>Mesas</h1>
-    <p class="muted">Mesas del local, su capacidad y zona</p>
-  </div>
-  <button class="btn primary" (click)="openNew()">+ Nueva mesa</button>
-</header>
+<div class="toolbar">
+  <h1>Mesas del salón</h1>
+  <button class="btn primary" type="button" (click)="openNew()"><span class="icon">add</span> Nueva mesa</button>
+</div>
 
-@if (notice()) { <div class="alert ok">{{ notice() }}</div> }
-@if (error()) { <div class="alert err">{{ error() }}</div> }
+@if (notice()) { <div class="toast ok"><span class="icon">check_circle</span>{{ notice() }}<button class="btn ghost" type="button" (click)="dismiss()" aria-label="Cerrar aviso"><span class="icon">close</span></button></div> }
+@if (error()) { <div class="toast err"><span class="icon">error</span>{{ error() }}<button class="btn ghost" type="button" (click)="dismiss()" aria-label="Cerrar aviso"><span class="icon">close</span></button></div> }
 
-@if (showForm()) {
-  <form class="card form" [formGroup]="form" (ngSubmit)="save()">
-    <h2>{{ editingId() === null ? 'Nueva mesa' : 'Editar mesa' }}</h2>
-    <div class="grid">
-      <label>Número
-        <input formControlName="number" maxlength="10" placeholder="Ej. M05" />
-        @if (fieldError('number'); as e) { <small class="field-err">{{ e }}</small> }
-      </label>
-      <label>Capacidad (personas)
-        <input type="number" formControlName="capacity" min="1" max="30" />
-        @if (fieldError('capacity'); as e) { <small class="field-err">{{ e }}</small> }
-      </label>
-      <label>Zona
-        <select formControlName="zone">
-          @for (z of zones; track z) { <option [value]="z">{{ z }}</option> }
-        </select>
-      </label>
-      <label>Estado
-        <select formControlName="status">
-          @for (s of statuses; track s) { <option [value]="s">{{ s }}</option> }
-        </select>
-      </label>
-    </div>
-    <div class="actions">
-      <button type="button" class="btn" (click)="cancel()">Cancelar</button>
-      <button type="submit" class="btn primary" [disabled]="saving()">{{ saving() ? 'Guardando…' : 'Guardar' }}</button>
-    </div>
-  </form>
-}
+<div class="workspace">
+  <section class="floor" aria-label="Plano de mesas por zona">
+    @for (z of byZone(); track z.value) {
+      <div class="zone">
+        <div class="zone-head label"><span><span class="icon">{{ z.icon }}</span>{{ z.label }}</span><span>{{ z.tables.length }} {{ z.tables.length === 1 ? 'mesa' : 'mesas' }}</span></div>
+        <div class="tiles">
+          @for (t of z.tables; track t.id) {
+            <button type="button" class="tile" [class]="'tile ' + statusOf(t.status).css" [class.on]="selectedId() === t.id" (click)="open(t)"
+              [attr.aria-label]="'Mesa ' + t.number + ', ' + t.capacity + ' personas, ' + statusOf(t.status).label">
+              <span class="tile-num num">{{ t.number }}</span>
+              <span class="tile-cap"><span class="icon">group</span>{{ t.capacity }}</span>
+              <span class="state" [class]="'state ' + statusOf(t.status).css">{{ statusOf(t.status).label }}</span>
+            </button>
+          }
+        </div>
+      </div>
+    } @empty {
+      <div class="list empty"><span class="icon">{{ loading() ? 'hourglass_top' : 'table_restaurant' }}</span>{{ loading() ? 'Cargando mesas desde MySQL…' : 'Aún no hay mesas.' }}</div>
+    }
+  </section>
 
-<div class="card table-wrap">
-  <table>
-    <thead>
-      <tr><th>#</th><th>Número</th><th>Capacidad</th><th>Zona</th><th>Estado</th><th class="right">Acciones</th></tr>
-    </thead>
-    <tbody>
-      @for (t of items(); track t.id) {
-        <tr>
-          <td class="muted">{{ t.id }}</td>
-          <td><strong>{{ t.number }}</strong></td>
-          <td>{{ t.capacity }}</td>
-          <td class="cap">{{ t.zone }}</td>
-          <td><span class="badge" [class.on]="t.status === 'disponible'">{{ t.status }}</span></td>
-          <td class="right">
-            <button class="btn small" (click)="edit(t)">Editar</button>
-            <button class="btn small danger" (click)="remove(t)">Eliminar</button>
-          </td>
-        </tr>
-      } @empty {
-        <tr><td colspan="6" class="empty">{{ loading() ? 'Cargando…' : 'No hay mesas registradas' }}</td></tr>
-      }
-    </tbody>
-  </table>
+  @if (selectedId() !== null) {
+    @let v = draft();
+    <form class="ficha" [formGroup]="form" (ngSubmit)="save()" [attr.aria-label]="isNew() ? 'Nueva mesa' : 'Ficha de la mesa'">
+      <div class="table-view">
+        <span class="preview-tag"><span class="icon">map</span> {{ zoneOf(v.zone).label }}</span>
+        <div class="table-top" [class]="'table-top ' + statusOf(v.status).css">
+          <span class="table-num num">{{ v.number || '—' }}</span>
+          <div class="seats" [style.--n]="seats().length">
+            @for (s of seats(); track $index) { <i [style.--i]="$index"></i> }
+          </div>
+        </div>
+      </div>
+
+      <div class="ficha-body">
+        <div class="headline">
+          <h2 class="ficha-title">Mesa {{ v.number || 'nueva' }}</h2>
+          <span class="state" [class]="'state ' + statusOf(v.status).css">{{ statusOf(v.status).label }}</span>
+        </div>
+        <p class="ficha-meta"><span><span class="icon">group</span>{{ v.capacity }} personas</span><span><span class="icon">{{ zoneOf(v.zone).icon }}</span>{{ zoneOf(v.zone).label }}</span></p>
+
+        <div class="divider"></div>
+
+        <div class="form-grid">
+          <label class="field" [class.bad]="fieldError('number')">
+            <span class="label">Número</span>
+            <input class="num" formControlName="number" maxlength="10" placeholder="Ej. M05" />
+            @if (fieldError('number'); as e) { <span class="field-err">{{ e }}</span> }
+          </label>
+          <label class="field" [class.bad]="fieldError('capacity')">
+            <span class="label">Capacidad (personas)</span>
+            <input class="num" type="number" formControlName="capacity" min="1" max="30" />
+            @if (fieldError('capacity'); as e) { <span class="field-err">{{ e }}</span> }
+          </label>
+          <div class="field span-2">
+            <span class="label">Zona</span>
+            <div class="segmented" role="radiogroup" aria-label="Zona">
+              @for (z of zones; track z.value) { <label><input type="radio" formControlName="zone" [value]="z.value" />{{ z.label }}</label> }
+            </div>
+          </div>
+          <div class="field span-2">
+            <span class="label">Estado</span>
+            <div class="segmented" role="radiogroup" aria-label="Estado">
+              @for (s of statuses; track s.value) { <label><input type="radio" formControlName="status" [value]="s.value" />{{ s.label }}</label> }
+            </div>
+          </div>
+        </div>
+
+        <div class="actions">
+          <span class="spacer"></span>
+          @if (confirmDelete()) {
+            <span class="confirm">¿Eliminar esta mesa?
+              <button class="btn danger solid" type="button" (click)="remove()">Sí, eliminar</button>
+              <button class="btn ghost" type="button" (click)="confirmDelete.set(false)">No</button>
+            </span>
+          } @else {
+            @if (!isNew()) { <button class="btn danger" type="button" (click)="confirmDelete.set(true)"><span class="icon">delete</span> Eliminar</button> }
+            @if (isNew() || form.dirty) { <button class="btn ghost" type="button" (click)="discard()">Descartar</button> }
+            <button class="btn primary" type="submit" [disabled]="saving()"><span class="icon">save</span> {{ saving() ? 'Guardando…' : isNew() ? 'Crear mesa' : 'Guardar cambios' }}</button>
+          }
+        </div>
+      </div>
+    </form>
+  } @else if (!loading()) {
+    <div class="ficha placeholder"><div class="empty"><span class="icon">touch_app</span>Elige una mesa del plano o crea una nueva.</div></div>
+  }
 </div>

@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "broken-image",
+        "value": "*",
+        "files": [
+          "src/app/pages/dishes/dishes.page.html"
+        ],
+        "createdAt": "2026-10-25T04:38:33.703Z",
+        "reason": "claude: <img> solo se renderiza dentro de @if (v.image) con src enlazado a la URL del plato; el detector estático no ve el binding"
+      }
+    ]
+  }
+}

@@ -1,55 +1,100 @@
-<header class="page-head">
-  <div>
-    <h1>Categorías</h1>
-    <p class="muted">Secciones de la carta digital</p>
-  </div>
-  <button class="btn primary" (click)="openNew()">+ Nueva categoría</button>
-</header>
+<div class="toolbar">
+  <h1>Categorías de la carta</h1>
+  <button class="btn primary" type="button" (click)="openNew()"><span class="icon">add</span> Nueva categoría</button>
+</div>
 
-@if (notice()) { <div class="alert ok">{{ notice() }}</div> }
-@if (error()) { <div class="alert err">{{ error() }}</div> }
+@if (notice()) { <div class="toast ok"><span class="icon">check_circle</span>{{ notice() }}<button class="btn ghost" type="button" (click)="dismiss()" aria-label="Cerrar aviso"><span class="icon">close</span></button></div> }
+@if (error()) { <div class="toast err"><span class="icon">error</span>{{ error() }}<button class="btn ghost" type="button" (click)="dismiss()" aria-label="Cerrar aviso"><span class="icon">close</span></button></div> }
 
-@if (showForm()) {
-  <form class="card form" [formGroup]="form" (ngSubmit)="save()">
-    <h2>{{ editingId() === null ? 'Nueva categoría' : 'Editar categoría' }}</h2>
-    <div class="grid">
-      <label>Nombre
-        <input formControlName="name" maxlength="80" placeholder="Ej. Entradas" />
-        @if (fieldError('name'); as e) { <small class="field-err">{{ e }}</small> }
-      </label>
-      <label>Orden
-        <input type="number" formControlName="sortOrder" min="0" />
-        @if (fieldError('sortOrder'); as e) { <small class="field-err">{{ e }}</small> }
-      </label>
-      <label class="check"><input type="checkbox" formControlName="active" /> Activa</label>
-    </div>
-    <div class="actions">
-      <button type="button" class="btn" (click)="cancel()">Cancelar</button>
-      <button type="submit" class="btn primary" [disabled]="saving()">{{ saving() ? 'Guardando…' : 'Guardar' }}</button>
-    </div>
-  </form>
-}
+<div class="workspace">
+  <section class="list" aria-label="Categorías en el orden de la carta">
+    <div class="list-group label"><span>Orden en la carta</span><span>Platos</span></div>
+    @for (c of items(); track c.id) {
+      <button type="button" class="row" [class.on]="selectedId() === c.id" [class.off]="!c.active" (click)="open(c)">
+        <span class="with-order">
+          <span class="order num">{{ c.sortOrder }}</span>
+          <span><span class="row-name">{{ c.name }}</span></span>
+        </span>
+        @if (c.active) { <span class="num muted">{{ dishCount(c.id) }}</span> }
+        @else { <span class="stamp">Inactiva</span> }
+      </button>
+    } @empty {
+      <div class="empty"><span class="icon">{{ loading() ? 'hourglass_top' : 'category' }}</span>{{ loading() ? 'Cargando categorías desde MySQL…' : 'Aún no hay categorías.' }}</div>
+    }
+  </section>
 
-<div class="card table-wrap">
-  <table>
-    <thead>
-      <tr><th>#</th><th>Nombre</th><th>Orden</th><th>Estado</th><th class="right">Acciones</th></tr>
-    </thead>
-    <tbody>
-      @for (c of items(); track c.id) {
-        <tr>
-          <td class="muted">{{ c.id }}</td>
-          <td><strong>{{ c.name }}</strong></td>
-          <td>{{ c.sortOrder }}</td>
-          <td><span class="badge" [class.on]="c.active">{{ c.active ? 'Activa' : 'Inactiva' }}</span></td>
-          <td class="right">
-            <button class="btn small" (click)="edit(c)">Editar</button>
-            <button class="btn small danger" (click)="remove(c)">Eliminar</button>
-          </td>
-        </tr>
-      } @empty {
-        <tr><td colspan="5" class="empty">{{ loading() ? 'Cargando…' : 'No hay categorías registradas' }}</td></tr>
-      }
-    </tbody>
-  </table>
+  @if (selectedId() !== null) {
+    @let v = draft();
+    <form class="ficha" [formGroup]="form" (ngSubmit)="save()" [attr.aria-label]="isNew() ? 'Nueva categoría' : 'Ficha de la categoría'">
+      <div class="carta-strip">
+        <span class="preview-tag"><span class="icon">visibility</span> Así aparece en la carta</span>
+        <div class="strip">
+          <span class="strip-pill">Todos</span>
+          @for (c of items(); track c.id) {
+            @if (c.id === selectedId()) {
+              <span class="strip-pill on">{{ v.name || 'Nueva categoría' }} <b class="num">{{ dishCount(c.id) }}</b></span>
+            } @else if (c.active) {
+              <span class="strip-pill">{{ c.name }} <b class="num">{{ dishCount(c.id) }}</b></span>
+            }
+          }
+          @if (isNew()) { <span class="strip-pill on">{{ v.name || 'Nueva categoría' }} <b class="num">0</b></span> }
+        </div>
+      </div>
+
+      <div class="ficha-body">
+        <div class="headline">
+          <h2 class="ficha-title">{{ v.name || 'Nueva categoría' }}</h2>
+          @if (!v.active) { <span class="stamp big">Inactiva</span> }
+        </div>
+        <p class="ficha-meta"><span><span class="icon">format_list_numbered</span>Posición {{ v.sortOrder }} en la carta</span><span><span class="icon">restaurant_menu</span>{{ selectedDishes().length }} platos</span></p>
+
+        @if (!isNew()) {
+          <div class="contents">
+            @for (d of selectedDishes(); track d.id) {
+              <span class="dish"><span>{{ d.name }}</span><span class="price">S/ {{ d.price | number: '1.2-2' }}</span></span>
+            } @empty {
+              <span class="muted">Todavía no tiene platos.</span>
+            }
+          </div>
+        }
+
+        <div class="divider"></div>
+
+        <div class="form-grid">
+          <label class="field" [class.bad]="fieldError('name')">
+            <span class="label">Nombre</span>
+            <input formControlName="name" maxlength="80" placeholder="Ej. Entradas" />
+            @if (fieldError('name'); as e) { <span class="field-err">{{ e }}</span> }
+          </label>
+          <label class="field" [class.bad]="fieldError('sortOrder')">
+            <span class="label">Orden en la carta</span>
+            <input class="num" type="number" formControlName="sortOrder" min="0" />
+            @if (fieldError('sortOrder'); as e) { <span class="field-err">{{ e }}</span> }
+          </label>
+        </div>
+
+        <div class="actions">
+          <label class="switch"><input type="checkbox" formControlName="active" /> Visible en la carta</label>
+          <span class="spacer"></span>
+          @if (confirmDelete()) {
+            <span class="confirm">¿Eliminar esta categoría?
+              <button class="btn danger solid" type="button" (click)="remove()">Sí, eliminar</button>
+              <button class="btn ghost" type="button" (click)="confirmDelete.set(false)">No</button>
+            </span>
+          } @else {
+            @if (!isNew()) {
+              <button class="btn danger" type="button" (click)="confirmDelete.set(true)"
+                [title]="selectedDishes().length ? 'Tiene platos: el sistema no permitirá eliminarla' : ''">
+                <span class="icon">delete</span> Eliminar
+              </button>
+            }
+            @if (isNew() || form.dirty) { <button class="btn ghost" type="button" (click)="discard()">Descartar</button> }
+            <button class="btn primary" type="submit" [disabled]="saving()"><span class="icon">save</span> {{ saving() ? 'Guardando…' : isNew() ? 'Crear categoría' : 'Guardar cambios' }}</button>
+          }
+        </div>
+      </div>
+    </form>
+  } @else if (!loading()) {
+    <div class="ficha placeholder"><div class="empty"><span class="icon">touch_app</span>Elige una categoría o crea una nueva.</div></div>
+  }
 </div>

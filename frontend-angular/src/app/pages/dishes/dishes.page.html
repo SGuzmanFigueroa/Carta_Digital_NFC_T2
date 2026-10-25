@@ -1,82 +1,117 @@
-<header class="page-head">
-  <div>
-    <h1>Platos</h1>
-    <p class="muted">Productos de la carta con su precio y categoría</p>
-  </div>
-  <div class="head-tools">
-    <select (change)="filterBy($any($event.target).value)" aria-label="Filtrar por categoría">
-      <option value="">Todas las categorías</option>
-      @for (c of categories(); track c.id) { <option [value]="c.id">{{ c.name }}</option> }
-    </select>
-    <button class="btn primary" (click)="openNew()" [disabled]="categories().length === 0">+ Nuevo plato</button>
-  </div>
-</header>
+<div class="toolbar">
+  <h1>Platos de la carta</h1>
+  <button class="btn primary" type="button" (click)="openNew()" [disabled]="categories().length === 0">
+    <span class="icon">add</span> Nuevo plato
+  </button>
+</div>
 
-@if (notice()) { <div class="alert ok">{{ notice() }}</div> }
-@if (error()) { <div class="alert err">{{ error() }}</div> }
+<div class="filters" role="group" aria-label="Filtrar por categoría">
+  <button type="button" class="chip" [class.on]="filterCategoryId() === null" (click)="filterBy(null)">Todas</button>
+  @for (c of categories(); track c.id) {
+    <button type="button" class="chip" [class.on]="filterCategoryId() === c.id" (click)="filterBy(c.id!)">
+      {{ c.name }}
+      @if (countIn(c.id!) !== null) { <span class="num">{{ countIn(c.id!) }}</span> }
+    </button>
+  }
+</div>
 
-@if (showForm()) {
-  <form class="card form" [formGroup]="form" (ngSubmit)="save()">
-    <h2>{{ editingId() === null ? 'Nuevo plato' : 'Editar plato' }}</h2>
-    <div class="grid">
-      <label>Nombre
-        <input formControlName="name" maxlength="120" placeholder="Ej. Lomo saltado" />
-        @if (fieldError('name'); as e) { <small class="field-err">{{ e }}</small> }
-      </label>
-      <label>Categoría
-        <select formControlName="categoryId">
-          @for (c of categories(); track c.id) { <option [ngValue]="c.id">{{ c.name }}</option> }
-        </select>
-        @if (fieldError('categoryId'); as e) { <small class="field-err">{{ e }}</small> }
-      </label>
-      <label>Precio (S/)
-        <input type="number" formControlName="price" min="0" step="0.10" />
-        @if (fieldError('price'); as e) { <small class="field-err">{{ e }}</small> }
-      </label>
-      <label>Tiempo de preparación
-        <input formControlName="prepTime" maxlength="30" placeholder="Ej. 15 min" />
-      </label>
-      <label class="span-2">Descripción
-        <textarea formControlName="description" rows="2" maxlength="500"></textarea>
-        @if (fieldError('description'); as e) { <small class="field-err">{{ e }}</small> }
-      </label>
-      <label>Dieta
-        <input formControlName="dietary" maxlength="60" placeholder="Ej. Vegetariano" />
-      </label>
-      <label>URL de imagen
-        <input formControlName="image" maxlength="300" placeholder="https://…" />
-      </label>
-      <label class="check"><input type="checkbox" formControlName="active" /> Disponible en la carta</label>
-    </div>
-    <div class="actions">
-      <button type="button" class="btn" (click)="cancel()">Cancelar</button>
-      <button type="submit" class="btn primary" [disabled]="saving()">{{ saving() ? 'Guardando…' : 'Guardar' }}</button>
-    </div>
-  </form>
-}
+@if (notice()) { <div class="toast ok"><span class="icon">check_circle</span>{{ notice() }}<button class="btn ghost" type="button" (click)="dismiss()" aria-label="Cerrar aviso"><span class="icon">close</span></button></div> }
+@if (error()) { <div class="toast err"><span class="icon">error</span>{{ error() }}<button class="btn ghost" type="button" (click)="dismiss()" aria-label="Cerrar aviso"><span class="icon">close</span></button></div> }
 
-<div class="card table-wrap">
-  <table>
-    <thead>
-      <tr><th>#</th><th>Plato</th><th>Categoría</th><th class="right">Precio</th><th>Prep.</th><th>Estado</th><th class="right">Acciones</th></tr>
-    </thead>
-    <tbody>
-      @for (d of items(); track d.id) {
-        <tr>
-          <td class="muted">{{ d.id }}</td>
-          <td><strong>{{ d.name }}</strong>@if (d.description) {<br /><small class="muted">{{ d.description }}</small>}</td>
-          <td>{{ d.category.name }}</td>
-          <td class="right">{{ d.price | currency: 'PEN' : 'S/ ' }}</td>
-          <td>{{ d.prepTime || '—' }}</td>
-          <td><span class="badge" [class.on]="d.active">{{ d.active ? 'Disponible' : 'Oculto' }}</span></td>
-          <td class="right">
-            <button class="btn small" (click)="edit(d)">Editar</button>
-            <button class="btn small danger" (click)="remove(d)">Eliminar</button>
-          </td>
-        </tr>
-      } @empty {
-        <tr><td colspan="7" class="empty">{{ loading() ? 'Cargando…' : 'No hay platos registrados' }}</td></tr>
-      }
-    </tbody>
-  </table>
+<div class="workspace">
+  <section class="list" aria-label="Lista de platos">
+    @for (d of items(); track d.id) {
+      <button type="button" class="row" [class.on]="selectedId() === d.id" [class.off]="!d.active" (click)="open(d)">
+        <span>
+          <span class="row-name">{{ d.name }}</span>
+          <span class="row-meta label">{{ d.category.name }}@if (d.prepTime) { · {{ d.prepTime }} }</span>
+        </span>
+        @if (d.active) { <span class="price">S/ {{ d.price | number: '1.2-2' }}</span> }
+        @else { <span class="stamp">Agotado</span> }
+      </button>
+    } @empty {
+      <div class="empty"><span class="icon">{{ loading() ? 'hourglass_top' : 'restaurant_menu' }}</span>{{ loading() ? 'Cargando platos desde MySQL…' : 'No hay platos en esta categoría.' }}</div>
+    }
+  </section>
+
+  @if (selectedId() !== null) {
+    @let v = draft();
+    <form class="ficha" [formGroup]="form" (ngSubmit)="save()" [attr.aria-label]="isNew() ? 'Nuevo plato' : 'Ficha del plato'">
+      <div class="plate" [class.has-photo]="v.image">
+        @if (v.image) { <img [src]="v.image" alt="" (error)="$any($event.target).style.display = 'none'" /> }
+        @else { <span class="icon plate-icon">restaurant</span> }
+        <span class="preview-tag"><span class="icon">visibility</span> Así lo ve el comensal</span>
+        @if (!v.active) { <span class="stamp big plate-stamp">Agotado</span> }
+      </div>
+
+      <div class="ficha-body">
+        <div class="headline">
+          <h2 class="ficha-title">{{ v.name || 'Nombre del plato' }}</h2>
+          <span class="price big-price">S/ {{ (+v.price || 0) | number: '1.2-2' }}</span>
+        </div>
+        <p class="ficha-meta">
+          <span><span class="icon">category</span>{{ draftCategory() }}</span>
+          @if (v.prepTime) { <span><span class="icon">schedule</span>Cocina: {{ v.prepTime }}</span> }
+          @if (v.dietary) { <span><span class="icon">eco</span>{{ v.dietary }}</span> }
+        </p>
+        @if (v.description) { <p class="desc">{{ v.description }}</p> }
+
+        <div class="divider"></div>
+
+        <div class="form-grid">
+          <label class="field span-2" [class.bad]="fieldError('name')">
+            <span class="label">Nombre</span>
+            <input formControlName="name" maxlength="120" placeholder="Ej. Lomo saltado" />
+            @if (fieldError('name'); as e) { <span class="field-err">{{ e }}</span> }
+          </label>
+          <label class="field" [class.bad]="fieldError('price')">
+            <span class="label">Precio (S/)</span>
+            <input class="num" type="number" formControlName="price" min="0" step="0.10" />
+            @if (fieldError('price'); as e) { <span class="field-err">{{ e }}</span> }
+          </label>
+          <label class="field" [class.bad]="fieldError('categoryId')">
+            <span class="label">Categoría</span>
+            <select formControlName="categoryId">
+              @for (c of categories(); track c.id) { <option [ngValue]="c.id">{{ c.name }}</option> }
+            </select>
+            @if (fieldError('categoryId'); as e) { <span class="field-err">{{ e }}</span> }
+          </label>
+          <label class="field span-2" [class.bad]="fieldError('description')">
+            <span class="label">Descripción</span>
+            <textarea formControlName="description" rows="2" maxlength="500" placeholder="Lo que lee el comensal en la carta"></textarea>
+            @if (fieldError('description'); as e) { <span class="field-err">{{ e }}</span> }
+          </label>
+          <label class="field">
+            <span class="label">Tiempo de cocina</span>
+            <input formControlName="prepTime" maxlength="30" placeholder="Ej. 15 min" />
+          </label>
+          <label class="field">
+            <span class="label">Dieta</span>
+            <input formControlName="dietary" maxlength="60" placeholder="Ej. Vegetariano" />
+          </label>
+          <label class="field span-2">
+            <span class="label">URL de la foto</span>
+            <input formControlName="image" maxlength="300" placeholder="https://…" />
+          </label>
+        </div>
+
+        <div class="actions">
+          <label class="switch"><input type="checkbox" formControlName="active" /> Disponible en la carta</label>
+          <span class="spacer"></span>
+          @if (confirmDelete()) {
+            <span class="confirm">¿Eliminar este plato?
+              <button class="btn danger solid" type="button" (click)="remove()">Sí, eliminar</button>
+              <button class="btn ghost" type="button" (click)="confirmDelete.set(false)">No</button>
+            </span>
+          } @else {
+            @if (!isNew()) { <button class="btn danger" type="button" (click)="confirmDelete.set(true)"><span class="icon">delete</span> Eliminar</button> }
+            @if (isNew() || form.dirty) { <button class="btn ghost" type="button" (click)="discard()">Descartar</button> }
+            <button class="btn primary" type="submit" [disabled]="saving()"><span class="icon">save</span> {{ saving() ? 'Guardando…' : isNew() ? 'Crear plato' : 'Guardar cambios' }}</button>
+          }
+        </div>
+      </div>
+    </form>
+  } @else if (!loading()) {
+    <div class="ficha placeholder"><div class="empty"><span class="icon">touch_app</span>Elige un plato de la lista o crea uno nuevo.</div></div>
+  }
 </div>

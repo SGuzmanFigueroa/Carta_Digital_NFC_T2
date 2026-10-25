@@ -1,0 +1,38 @@
+.filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font: 600 14px var(--sans);
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text-2);
+  cursor: pointer;
+}
+.chip .num { font-size: 12px; color: var(--text-3); }
+.chip:hover { color: var(--text); }
+.chip.on { border-color: var(--gold); color: var(--gold); background: var(--gold-wash); }
+.chip.on .num { color: var(--gold); }
+
+.plate {
+  position: relative;
+  height: 230px;
+  background:
+    radial-gradient(120% 90% at 30% 20%, #3b2b12 0%, #1a130a 45%, #0e0c0a 100%);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.plate img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.plate.has-photo::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to top, rgb(21 22 28 / 0.85), transparent 55%); }
+.plate-icon { font-size: 72px; color: rgb(234 179 8 / 0.28); font-variation-settings: 'FILL' 0, 'wght' 200, 'GRAD' 0, 'opsz' 48; }
+.plate-stamp { position: absolute; left: 24px; bottom: 22px; z-index: 1; background: rgb(11 12 14 / 0.6); }
+.preview-tag { z-index: 1; }
+
+.headline { display: flex; align-items: baseline; justify-content: space-between; gap: 18px; flex-wrap: wrap; }
+.big-price { font-size: 32px; }
+.desc { color: var(--text-2); margin-top: 12px; max-width: 62ch; }
+
+.placeholder { position: static; animation: none; }

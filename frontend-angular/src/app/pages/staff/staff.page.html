@@ -1,73 +1,104 @@
-<header class="page-head">
-  <div>
-    <h1>Personal</h1>
-    <p class="muted">Trabajadores del restaurante y su rol</p>
-  </div>
-  <button class="btn primary" (click)="openNew()">+ Nuevo trabajador</button>
-</header>
+<div class="toolbar">
+  <h1>Personal del restaurante</h1>
+  <button class="btn primary" type="button" (click)="openNew()"><span class="icon">person_add</span> Nuevo trabajador</button>
+</div>
 
-@if (notice()) { <div class="alert ok">{{ notice() }}</div> }
-@if (error()) { <div class="alert err">{{ error() }}</div> }
+@if (notice()) { <div class="toast ok"><span class="icon">check_circle</span>{{ notice() }}<button class="btn ghost" type="button" (click)="dismiss()" aria-label="Cerrar aviso"><span class="icon">close</span></button></div> }
+@if (error()) { <div class="toast err"><span class="icon">error</span>{{ error() }}<button class="btn ghost" type="button" (click)="dismiss()" aria-label="Cerrar aviso"><span class="icon">close</span></button></div> }
 
-@if (showForm()) {
-  <form class="card form" [formGroup]="form" (ngSubmit)="save()">
-    <h2>{{ editingId() === null ? 'Nuevo trabajador' : 'Editar trabajador' }}</h2>
-    <div class="grid">
-      <label>Nombre completo
-        <input formControlName="name" maxlength="100" />
-        @if (fieldError('name'); as e) { <small class="field-err">{{ e }}</small> }
-      </label>
-      <label>Usuario
-        <input formControlName="username" maxlength="40" placeholder="ej. juan.perez" />
-        @if (fieldError('username'); as e) { <small class="field-err">{{ e === 'Formato inválido' ? 'Minúsculas, números, punto o guion bajo (3 a 40)' : e }}</small> }
-      </label>
-      <label>Rol
-        <select formControlName="role">
-          @for (r of roles; track r.value) { <option [value]="r.value">{{ r.label }}</option> }
-        </select>
-      </label>
-      <label>Cargo
-        <input formControlName="roleTitle" maxlength="60" placeholder="Ej. Chef principal" />
-      </label>
-      <label>Estación
-        <input formControlName="station" maxlength="60" placeholder="Ej. Cocina caliente" />
-      </label>
-      <label>Estado
-        <select formControlName="status">
-          <option value="Activo">Activo</option>
-          <option value="Inactivo">Inactivo</option>
-        </select>
-      </label>
-    </div>
-    <div class="actions">
-      <button type="button" class="btn" (click)="cancel()">Cancelar</button>
-      <button type="submit" class="btn primary" [disabled]="saving()">{{ saving() ? 'Guardando…' : 'Guardar' }}</button>
-    </div>
-  </form>
-}
-
-<div class="card table-wrap">
-  <table>
-    <thead>
-      <tr><th>#</th><th>Nombre</th><th>Usuario</th><th>Rol</th><th>Cargo</th><th>Estado</th><th class="right">Acciones</th></tr>
-    </thead>
-    <tbody>
-      @for (s of items(); track s.id) {
-        <tr>
-          <td class="muted">{{ s.id }}</td>
-          <td><strong>{{ s.name }}</strong>@if (s.station) {<br /><small class="muted">{{ s.station }}</small>}</td>
-          <td><code>{{ s.username }}</code></td>
-          <td>{{ roleLabel(s.role) }}</td>
-          <td>{{ s.roleTitle || '—' }}</td>
-          <td><span class="badge" [class.on]="s.status === 'Activo'">{{ s.status }}</span></td>
-          <td class="right">
-            <button class="btn small" (click)="edit(s)">Editar</button>
-            <button class="btn small danger" (click)="remove(s)">Eliminar</button>
-          </td>
-        </tr>
-      } @empty {
-        <tr><td colspan="7" class="empty">{{ loading() ? 'Cargando…' : 'No hay personal registrado' }}</td></tr>
+<div class="workspace">
+  <section class="list" aria-label="Personal por área">
+    @for (g of byRole(); track g.value) {
+      <div class="list-group label"><span><span class="icon grp-icon">{{ g.icon }}</span>{{ g.label }}</span><span>{{ g.people.length }}</span></div>
+      @for (s of g.people; track s.id) {
+        <button type="button" class="row" [class.on]="selectedId() === s.id" [class.off]="s.status === 'Inactivo'" (click)="open(s)">
+          <span class="person">
+            <span class="avatar">{{ initials(s.name) }}</span>
+            <span><span class="row-name">{{ s.name }}</span><span class="row-meta">{{ s.roleTitle || g.label }}@if (s.station) { · {{ s.station }} }</span></span>
+          </span>
+          @if (s.status === 'Activo') { <span class="state ok">Activo</span> }
+          @else { <span class="stamp">Inactivo</span> }
+        </button>
       }
-    </tbody>
-  </table>
+    } @empty {
+      <div class="empty"><span class="icon">{{ loading() ? 'hourglass_top' : 'badge' }}</span>{{ loading() ? 'Cargando personal desde MySQL…' : 'Aún no hay personal registrado.' }}</div>
+    }
+  </section>
+
+  @if (selectedId() !== null) {
+    @let v = draft();
+    <form class="ficha" [formGroup]="form" (ngSubmit)="save()" [attr.aria-label]="isNew() ? 'Nuevo trabajador' : 'Credencial del trabajador'">
+      <div class="badge-band">
+        <span class="preview-tag"><span class="icon">badge</span> Credencial</span>
+        <div class="credential">
+          <span class="avatar big">{{ initials(v.name) }}</span>
+          <div class="cred-text">
+            <span class="cred-name">{{ v.name || 'Nombre del trabajador' }}</span>
+            <span class="num cred-user">&#64;{{ v.username || 'usuario' }}</span>
+            <span class="role-chip"><span class="icon">{{ roleOf(v.role).icon }}</span>{{ roleOf(v.role).label }}</span>
+          </div>
+          @if (v.status === 'Inactivo') { <span class="stamp big cred-stamp">Inactivo</span> }
+        </div>
+      </div>
+
+      <div class="ficha-body">
+        <p class="ficha-meta">
+          <span><span class="icon">work</span>{{ v.roleTitle || 'Sin cargo' }}</span>
+          <span><span class="icon">location_on</span>{{ v.station || 'Sin estación' }}</span>
+        </p>
+
+        <div class="divider"></div>
+
+        <div class="form-grid">
+          <label class="field" [class.bad]="fieldError('name')">
+            <span class="label">Nombre completo</span>
+            <input formControlName="name" maxlength="100" placeholder="Ej. Juan Pérez" />
+            @if (fieldError('name'); as e) { <span class="field-err">{{ e }}</span> }
+          </label>
+          <label class="field" [class.bad]="fieldError('username')">
+            <span class="label">Usuario</span>
+            <input class="num" formControlName="username" maxlength="40" placeholder="juan.perez" />
+            @if (fieldError('username'); as e) { <span class="field-err">{{ e === 'Formato inválido' ? 'Minúsculas, números, punto o guion bajo (3 a 40)' : e }}</span> }
+          </label>
+          <div class="field span-2">
+            <span class="label">Rol en el sistema</span>
+            <div class="segmented" role="radiogroup" aria-label="Rol">
+              @for (r of roles; track r.value) { <label><input type="radio" formControlName="role" [value]="r.value" />{{ r.label }}</label> }
+            </div>
+          </div>
+          <label class="field">
+            <span class="label">Cargo</span>
+            <input formControlName="roleTitle" maxlength="60" placeholder="Ej. Chef principal" />
+          </label>
+          <label class="field">
+            <span class="label">Estación</span>
+            <input formControlName="station" maxlength="60" placeholder="Ej. Cocina caliente" />
+          </label>
+          <div class="field span-2">
+            <span class="label">Estado</span>
+            <div class="segmented" role="radiogroup" aria-label="Estado">
+              <label><input type="radio" formControlName="status" value="Activo" />Activo</label>
+              <label><input type="radio" formControlName="status" value="Inactivo" />Inactivo</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="actions">
+          <span class="spacer"></span>
+          @if (confirmDelete()) {
+            <span class="confirm">¿Eliminar a este trabajador?
+              <button class="btn danger solid" type="button" (click)="remove()">Sí, eliminar</button>
+              <button class="btn ghost" type="button" (click)="confirmDelete.set(false)">No</button>
+            </span>
+          } @else {
+            @if (!isNew()) { <button class="btn danger" type="button" (click)="confirmDelete.set(true)"><span class="icon">delete</span> Eliminar</button> }
+            @if (isNew() || form.dirty) { <button class="btn ghost" type="button" (click)="discard()">Descartar</button> }
+            <button class="btn primary" type="submit" [disabled]="saving()"><span class="icon">save</span> {{ saving() ? 'Guardando…' : isNew() ? 'Registrar' : 'Guardar cambios' }}</button>
+          }
+        </div>
+      </div>
+    </form>
+  } @else if (!loading()) {
+    <div class="ficha placeholder"><div class="empty"><span class="icon">touch_app</span>Elige a alguien de la lista o registra a un trabajador.</div></div>
+  }
 </div>

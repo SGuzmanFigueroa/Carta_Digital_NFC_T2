@@ -1,27 +1,40 @@
-import { Directive, OnInit, signal } from '@angular/core';
+import { computed, Directive, inject, OnInit, signal } from '@angular/core';
 import { FormGroup } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { CrudService, toApiError } from './crud.service';
+import { PanelStore, Resource } from './panel-store';
 
 /**
- * Lógica compartida por las páginas CRUD: listar, crear, editar y eliminar.
- * Cada página solo define su formulario y cómo convertirlo en la entidad.
+ * Lógica compartida por las páginas: una lista a la izquierda y una ficha a la
+ * derecha que sirve a la vez de vista previa y de editor del registro elegido.
  */
 @Directive()
 export abstract class CrudPage<T extends { id?: number }> implements OnInit {
   protected abstract readonly service: CrudService<T>;
   protected abstract readonly form: FormGroup;
+  protected abstract readonly resource: Resource;
   /** Texto para mensajes, p. ej. "categoría". */
   protected abstract readonly entityLabel: string;
 
+  protected readonly store = inject(PanelStore);
+
   protected readonly items = signal<T[]>([]);
-  protected readonly loading = signal(false);
+  protected readonly loading = signal(true);
   protected readonly saving = signal(false);
-  protected readonly showForm = signal(false);
-  protected readonly editingId = signal<number | null>(null);
+  /** null = sin selección; 'new' = creando; número = id del registro abierto. */
+  protected readonly selectedId = signal<number | 'new' | null>(null);
+  protected readonly confirmDelete = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
   protected readonly fieldErrors = signal<Record<string, string>>({});
+  /** Valor del formulario como señal, para que la ficha se actualice al escribir. */
+  protected readonly draft = signal<any>({});
+
+  protected readonly selected = computed(() => {
+    const id = this.selectedId();
+    return typeof id === 'number' ? this.items().find((i) => i.id === id) ?? null : null;
+  });
+  protected readonly isNew = computed(() => this.selectedId() === 'new');
 
   protected abstract defaults(): Record<string, unknown>;
   protected abstract toFormValue(item: T): Record<string, unknown>;
@@ -29,19 +42,26 @@ export abstract class CrudPage<T extends { id?: number }> implements OnInit {
   protected abstract describe(item: T): string;
 
   ngOnInit(): void {
+    this.form.valueChanges.subscribe(() => this.draft.set(this.form.getRawValue()));
     this.load();
   }
 
-  protected load(): void {
+  protected load(selectId?: number): void {
     this.loading.set(true);
     this.service.list(this.listParams()).subscribe({
       next: (items) => {
         this.items.set(items);
         this.loading.set(false);
+        if (this.listParams() === undefined) this.store.setCount(this.resource, items.length);
+        const keep = selectId ?? this.selectedId();
+        if (typeof keep === 'number' && items.some((i) => i.id === keep)) this.open(items.find((i) => i.id === keep)!);
+        else if (keep !== 'new' && items.length) this.open(items[0]);
+        else if (!items.length && keep !== 'new') this.selectedId.set(null);
       },
       error: (err: HttpErrorResponse) => {
-        this.error.set(toApiError(err).message);
         this.loading.set(false);
+        this.error.set(toApiError(err).message);
+        if (err.status === 0) this.store.markOffline();
       },
     });
   }
@@ -51,23 +71,27 @@ export abstract class CrudPage<T extends { id?: number }> implements OnInit {
     return undefined;
   }
 
-  protected openNew(): void {
-    this.editingId.set(null);
-    this.form.reset(this.defaults());
-    this.resetMessages();
-    this.showForm.set(true);
-  }
-
-  protected edit(item: T): void {
-    this.editingId.set(item.id ?? null);
+  protected open(item: T): void {
+    this.selectedId.set(item.id ?? null);
     this.form.reset(this.toFormValue(item));
-    this.resetMessages();
-    this.showForm.set(true);
+    this.draft.set(this.form.getRawValue());
+    this.confirmDelete.set(false);
+    this.fieldErrors.set({});
   }
 
-  protected cancel(): void {
-    this.showForm.set(false);
-    this.fieldErrors.set({});
+  protected openNew(): void {
+    this.selectedId.set('new');
+    this.form.reset(this.defaults());
+    this.draft.set(this.form.getRawValue());
+    this.confirmDelete.set(false);
+    this.resetMessages();
+  }
+
+  protected discard(): void {
+    const item = this.selected();
+    if (item) this.open(item);
+    else if (this.items().length) this.open(this.items()[0]);
+    else this.selectedId.set(null);
   }
 
   protected save(): void {
@@ -76,17 +100,16 @@ export abstract class CrudPage<T extends { id?: number }> implements OnInit {
       return;
     }
     const entity = this.toEntity(this.form.getRawValue());
-    const id = this.editingId();
-    const request = id === null ? this.service.create(entity) : this.service.update(id, entity);
+    const id = this.selectedId();
+    const request = typeof id === 'number' ? this.service.update(id, entity) : this.service.create(entity);
 
     this.saving.set(true);
     this.resetMessages();
     request.subscribe({
       next: (saved) => {
         this.saving.set(false);
-        this.showForm.set(false);
-        this.notice.set(`"${this.describe(saved)}" se ${id === null ? "registró" : "actualizó"} correctamente`);
-        this.load();
+        this.notice.set(`«${this.describe(saved)}» se ${typeof id === 'number' ? 'actualizó' : 'registró'} en MySQL`);
+        this.load(saved.id);
       },
       error: (err: HttpErrorResponse) => {
         const apiError = toApiError(err);
@@ -97,15 +120,20 @@ export abstract class CrudPage<T extends { id?: number }> implements OnInit {
     });
   }
 
-  protected remove(item: T): void {
-    if (item.id == null || !confirm(`¿Eliminar ${this.entityLabel} "${this.describe(item)}"?`)) return;
+  protected remove(): void {
+    const item = this.selected();
+    if (!item?.id) return;
     this.resetMessages();
     this.service.delete(item.id).subscribe({
       next: () => {
-        this.notice.set(`"${this.describe(item)}" se eliminó correctamente`);
+        this.notice.set(`«${this.describe(item)}» se eliminó`);
+        this.selectedId.set(null);
         this.load();
       },
-      error: (err: HttpErrorResponse) => this.error.set(toApiError(err).message),
+      error: (err: HttpErrorResponse) => {
+        this.confirmDelete.set(false);
+        this.error.set(toApiError(err).message);
+      },
     });
   }
 
@@ -122,6 +150,10 @@ export abstract class CrudPage<T extends { id?: number }> implements OnInit {
     if (e['max']) return `Valor máximo ${e['max'].max}`;
     if (e['pattern']) return 'Formato inválido';
     return 'Valor inválido';
+  }
+
+  protected dismiss(): void {
+    this.resetMessages();
   }
 
   private resetMessages(): void {
