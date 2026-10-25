@@ -46,6 +46,7 @@ export function MenuClient({ initialMenuItems }: { initialMenuItems: MenuItem[] 
     orders,
     tableOrderRounds,
     tables,
+    collectTableBill,
     showToast,
     requestTableAccount,
     callWaiter
@@ -136,6 +137,7 @@ export function MenuClient({ initialMenuItems }: { initialMenuItems: MenuItem[] 
           orderHistory={orders}
           tableOrderRounds={tableOrderRounds}
           tables={tables}
+          onCollectTableBill={collectTableBill}
           onSendOrderFromMenu={sendOrderFromMenu}
           onRecordTableOrderRound={recordTableOrderRound}
           onRequestTableAccount={requestTableAccount}
@@ -162,10 +164,12 @@ export function MenuClient({ initialMenuItems }: { initialMenuItems: MenuItem[] 
               });
             }}
           />
-        </LanguageProvider>
 
-        {/* CD-26 · Invitación flotante a instalar la carta como aplicación */}
-        <PWAInstallBanner />
+          {/* CD-26 · Invitación flotante a instalar la carta como aplicación.
+              CD-101 · Vive DENTRO de `LanguageProvider` para que su copy respete
+              el idioma activo (ES/EN) sin recargar la página. */}
+          <PWAInstallBanner />
+        </LanguageProvider>
 
         {/* Floating Toast Alert */}
         {toast && (

@@ -14,7 +14,16 @@ interface CartDrawerProps {
   onClose: () => void;
   selectedTable: string;
   cart: MenuCartItem[];
-  cartTotal: number;
+  /**
+   * Saldo pendiente REAL de la mesa (`restaurant_tables.amount`). Es la única
+   * fuente de verdad del cobro: tras un abono parcial ya viene descontado.
+   */
+  amountDue: number;
+  /**
+   * Total original de los platos (antes de los abonos). Si es mayor que
+   * `amountDue`, la diferencia son los abonos ya registrados por la mesa.
+   */
+  orderTotal: number;
   /** Mientras se verifica la ubicación no se puede enviar (evita doble envío). */
   isVerifyingGeofence: boolean;
   /** Líneas del carrito con el campo de nota abierto. */
@@ -29,14 +38,27 @@ interface CartDrawerProps {
 
 /** Hoja del pedido: revisar platos, notas de cocina, enviar a cocina o pedir la cuenta. */
 export function CartDrawer({
-  isCartOpen, onClose, selectedTable, cart, cartTotal, isVerifyingGeofence, activeNoteItemId, setActiveNoteItemId,
+  isCartOpen, onClose, selectedTable, cart, amountDue, orderTotal, isVerifyingGeofence, activeNoteItemId, setActiveNoteItemId,
   onAddToCart: handleAddToCart, onRemoveFromCart: handleRemoveFromCart, onUpdateNotes: handleUpdateNotes,
   onSendOrder: handleSendOrder, onOpenSplitBill: handleOpenSplitBill
 }: CartDrawerProps) {
   const { language, t } = useLanguage();
   const setIsCartOpen = (open: boolean) => { if (!open) onClose(); };
   const cartDialog = useDialog(isCartOpen, onClose);
-
+  const hasLocalCart = cart.length > 0;
+  // El saldo pendiente manda en el cobro; el total de platos solo sirve para
+  // reconstruir cuánto se abonó antes. Ambos se blindan contra NaN/negativos.
+  const safeAmountDue = Number.isFinite(amountDue) && amountDue > 0 ? amountDue : 0;
+  const safeOrderTotal = Number.isFinite(orderTotal) && orderTotal > 0
+    ? Math.max(orderTotal, safeAmountDue)
+    : safeAmountDue;
+  const previousPayments = hasLocalCart
+    ? 0
+    : Math.max(0, Math.round((safeOrderTotal - safeAmountDue + Number.EPSILON) * 100) / 100);
+  const hasPreviousPayments = previousPayments > 0.005;
+  // Sin abonos, subtotal + IGV deben sumar exactamente el saldo pendiente.
+  // Con abonos, muestran el consumo original y luego se descuenta lo pagado.
+  const summaryTotal = hasLocalCart || !hasPreviousPayments ? safeAmountDue : safeOrderTotal;
 
   return (
     <>
@@ -152,15 +174,27 @@ export function CartDrawer({
           <div className="p-3 bg-[#f1f5f9] dark:bg-[#0e0e10] rounded-xl space-y-1.5 text-[11px] sm:text-[12px] font-mono-code">
             <div className="flex justify-between text-[#475569] dark:text-[#a1a1aa]">
               <span>{t('cart.subtotalNoIgv')}</span>
-              <span><AnimatedSoles value={cartTotal / 1.18} /></span>
+              <span><AnimatedSoles value={summaryTotal / 1.18} /></span>
             </div>
             <div className="flex justify-between text-[#475569] dark:text-[#a1a1aa]">
               <span>{t('cart.igv')}</span>
-              <span><AnimatedSoles value={cartTotal - cartTotal / 1.18} /></span>
+              <span><AnimatedSoles value={summaryTotal - summaryTotal / 1.18} /></span>
             </div>
+            {hasPreviousPayments && (
+              <>
+                <div className="flex justify-between text-[#0f172a] dark:text-white font-semibold pt-1.5 border-t border-[#e2e8f0] dark:border-[#24252e]">
+                  <span>{t('cart.orderTotal')}</span>
+                  <span><AnimatedSoles value={safeOrderTotal} /></span>
+                </div>
+                <div className="flex justify-between text-emerald-700 dark:text-emerald-300 font-semibold">
+                  <span>{t('cart.previousPayments')}</span>
+                  <span>- <AnimatedSoles value={previousPayments} /></span>
+                </div>
+              </>
+            )}
             <div className="flex justify-between text-[#0f172a] dark:text-white font-bold text-[14px] sm:text-[15px] pt-1.5 border-t border-[#e2e8f0] dark:border-[#24252e]">
-              <span>{t('cart.totalToPay')}</span>
-              <span className="text-primary font-bold"><AnimatedSoles value={cartTotal} /></span>
+              <span>{t(hasPreviousPayments ? 'cart.pendingBalance' : 'cart.totalToPay')}</span>
+              <span className="text-primary font-bold"><AnimatedSoles value={safeAmountDue} /></span>
             </div>
           </div>
 

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { submitCustomerReview } from '@/services/reviewService';
 import { getPaymentConfig, loadPaymentConfig, PaymentGatewayConfig } from '@/services/paymentConfigService';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -14,11 +14,20 @@ interface PaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
   tableNumber: string;
-  totalAmount: number;
+  /**
+   * Saldo pendiente REAL de la mesa (`restaurant_tables.amount`). Es la ÚNICA
+   * fuente de verdad del cobro: incluye los abonos previos ya descontados.
+   */
+  amountDue: number;
   orderId?: string;
   /** Clave del pedido del comensal: verifica la reseña (una por pedido). */
   orderKey?: string;
   onRequestTableAccount?: (paymentMethod: string, table?: string, claim?: PaymentClaim) => Promise<boolean> | void;
+  /** Registra el abono y confirma al modal que puede limpiar el carrito local. */
+  onPaymentSuccess: (
+    amountPaid: number,
+    options?: { keepOpen?: boolean }
+  ) => Promise<boolean>;
   onShowToast: (msg: string, icon?: string) => void;
 }
 
@@ -29,10 +38,11 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   isOpen,
   onClose,
   tableNumber,
-  totalAmount,
+  amountDue,
   orderId,
   orderKey,
   onRequestTableAccount,
+  onPaymentSuccess,
   onShowToast
 }) => {
   // CD-31 · Idioma de la carta: pasarela de pago y reseña post-pago (ES/EN).
@@ -82,16 +92,16 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
   // Cálculo automático del vuelto en efectivo
   const numericCashGiven = React.useMemo(() => {
-    if (cashType === 'exact') return totalAmount;
+    if (cashType === 'exact') return amountDue;
     if (cashType === '50') return 50;
     if (cashType === '100') return 100;
     if (cashType === '200') return 200;
     if (cashType === 'custom') return parseFloat(customCash) || 0;
-    return totalAmount;
-  }, [cashType, customCash, totalAmount]);
+    return amountDue;
+  }, [cashType, customCash, amountDue]);
 
-  const cashChange = Math.max(0, numericCashGiven - totalAmount);
-  const isCashInsufficient = selectedMethod === 'efectivo' && cashType !== 'exact' && (numericCashGiven < totalAmount);
+  const cashChange = Math.max(0, numericCashGiven - amountDue);
+  const isCashInsufficient = selectedMethod === 'efectivo' && cashType !== 'exact' && (numericCashGiven < amountDue);
 
   // Validación estricta de Código de Operación Yape/Plin (6 a 8 dígitos) o subida de captura de voucher
   const cleanOpDigits = opCode.replace(/\D/g, '');
@@ -150,8 +160,11 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     setSelectedMethod(availableMethods[0].id);
   }
 
+  const paymentSubmittingRef = useRef(false);
+  const handleClose = () => onClose();
+
   // Mientras se envía el pago, Esc no cierra (evita perder la confirmación).
-  const dialog = useDialog(isOpen, isSubmitting ? undefined : onClose);
+  const dialog = useDialog(isOpen, isSubmitting ? undefined : handleClose);
 
   if (!isOpen) return null;
 
@@ -184,7 +197,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     onShowToast(t('pay.voucherSimulated', { code: randomOp }), 'verified');
   };
 
-  const handleConfirmPayment = () => {
+  const handleConfirmPayment = async () => {
+    if (paymentSubmittingRef.current) return;
     if ((selectedMethod === 'yape' || selectedMethod === 'plin') && !isDigitalPaymentValid) {
       onShowToast(t('pay.errorDigits'), 'warning');
       return;
@@ -194,6 +208,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       return;
     }
 
+    paymentSubmittingRef.current = true;
     setIsSubmitting(true);
     try {
       const opSuffix = cleanOpDigits ? ` (OP: ${cleanOpDigits})` : '';
@@ -205,41 +220,54 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           : selectedMethod === 'tarjeta'
           ? 'Tarjeta POS'
           : cashType === 'exact'
-          ? `Efectivo (Monto Exacto: S/ ${totalAmount.toFixed(2)})`
+          ? `Efectivo (Monto Exacto: S/ ${amountDue.toFixed(2)})`
           : `Efectivo (Paga con: S/ ${numericCashGiven.toFixed(2)} • Vuelto: S/ ${cashChange.toFixed(2)})`;
-
-      // Optimistic UI: disparar en segundo plano sin congelar la interfaz del comensal
-      if (onRequestTableAccount) {
-        try {
-          const res = onRequestTableAccount(methodLabel, undefined, {
-            kind: selectedMethod,
-            operationCode: cleanOpDigits || undefined
-          });
-          if (res && typeof (res as Promise<boolean>).catch === 'function') {
-            (res as Promise<boolean>).catch((err: unknown) => {
-              console.warn('Error en sincronización en segundo plano de cuenta:', err);
-            });
-          }
-        } catch (err: unknown) {
-          console.warn('Error llamando onRequestTableAccount:', err);
-        }
-      }
 
       // El aviso usa la etiqueta VISIBLE (idioma de la carta); el payload que viaja
       // al panel del garzón (`methodLabel`) se mantiene en español.
       const displayMethodLabel =
         availableMethods.find((method) => method.id === selectedMethod)?.label ?? methodLabel;
-      // Yape/Plin no se dan por cobrados: el personal confirma que llegó el dinero.
+
+      // Yape/Plin siguen pendientes hasta que el personal verifique el pago.
       if (selectedMethod === 'yape' || selectedMethod === 'plin') {
+        if (onRequestTableAccount) {
+          try {
+            await onRequestTableAccount(methodLabel, tableNumber, {
+              kind: selectedMethod,
+              operationCode: cleanOpDigits || undefined
+            });
+          } catch (e) {
+            console.warn('Advertencia en requestTableAccount:', e);
+          }
+        }
+
+        // Forzamos la ejecución de onPaymentSuccess sin bloquear si retorna false
+        try {
+          await onPaymentSuccess(amountDue, { keepOpen: true });
+        } catch (e) {
+          console.warn('Advertencia en onPaymentSuccess:', e);
+        }
+
         onShowToast(t('pay.pendingVerification', { method: displayMethodLabel }), 'hourglass_top');
-      } else {
-        onShowToast(t('pay.paid', { method: displayMethodLabel }), 'check_circle');
+        setStep('feedback');
+        return;
       }
+
+      // Efectivo/POS se consideran confirmados aquí. Persistir el abono primero;
+      // si falla, conservar el carrito y dejar al usuario reintentar.
+      const collected = await onPaymentSuccess(amountDue);
+      if (!collected) {
+        onShowToast(t('pay.errorConfirm'), 'error');
+        return;
+      }
+
+      onShowToast(t('pay.paid', { method: displayMethodLabel }), 'check_circle');
       setStep('feedback');
     } catch (err) {
-      console.error('Error confirming payment:', err);
       onShowToast(t('pay.errorConfirm'), 'error');
+      console.error('Error confirming payment:', err);
     } finally {
+      paymentSubmittingRef.current = false;
       setIsSubmitting(false);
     }
   };
@@ -305,7 +333,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   <span className="text-[11px] font-mono-code text-primary font-semibold">
                     {t('pay.tableTotal', {
                       table: localizeTableLabel(tableNumber, language),
-                      amount: `S/ ${totalAmount.toFixed(2)}`
+                      amount: `S/ ${amountDue.toFixed(2)}`
                     })}
                   </span>
                 </div>
@@ -313,7 +341,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               <button
                 id="btn-close-payment-modal"
                 type="button"
-                onClick={onClose}
+                onClick={handleClose}
                 className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-[#64748b] hover:text-[#0f172a] dark:text-[#a1a1aa] dark:hover:text-white cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[20px]">close</span>
@@ -438,7 +466,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   )}
 
                   <div className="mt-1 text-[11px] font-mono-code font-bold text-[#0f172a]">
-                    {t('pay.totalToPay', { amount: `S/ ${totalAmount.toFixed(2)}` })}
+                    {t('pay.totalToPay', { amount: `S/ ${amountDue.toFixed(2)}` })}
                   </div>
                 </div>
 
@@ -581,7 +609,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     }`}
                   >
                     {t('pay.cashExact')}
-                    <span className="block text-[10px] font-normal opacity-90">S/ {totalAmount.toFixed(2)}</span>
+                    <span className="block text-[10px] font-normal opacity-90">S/ {amountDue.toFixed(2)}</span>
                   </button>
 
                   <button
@@ -595,7 +623,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   >
                     {t('pay.cashBill50')}
                     <span className="block text-[10px] font-normal opacity-90">
-                      {totalAmount <= 50 ? t('pay.cashChange', { amount: `S/ ${(50 - totalAmount).toFixed(2)}` }) : t('pay.cashInsufficient')}
+                      {amountDue <= 50 ? t('pay.cashChange', { amount: `S/ ${(50 - amountDue).toFixed(2)}` }) : t('pay.cashInsufficient')}
                     </span>
                   </button>
 
@@ -610,7 +638,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   >
                     {t('pay.cashBill100')}
                     <span className="block text-[10px] font-normal opacity-90">
-                      {totalAmount <= 100 ? t('pay.cashChange', { amount: `S/ ${(100 - totalAmount).toFixed(2)}` }) : t('pay.cashInsufficient')}
+                      {amountDue <= 100 ? t('pay.cashChange', { amount: `S/ ${(100 - amountDue).toFixed(2)}` }) : t('pay.cashInsufficient')}
                     </span>
                   </button>
 
@@ -625,7 +653,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   >
                     {t('pay.cashBill200')}
                     <span className="block text-[10px] font-normal opacity-90">
-                      {totalAmount <= 200 ? t('pay.cashChange', { amount: `S/ ${(200 - totalAmount).toFixed(2)}` }) : t('pay.cashInsufficient')}
+                      {amountDue <= 200 ? t('pay.cashChange', { amount: `S/ ${(200 - amountDue).toFixed(2)}` }) : t('pay.cashInsufficient')}
                     </span>
                   </button>
                 </div>
@@ -665,7 +693,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                       </span>
                     </div>
                     <div className="text-[11px] text-[#475569] dark:text-[#a1a1aa] flex justify-between border-t border-emerald-500/20 pt-1">
-                      <span>{t('pay.cashTotal', { amount: `S/ ${totalAmount.toFixed(2)}` })}</span>
+                      <span>{t('pay.cashTotal', { amount: `S/ ${amountDue.toFixed(2)}` })}</span>
                       <span>{t('pay.cashGiven', { amount: `S/ ${numericCashGiven.toFixed(2)}` })}</span>
                     </div>
                   </div>
@@ -674,8 +702,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     <span className="material-symbols-outlined text-amber-500 text-[20px]">warning</span>
                     <span>{t('pay.cashShort', {
                       given: `S/ ${numericCashGiven.toFixed(2)}`,
-                      total: `S/ ${totalAmount.toFixed(2)}`,
-                      missing: `S/ ${(totalAmount - numericCashGiven).toFixed(2)}`
+                      total: `S/ ${amountDue.toFixed(2)}`,
+                      missing: `S/ ${(amountDue - numericCashGiven).toFixed(2)}`
                     })}</span>
                   </div>
                 )}
@@ -702,7 +730,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   ? t('pay.needOp')
                   : (selectedMethod === 'efectivo' && isCashInsufficient)
                   ? t('pay.needCash')
-                  : t('pay.confirm', { amount: `S/ ${totalAmount.toFixed(2)}` })}
+                  : t('pay.confirm', { amount: `S/ ${amountDue.toFixed(2)}` })}
               </span>
             </button>
           </div>
@@ -851,7 +879,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             <button
               id="btn-completed-close-modal"
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               className="px-6 py-2.5 min-h-[44px] rounded-xl bg-primary text-on-primary font-bold text-[13px] shadow hover:brightness-110 transition-all cursor-pointer"
             >
               {t('pay.closeBack')}

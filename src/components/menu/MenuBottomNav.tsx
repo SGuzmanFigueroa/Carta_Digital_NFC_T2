@@ -110,8 +110,8 @@ export function MenuBottomNav({
           onClick={onCallWaiter}
           disabled={waiterCalled}
           aria-live="polite"
-          aria-label={waiterCalled ? 'Garzón notificado, esperando atención' : 'Llamar al garzón'}
-          title="Llamar al mozo / asistencia en mesa"
+          aria-label={waiterCalled ? t('nav.waiterCallingAria') : t('nav.waiterCallAria')}
+          title={t('nav.waiterTitle')}
           className={cn(
             itemBaseClass,
             waiterCalled

@@ -40,11 +40,11 @@ export async function updateTableStateInDb(
   updates: Partial<{ status: string; amount: number; pax: number; waiter: string | null }>
 ): Promise<boolean> {
   try {
-    const target = Number(tableNumber.replace(/D/g, ''));
+    const target = Number(tableNumber.replace(/\D/g, ''));
     if (!target) return false;
     const { data: all, error: readError } = await supabase.from('restaurant_tables').select('id, number');
     if (readError) throw readError;
-    const ids = (all ?? []).filter((t) => Number(t.number.replace(/D/g, '')) === target).map((t) => t.id);
+    const ids = (all ?? []).filter((t) => Number(t.number.replace(/\D/g, '')) === target).map((t) => t.id);
     if (ids.length === 0) return false;
 
     const { error } = await supabase

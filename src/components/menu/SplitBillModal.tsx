@@ -3,6 +3,7 @@
 import React, { useMemo, useState } from 'react';
 import { Minus, Plus, X } from 'lucide-react';
 import { useDialog } from '@/hooks/useDialog';
+import { useLanguage } from '@/hooks/useLanguage';
 
 export interface SplitBillItem {
   id: string;
@@ -13,7 +14,12 @@ export interface SplitBillItem {
 
 interface SplitBillModalProps {
   isOpen: boolean;
-  totalAmount: number;
+  /**
+   * Saldo pendiente REAL de la mesa (`restaurant_tables.amount`), ya descontados
+   * los abonos previos. Es la ÚNICA fuente de verdad de la división: los platos
+   * son solo referencia visual y nunca imponen el importe a cobrar.
+   */
+  amountDue: number;
   items: SplitBillItem[];
   onClose: () => void;
   onConfirm: (amount: number) => void;
@@ -29,27 +35,32 @@ function roundToCents(amount: number): number {
 
 export function SplitBillModal({
   isOpen,
-  totalAmount,
+  amountDue,
   items,
   onClose,
   onConfirm
 }: SplitBillModalProps) {
+  // CD-31 · Idioma de la carta: todos los rótulos se resuelven con `t()`.
+  const { t } = useLanguage();
   const [mode, setMode] = useState<SplitMode>('total');
   const [people, setPeople] = useState(2);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
 
+  // Blindaje numérico: la división solo puede operar sobre un monto positivo.
+  const safeAmountDue = Number.isFinite(amountDue) && amountDue > 0 ? amountDue : 0;
+
   const amountToPay = useMemo(() => {
-    if (mode === 'equal') return roundToCents(totalAmount / people);
+    if (mode === 'equal') return roundToCents(safeAmountDue / people);
     if (mode === 'dishes') {
-      return roundToCents(
-        items.reduce(
-          (sum, item) => sum + (selectedItems.includes(item.id) ? item.price : 0),
-          0
-        )
+      const selectedTotal = items.reduce(
+        (sum, item) => sum + (selectedItems.includes(item.id) ? item.price : 0),
+        0
       );
+      // La suma de platos nunca puede superar el saldo pendiente de la mesa.
+      return roundToCents(Math.min(selectedTotal, safeAmountDue));
     }
-    return roundToCents(totalAmount);
-  }, [items, mode, people, selectedItems, totalAmount]);
+    return roundToCents(safeAmountDue);
+  }, [items, mode, people, safeAmountDue, selectedItems]);
 
   const dialog = useDialog<HTMLElement>(isOpen, onClose);
 
@@ -64,9 +75,9 @@ export function SplitBillModal({
   };
 
   const modes: Array<{ id: SplitMode; label: string }> = [
-    { id: 'total', label: 'Pagar Total' },
-    { id: 'equal', label: 'Partes iguales' },
-    { id: 'dishes', label: 'Por platos' }
+    { id: 'total', label: t('splitBill.modeTotal') },
+    { id: 'equal', label: t('splitBill.modeEqual') },
+    { id: 'dishes', label: t('splitBill.modeDishes') }
   ];
 
   return (
@@ -85,16 +96,16 @@ export function SplitBillModal({
         <header className="flex items-start justify-between gap-4">
           <div>
             <h2 id="split-bill-title" className="text-lg font-bold">
-              ¿Cómo deseas pagar?
+              {t('splitBill.title')}
             </h2>
             <p className="mt-1 text-sm text-[#64748b] dark:text-[#a1a1aa]">
-              Total de la cuenta: S/ {totalAmount.toFixed(2)}
+Saldo pendiente: S/ {safeAmountDue.toFixed(2)}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label="Cerrar división de cuenta"
+            aria-label={t('splitBill.close')}
             className="rounded-full p-2 text-[#64748b] transition-colors hover:bg-[#f1f5f9] dark:hover:bg-[#24252e]"
           >
             <X aria-hidden="true" size={19} />
@@ -122,9 +133,9 @@ export function SplitBillModal({
         {mode === 'equal' && (
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-semibold">Personas</p>
+              <p className="text-sm font-semibold">{t('splitBill.guests')}</p>
               <p className="text-xs text-[#64748b] dark:text-[#a1a1aa]">
-                Monto por persona
+                {t('splitBill.amountPerPerson')}
               </p>
             </div>
             <div className="flex items-center gap-4">
@@ -132,7 +143,7 @@ export function SplitBillModal({
                 type="button"
                 onClick={() => setPeople((count) => Math.max(2, count - 1))}
                 disabled={people <= 2}
-                aria-label="Restar una persona"
+                aria-label={t('splitBill.removeGuest')}
                 className="flex h-9 w-9 items-center justify-center rounded-full text-[#c2410c] transition-colors hover:bg-[#fff1eb] disabled:opacity-40 dark:text-[#ffb59c] dark:hover:bg-[#24252e]"
               >
                 <Minus aria-hidden="true" size={17} />
@@ -144,7 +155,7 @@ export function SplitBillModal({
                 type="button"
                 onClick={() => setPeople((count) => Math.min(MAX_PEOPLE, count + 1))}
                 disabled={people >= MAX_PEOPLE}
-                aria-label="Sumar una persona"
+                aria-label={t('splitBill.addGuest')}
                 className="flex h-9 w-9 items-center justify-center rounded-full text-[#c2410c] transition-colors hover:bg-[#fff1eb] disabled:opacity-40 dark:text-[#ffb59c] dark:hover:bg-[#24252e]"
               >
                 <Plus aria-hidden="true" size={17} />
@@ -171,7 +182,7 @@ export function SplitBillModal({
                     <span className="block truncate font-medium">{item.name}</span>
                     {item.quantity > 1 && (
                       <span className="text-xs text-[#64748b] dark:text-[#a1a1aa]">
-                        Cantidad: {item.quantity}
+                        {t('splitBill.quantity', { count: item.quantity })}
                       </span>
                     )}
                   </span>
@@ -180,14 +191,14 @@ export function SplitBillModal({
               ))
             ) : (
               <p className="py-3 text-sm text-[#64748b] dark:text-[#a1a1aa]">
-                No hay platos de una comanda activa para seleccionar.
+                {t('splitBill.emptyItems')}
               </p>
             )}
           </div>
         )}
 
         <div className="flex items-center justify-between border-t border-[#e2e8f0] pt-4 dark:border-[#2a2b36]">
-          <span className="text-sm font-semibold">Monto a pagar</span>
+          <span className="text-sm font-semibold">{t('splitBill.amountToPay')}</span>
           <span className="text-lg font-bold tabular-nums text-[#c2410c] dark:text-[#ffb59c]">
             S/ {amountToPay.toFixed(2)}
           </span>
@@ -196,10 +207,10 @@ export function SplitBillModal({
         <button
           type="button"
           onClick={() => onConfirm(amountToPay)}
-          disabled={!Number.isFinite(amountToPay) || amountToPay <= 0}
+          disabled={!Number.isFinite(amountToPay) || amountToPay <= 0 || safeAmountDue <= 0}
           className="min-h-11 w-full rounded-xl bg-[#ff5708] px-4 py-3 text-sm font-bold text-[#2b0b00] transition-colors hover:bg-[#ff6924] disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Continuar al pago
+          {t('splitBill.continue')}
         </button>
       </section>
     </div>
