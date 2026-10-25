@@ -28,7 +28,7 @@ frontend-angular/   Angular 21 · standalone · signals · formularios reactivos
 
 ## Cómo ejecutarlo
 
-1. **MySQL**: debe estar corriendo en `localhost:3306`. La base `carta_digital_t2` y las tablas se crean solas.
+1. **MySQL** (guía detallada en [MYSQL_SETUP.md](MYSQL_SETUP.md)): debe estar corriendo en `localhost:3306`. La base `carta_digital_t2` y las tablas se crean solas.
    Usuario/clave por defecto `root`/`root`; si tu clave es otra, cámbiala en
    `backend/src/main/resources/application.properties` o usa variables de entorno:
 
